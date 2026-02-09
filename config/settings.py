@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 import os
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -48,7 +49,9 @@ INSTALLED_APPS = [
     
     
     # global apps
-    
+    'rest_framework',
+    'rest_framework_simplejwt.token_blacklist',
+    'rest_framework_simplejwt',
     
 ]
 
@@ -136,3 +139,40 @@ STATIC_ROOT = 'staticfiles'
 
 MEDIA_URL = '/media/'  # Brauzer orqali kirish yo'li
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')  # Serverda saqlanish joyi
+
+
+
+REST_FRAMEWORK = {
+    # Use Django's standard `django.contrib.auth` permissions,
+    # or allow read-only access for unauthenticated users.
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly'
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    )
+}
+
+
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=10), # minutes ga o'zgartirib qoyish kk, oxirida
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=10), # days ni 3 kun qilib qo'yish kk
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+}
+
+
+AUTHENTICATION_BACKENDS = [
+    'users.backend.CustomBackend',  # Passport orqali autentifikatsiya qilish uchun qo'shilgan backend
+    'django.contrib.auth.backends.ModelBackend',  # Simple JWT ishlatadigan standart backend
+]
+
+
+
+
