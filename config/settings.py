@@ -140,6 +140,7 @@ STATIC_ROOT = 'staticfiles'
 MEDIA_URL = '/media/'  # Brauzer orqali kirish yo'li
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')  # Serverda saqlanish joyi
 
+AUTH_USER_MODEL = 'accaunt.CustomUser'
 
 
 REST_FRAMEWORK = {
@@ -169,7 +170,7 @@ SIMPLE_JWT = {
 
 
 AUTHENTICATION_BACKENDS = [
-    'users.backend.CustomBackend',  # Passport orqali autentifikatsiya qilish uchun qo'shilgan backend
+    'accaunt.backend.CustomBackend',  # Passport orqali autentifikatsiya qilish uchun qo'shilgan backend
     'django.contrib.auth.backends.ModelBackend',  # Simple JWT ishlatadigan standart backend
 ]
 
