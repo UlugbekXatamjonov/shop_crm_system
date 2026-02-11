@@ -10,25 +10,11 @@ from store.models import Store, Branch
 
 phone_regex = RegexValidator(regex=r'^\+998\d{9}$', message="Telefon raqami '+998991234567' formatida kiritilishi kerak.")
 
-STATUS_CHOICES = (
-    ('active', 'Active'),
-    ('deactive', 'Deactive'),
+
+WORKER_STATUS = (
+    ('active',"Active"),
+    ('deactive',"Deactive"),
 )
-
-PERSONAL_STATUS = [
-        ("director", "Direktor"),
-        ("manager", "Mudir"),
-        
-        ("assistant", "Kotiba"),
-        ("worker", "Oddiy hodim"),
-        
-        ('teacher',"O'qtuvchi"),
-        ('assistant_teacher',"Asistent o'qtuvchi"),
-        
-        ('father',"Ota-ona"),
-        ('student',"O'quvchi"),
-]
-
 
 class UserManager(BaseUserManager):
     def create_user(self, first_name, last_name, email, username, is_superuser, is_staff,
@@ -96,6 +82,93 @@ class CustomUser(AbstractUser):
     
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
+
+
+
+""" ------------------- Permissions ------------------- """
+class Permission(models.Model):
+    """ Frontend va backend uchun permissionlar """
+
+    name = models.CharField(max_length=100)
+    code = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.code
+    
+
+class Role(models.Model):
+    """ Hodimlarning rol lari """
+    name = models.CharField(max_length=100)
+    code = models.CharField(max_length=50, unique=True)
+    permissions = models.ManyToManyField(
+        Permission, 
+        related_name='roles', 
+        blank=True
+    )
+
+    def __str__(self):
+        return self.name
+
+
+class Worker(models.Model):
+    """ Do'konda ishlovchi xodim """
+
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
+    role = models.ForeignKey(
+        Role,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='workers'
+    )
+
+    # Maxsus individual permissionlar (role’dan tashqari)
+    extra_permissions = models.ManyToManyField(
+        Permission,
+        blank=True,
+        related_name='workers'
+    )
+
+    store = models.ForeignKey(
+        Store, 
+        on_delete=models.CASCADE, 
+        related_name='workers',
+        null=True,
+        blank=True
+
+    )
+
+    branch = models.ForeignKey(
+        Branch, 
+        on_delete=models.CASCADE, 
+        related_name='workers',
+        null=True,
+        blank=True
+
+    )
+
+    salary = models.DecimalField(max_digits=12, decimal_places=2, default=100)
+    
+    status = models.CharField(max_length=10, choices=WORKER_STATUS, default='active')
+    created_on = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.first_name} {self.user.last_name}"
+
+    def get_permissions(self):
+        role_permissions = self.role.permissions.all() if self.role else Permission.objects.none()
+        extra_permissions = self.extra_permissions.all()
+        return set(role_permissions) | set(extra_permissions)
+
+    def has_permission(self, code):
+        return any(p.code == code for p in self.get_permissions())
+
+
+
+
+
+
+
 
 
 
