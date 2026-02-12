@@ -5,7 +5,7 @@ from django.contrib.auth import authenticate
 from pprint import pprint
 
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly, AllowAny
 from rest_framework.response import Response
 from rest_framework import status, generics
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -36,6 +36,7 @@ def get_tokens_for_user(user):
 
 class UserRegistrationView(APIView):
     # renderer_classes = [UserRenderer]
+    permission_classes = [AllowAny]
 
     def post(self, request, format=None):
         serializer = UserRegistrationSerializer(data=request.data)
@@ -46,6 +47,8 @@ class UserRegistrationView(APIView):
 
 
 class UserLoginView(APIView):
+    permission_classes = [AllowAny]
+    
     def post(self, request, *args, **kwargs):
         serializer = UserLoginSerializer(data=request.data)
              
@@ -109,6 +112,10 @@ class UserPasswordResetView(APIView):
 
 
 
-
+class UserProfile_View(viewsets.ModelViewSet):
+    queryset = CustomUser.objects.all()
+    serializer_class = UserProfileSerializer
+    permission_classes = [IsAuthenticated]
+    
 
 

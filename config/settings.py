@@ -157,7 +157,7 @@ REST_FRAMEWORK = {
 
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=10), # minutes ga o'zgartirib qoyish kk, oxirida
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=10), # minutes ga o'zgartirib qoyish kk, oxirida ❗❗❗❗
     'REFRESH_TOKEN_LIFETIME': timedelta(days=10), # days ni 3 kun qilib qo'yish kk
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,

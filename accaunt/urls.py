@@ -4,7 +4,8 @@
 from django.urls import path
 from .views import (
     UserRegistrationView, UserLoginView, LogoutAPIView,
-    UserChangePasswordView, SendPasswordResetEmailView, UserPasswordResetView
+    UserChangePasswordView, SendPasswordResetEmailView, UserPasswordResetView,
+    UserProfile_View
 )
 
 urlpatterns = [
@@ -14,6 +15,8 @@ urlpatterns = [
     path('change-password/', UserChangePasswordView.as_view(), name='change-password'),
     path('send-reset-email/', SendPasswordResetEmailView.as_view(), name='send-reset-email'),
     path('reset-password/<uid>/<token>/', UserPasswordResetView.as_view(), name='reset-password'),
+    path('profil/', UserProfile_View.as_view({'get': 'list'}), name='profil/'),
+
 ]
 
 

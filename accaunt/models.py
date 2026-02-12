@@ -4,8 +4,6 @@ from django.core.validators import RegexValidator
 from django.utils.text import slugify
 from django.utils.html import mark_safe
 
-from store.models import Store, Branch
-
 # Create your models here.
 
 phone_regex = RegexValidator(regex=r'^\+998\d{9}$', message="Telefon raqami '+998991234567' formatida kiritilishi kerak.")
@@ -130,7 +128,7 @@ class Worker(models.Model):
     )
 
     store = models.ForeignKey(
-        Store, 
+        'store.Store', 
         on_delete=models.CASCADE, 
         related_name='workers',
         null=True,
@@ -139,7 +137,7 @@ class Worker(models.Model):
     )
 
     branch = models.ForeignKey(
-        Branch, 
+        'store.Branch', 
         on_delete=models.CASCADE, 
         related_name='workers',
         null=True,
