@@ -53,8 +53,8 @@ class UserLoginView(APIView):
             user = serializer.validated_data['user']
 
             """ Login bo'lgan userning ma'lumotlarini bazadan username bo'yicha olamiz  """
-            active_user = CustomUser.objects.get(username=serializer.data['username'])
-            active_user_serializer = UserProfileSerializer(active_user)
+            active_user_serializer = UserProfileSerializer(user)  # user = serializer.validated_data['user']
+            
             
             refresh = RefreshToken.for_user(user)
             

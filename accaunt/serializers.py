@@ -95,7 +95,7 @@ class UserChangePasswordSerializer(serializers.Serializer):
     password = attrs.get('password')
     password2 = attrs.get('password2')
     if password != password2:
-      raise serializers.ValidationError("parol muvaffaqiyatli o'zgartirildi !")
+      raise serializers.ValidationError("Kiritilgan parollar bir xil emas !")
     user = self.context.get('user')
     user.set_password(password)
     user.save()
@@ -156,8 +156,7 @@ class UserPasswordResetSerializer(serializers.Serializer):
             user.set_password(password)
             user.save()
             return attrs
-        except DjangoUnicodeDecodeError as identifier:
-            PasswordResetTokenGenerator().check_token(user, token)
+        except (DjangoUnicodeDecodeError, CustomUser.DoesNotExist):
             raise serializers.ValidationError('Token is not Valid or Expired')
      
   
@@ -172,8 +171,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = CustomUser
         fields = (
             "id",
+            "username",
+            "first_name",
+            "last_name",
+            "email",
             "phone1",
             "phone2",
+            "status"            
         )
     
   

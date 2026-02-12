@@ -17,9 +17,9 @@ WORKER_STATUS = (
 )
 
 class UserManager(BaseUserManager):
-    def create_user(self, first_name, last_name, email, username, is_superuser, is_staff,
-                    phone1, phone2,
-                    password=None): 
+    def create_user(self, username, email, phone1, password=None,
+                first_name='', last_name='', 
+                is_superuser=False, is_staff=False, phone2=None): 
 
         if not username:
             raise ValueError("Foydalanuvchida 'username' bo'lishi shart !")
@@ -51,8 +51,8 @@ class UserManager(BaseUserManager):
             is_superuser = 1,
             is_staff = 1,
             
-            phone1 = '998990000000',
-            phone2 = '998990000001',
+            phone1 = '+998990000000',
+            phone2 = '+998990000001',
         )
         user.is_admin = True
         user.save(using=self._db)
