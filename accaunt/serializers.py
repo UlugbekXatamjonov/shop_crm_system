@@ -14,11 +14,12 @@ from .utils import Util
 
 """ Serialization for CustomUser Authentification """
 class UserRegistrationSerializer(serializers.ModelSerializer):
+    
   # Ro'yhatdan o'tish vaqtida parolni tekshirish uchun password2 maydoni yaratib olindi
-  password2 = serializers.CharField(style={'input_type':'password'}, write_only=True)
-  class Meta:
-    model = CustomUser
-    fields = (
+    password2 = serializers.CharField(style={'input_type':'password'}, write_only=True)
+    class Meta:
+        model = CustomUser
+        fields = (
             "password",
             "password2", 
             "first_name",
@@ -27,22 +28,22 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             "username",
             "phone1",
             "phone2",
-        )
-    extra_kwargs={
-      'password':{'write_only':True}
-    }
+            )
+        extra_kwargs={
+        'password':{'write_only':True}
+        }
 
-  # parollarni validatsiyadan o'tkazish va bir biriga mosligini tekshirib chiqamiz
-  def validate(self, attrs):
-    password = attrs.get('password')
-    password2 = attrs.get('password2')
-    if password != password2:
-      raise serializers.ValidationError("Kiritilgan parollar birxil emas !!!")
-    return attrs
+    # parollarni validatsiyadan o'tkazish va bir biriga mosligini tekshirib chiqamiz
+    def validate(self, attrs):
+        password = attrs.get('password')
+        password2 = attrs.get('password2')
+        if password != password2:
+            raise serializers.ValidationError("Kiritilgan parollar birxil emas !!!")
+        return attrs
 
-  def create(self, validate_data):
-    validate_data.pop('password2') 
-    return CustomUser.objects.create_user(**validate_data)
+    def create(self, validate_data):
+        validate_data.pop('password2') 
+        return CustomUser.objects.create_user(**validate_data)
 
 
 class UserLoginSerializer(serializers.Serializer):
@@ -78,28 +79,28 @@ class LogoutSerializer(serializers.Serializer):
       
 
 class UserChangePasswordSerializer(serializers.Serializer):
-  current_password = serializers.CharField(max_length=255, style={'input_type':'password'}, write_only=True)
-  password = serializers.CharField(max_length=255, style={'input_type':'password'}, write_only=True)
-  password2 = serializers.CharField(max_length=255, style={'input_type':'password'}, write_only=True)
+    current_password = serializers.CharField(max_length=255, style={'input_type':'password'}, write_only=True)
+    password = serializers.CharField(max_length=255, style={'input_type':'password'}, write_only=True)
+    password2 = serializers.CharField(max_length=255, style={'input_type':'password'}, write_only=True)
 
-  class Meta:
-    fields = ['current_password', 'password', 'password2']
+    class Meta:
+        fields = ['current_password', 'password', 'password2']
 
-  def validate_current_password(self, value):
-    user = self.context.get('user')
-    if not user.check_password(value):
-      raise serializers.ValidationError("Joriy parol noto'g'ri kiritildi !")
-    return value
+    def validate_current_password(self, value):
+        user = self.context.get('user')
+        if not user.check_password(value):
+            raise serializers.ValidationError("Joriy parol noto'g'ri kiritildi !")
+        return value
 
-  def validate(self, attrs):
-    password = attrs.get('password')
-    password2 = attrs.get('password2')
-    if password != password2:
-      raise serializers.ValidationError("Kiritilgan parollar bir xil emas !")
-    user = self.context.get('user')
-    user.set_password(password)
-    user.save()
-    return attrs
+    def validate(self, attrs):
+        password = attrs.get('password')
+        password2 = attrs.get('password2')
+        if password != password2:
+            raise serializers.ValidationError("Kiritilgan parollar bir xil emas !")
+        user = self.context.get('user')
+        user.set_password(password)
+        user.save()
+        return attrs
 
 
 class SendPasswordResetEmailSerializer(serializers.Serializer):

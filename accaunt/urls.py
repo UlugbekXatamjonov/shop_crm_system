@@ -13,8 +13,8 @@ urlpatterns = [
     path('login/', UserLoginView.as_view(), name='login'),
     path('logout/', LogoutAPIView.as_view(), name='logout'),
     path('change-password/', UserChangePasswordView.as_view(), name='change-password'),
-    path('send-reset-email/', SendPasswordResetEmailView.as_view(), name='send-reset-email'),
-    path('reset-password/<uid>/<token>/', UserPasswordResetView.as_view(), name='reset-password'),
+    # path('send-reset-email/', SendPasswordResetEmailView.as_view(), name='send-reset-email'),
+    # path('reset-password/<uid>/<token>/', UserPasswordResetView.as_view(), name='reset-password'),
     path('profil/', UserProfile_View.as_view({'get': 'list'}), name='profil/'),
 
 ]
