@@ -22,7 +22,7 @@ from .serializers import \
         UserChangePasswordSerializer,\
         SendPasswordResetEmailSerializer,\
         UserPasswordResetSerializer,\
-        UserProfileSerializer
+        CustomUser_Profile_Serializer
 
 
 
@@ -56,7 +56,7 @@ class UserLoginView(APIView):
             user = serializer.validated_data['user']
 
             """ Login bo'lgan userning ma'lumotlarini bazadan username bo'yicha olamiz  """
-            active_user_serializer = UserProfileSerializer(user)  # user = serializer.validated_data['user']
+            active_user_serializer = CustomUser_Profile_Serializer(user)  # user = serializer.validated_data['user']
             
             
             refresh = RefreshToken.for_user(user)
@@ -112,9 +112,9 @@ class UserPasswordResetView(APIView):
 
 
 
-class UserProfile_View(viewsets.ModelViewSet):
+class Worker_Profile_View(viewsets.ModelViewSet):
     queryset = CustomUser.objects.all()
-    serializer_class = UserProfileSerializer
+    serializer_class = CustomUser_Profile_Serializer
     permission_classes = [IsAuthenticated]
     
 

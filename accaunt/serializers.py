@@ -164,9 +164,27 @@ class UserPasswordResetSerializer(serializers.Serializer):
   
   
 """ ---------------- Serialization for User ---------------- """
-  
-class UserProfileSerializer(serializers.ModelSerializer): 
+class Worker_Profile_Serializer(serializers.ModelSerializer): 
     """ User login bo'lganda, tokenga qo'shimcha ravishda uning ma'lumotlarini yuborish uchun serializer """
+    
+    class Meta:
+        model = Worker
+        fields = '__all__'
+        # fields = (
+        #     "id",
+        #     # "user__first_name",
+        #     "role",
+        #     "extra_permissions",
+        #     "store",
+        #     "branch",
+        #     "salary",
+        #     "status",           
+        # )  
+        
+        
+class CustomUser_Profile_Serializer(serializers.ModelSerializer): 
+    """ User login bo'lganda, tokenga qo'shimcha ravishda uning ma'lumotlarini yuborish uchun serializer """
+    worker = Worker_Profile_Serializer(many=True, read_only=True)
     
     class Meta:
         model = CustomUser
@@ -178,8 +196,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "email",
             "phone1",
             "phone2",
-            "status"            
+            "status",
+            'worker'         
         )
+        
+
     
   
 # class CustomUser_Create_Serializer(serializers.ModelSerializer):

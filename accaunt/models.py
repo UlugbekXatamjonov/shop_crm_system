@@ -112,7 +112,7 @@ class Role(models.Model):
 class Worker(models.Model):
     """ Do'konda ishlovchi xodim """
 
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='worker')
     role = models.ForeignKey(
         Role,
         on_delete=models.SET_NULL,
