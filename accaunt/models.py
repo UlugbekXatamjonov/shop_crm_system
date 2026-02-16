@@ -3,6 +3,8 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.core.validators import RegexValidator
 from django.utils.text import slugify
 from django.utils.html import mark_safe
+from store.models import Store, Branch
+
 
 # Create your models here.
 

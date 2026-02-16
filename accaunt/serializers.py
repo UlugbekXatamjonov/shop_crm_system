@@ -164,27 +164,77 @@ class UserPasswordResetSerializer(serializers.Serializer):
   
   
 """ ---------------- Serialization for User ---------------- """
+from django.utils.encoding import smart_str, force_bytes, DjangoUnicodeDecodeError
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth import authenticate
+
+from rest_framework import serializers
+from rest_framework_simplejwt.tokens import RefreshToken, TokenError
+
+from .models import CustomUser, Worker, Role, Permission
+from store.models import Store, Branch
+from .utils import Util
+
+
+# ========== Yordamchi Serializer'lar ==========
+
+class RoleSerializer(serializers.ModelSerializer):
+    """Role ning ID, nomi va kodi"""
+    class Meta:
+        model = Role
+        fields = ('id', 'name', 'code')
+
+
+
+# ========== Worker Profile Serializer ==========
+
 class Worker_Profile_Serializer(serializers.ModelSerializer): 
-    """ User login bo'lganda, tokenga qo'shimcha ravishda uning ma'lumotlarini yuborish uchun serializer """
+    """
+    Worker profili - Faqat permission code'lar
+    get_permissions() metodi Role + Extra permissionlarni birlashtiradi
+    """
+    role = RoleSerializer(read_only=True)
+
+    store_id = serializers.IntegerField(source='store.id', read_only=True)
+    store_name = serializers.CharField(source='store.name', read_only=True)
+    
+    branch_id = serializers.IntegerField(source='branch.id', read_only=True)
+    branch_name = serializers.CharField(source='branch.name', read_only=True)
+    
+    # Faqat permission code'lar (string array)
+    permissions = serializers.SerializerMethodField()
     
     class Meta:
         model = Worker
-        # fields = '__all__'
         fields = (
             "id",
-            # "user__first_name",
             "role",
-            "extra_permissions",
-            "store",
-            "branch",
-            "salary",
+            "permissions",  # ["product.view", "product.add", ...]
+            "store_id",
+            "store_name",
+            "branch_id",
+            "branch_name",
+            # "branch",
+            # "salary",
             "status",           
-        )  
-        
-        
+        )
+    
+    def get_permissions(self, obj):
+        """
+        get_permissions() metodidan foydalanish
+        Role permissions + Extra permissions = Faqat code'lar
+        """
+        all_permissions = obj.get_permissions()  # Set qaytaradi
+        return [p.code for p in all_permissions]
+
+
 class CustomUser_Profile_Serializer(serializers.ModelSerializer): 
-    """ User login bo'lganda, tokenga qo'shimcha ravishda uning ma'lumotlarini yuborish uchun serializer """
-    worker = Worker_Profile_Serializer( read_only=True)
+    """
+    User profili - Worker ma'lumotlari bilan
+    """
+    worker = Worker_Profile_Serializer(read_only=True)
     
     class Meta:
         model = CustomUser
@@ -199,44 +249,6 @@ class CustomUser_Profile_Serializer(serializers.ModelSerializer):
             "status",
             'worker'         
         )
-        
 
-    
-  
-# class CustomUser_Create_Serializer(serializers.ModelSerializer):
-#   """
-#   OnetoOneField bog'lanish bo'yicha ulangan modellarda O'qtuvchi, Xodim, O'quvchi, Ota-ona ni qo'shish vaqtida,
-#   CustomUser ni ham yaratib ketish uchun ushbu serializerdan foydalanildi.
-#   """
-  
-#   class Meta:
-#       model = CustomUser
-#       fields = ['passport', 'password', 'email', 'first_name', 'last_name', 'date_of_bith', 'phone1', 'phone2', 
-#                   'gender', 'personal_status', 'address', 'status']
-
-
-# class CustomUser_List_Serializer(serializers.ModelSerializer):
-#   """
-#   OnetoOneField bog'lanish bo'yicha ulangan modellarda O'qtuvchi, Xodim, O'quvchi, Ota-ona ning malumotlarini olish
-#     uchun ushbu serializerdan foydalanildi.
-#   """
-  
-#   class Meta:
-#       model = CustomUser
-#       fields = ['id','passport', 'first_name', 'last_name', 'date_of_bith', 'phone1', 'phone2', 
-#                   'gender', 'personal_status', 'status']
-
-
-# class CustomUser_datas_for_Teachers_list_Serializer(serializers.ModelSerializer):
-#   """
-#   OnetoOneField bog'lanish bo'yicha ulangan O'quvchi malumotlarini Teachers list bo'limiga olish
-#   uchun ushbu serializerdan foydalanildi.
-#   """
-  
-#   class Meta:
-#       model = CustomUser
-#       fields = ['first_name', 'last_name','phone1', 'phone2', 
-#                 'gender', 'personal_status', 'status']
-      
       
       

@@ -1,12 +1,19 @@
 # ❌ urls.py butunlay bo'sh, hech qanday URL yo'q
 # ✅ Kamida quyidagilar bo'lishi kerak:
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 
-from django.urls import path
+
 from .views import (
     UserRegistrationView, UserLoginView, LogoutAPIView,
     UserChangePasswordView, SendPasswordResetEmailView, UserPasswordResetView,
     Worker_Profile_View
 )
+
+# Router yaratish
+# router = DefaultRouter()
+# router.register(r'profil', Worker_Profile_View, basename='profil')
+
 
 urlpatterns = [
     path('register/', UserRegistrationView.as_view(), name='register'),
@@ -15,8 +22,10 @@ urlpatterns = [
     path('change-password/', UserChangePasswordView.as_view(), name='change-password'),
     # path('send-reset-email/', SendPasswordResetEmailView.as_view(), name='send-reset-email'),
     # path('reset-password/<uid>/<token>/', UserPasswordResetView.as_view(), name='reset-password'),
-    path('profil/', Worker_Profile_View.as_view({'get': 'list'}), name='profil/'),
+
+
+    path('profil/', Worker_Profile_View.as_view({'get': 'retrieve'}), name='my-profile'),
 
 ]
-
+# urlpatterns += router.urls
 

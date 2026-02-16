@@ -9,7 +9,7 @@ from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnl
 from rest_framework.response import Response
 from rest_framework import status, generics
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework import viewsets
+from rest_framework import viewsets, mixins
 
 
 from .renderers import UserRenderer
@@ -112,10 +112,23 @@ class UserPasswordResetView(APIView):
 
 
 
-class Worker_Profile_View(viewsets.ModelViewSet):
-    queryset = CustomUser.objects.all()
+class Worker_Profile_View(
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet
+):
+    """
+    Faqat o'z profilini ko'rish
+    - Faqat retrieve action (GET /profil/me/)
+    - Permission code'lar get_permissions() orqali olinadi
+    """
     serializer_class = CustomUser_Profile_Serializer
     permission_classes = [IsAuthenticated]
     
-
-
+    def get_queryset(self):
+        """Faqat o'z profilini ko'rsatish"""
+        return CustomUser.objects.filter(id=self.request.user.id)
+    
+    def get_object(self):
+        """Faqat o'z profilini olish"""
+        return self.request.user
+    
