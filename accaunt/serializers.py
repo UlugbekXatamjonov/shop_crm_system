@@ -169,22 +169,22 @@ class Worker_Profile_Serializer(serializers.ModelSerializer):
     
     class Meta:
         model = Worker
-        fields = '__all__'
-        # fields = (
-        #     "id",
-        #     # "user__first_name",
-        #     "role",
-        #     "extra_permissions",
-        #     "store",
-        #     "branch",
-        #     "salary",
-        #     "status",           
-        # )  
+        # fields = '__all__'
+        fields = (
+            "id",
+            # "user__first_name",
+            "role",
+            "extra_permissions",
+            "store",
+            "branch",
+            "salary",
+            "status",           
+        )  
         
         
 class CustomUser_Profile_Serializer(serializers.ModelSerializer): 
     """ User login bo'lganda, tokenga qo'shimcha ravishda uning ma'lumotlarini yuborish uchun serializer """
-    worker = Worker_Profile_Serializer(many=True, read_only=True)
+    worker = Worker_Profile_Serializer( read_only=True)
     
     class Meta:
         model = CustomUser
