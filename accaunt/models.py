@@ -2,15 +2,18 @@
 ============================================================
 ACCAUNT APP — Modellar
 ============================================================
-Bu fayl tizimning barcha foydalanuvchi va ruxsat modellarini
-o'z ichiga oladi:
+Modellar:
+  CustomUser   — Kengaytirilgan foydalanuvchi modeli
+  UserManager  — CustomUser uchun manager
+  WorkerRole   — Sobit hodim rollari (TextChoices)
+  Worker       — Do'kon hodimi
+  AuditLog     — Tizim amallari jurnali
 
-  CustomUser  — Kengaytirilgan foydalanuvchi modeli
-  UserManager — CustomUser uchun manager
-  Permission  — Frontend/backend ruxsatlar
-  Role        — Hodim rollari
-  Worker      — Do'kon hodimi
-  AuditLog    — Tizim amallari jurnali
+Ruxsat tizimi:
+  - Rollar sobit: owner, manager, sotuvchi
+  - Har bir permission = frontendda bitta bo'lim (sahifa)
+  - ROLE_PERMISSIONS — har bir rolning standart permission ro'yxati
+  - Worker.extra_permissions — individual qo'shish/olib tashlash (JSONField)
 """
 
 from django.db import models
@@ -22,7 +25,6 @@ from django.core.validators import RegexValidator
 # VALIDATORLAR
 # ============================================================
 
-# O'zbekiston telefon raqami formati: +998901234567
 phone_regex = RegexValidator(
     regex=r'^\+998\d{9}$',
     message="Telefon raqami '+998901234567' formatida bo'lishi kerak."
@@ -30,12 +32,79 @@ phone_regex = RegexValidator(
 
 
 # ============================================================
-# KONSTANTLAR
+# HODIM ROLLARI (Sobit — DB da saqlanmaydi)
+# ============================================================
+
+class WorkerRole(models.TextChoices):
+    """
+    Do'kon hodimlarining rollari.
+    Har bir rol o'ziga xos permission to'plamiga ega.
+    Rollar sobit — kod ichida belgilangan, DB dan o'zgartirib bo'lmaydi.
+    """
+    OWNER    = 'owner',    'Egasi'
+    MANAGER  = 'manager',  'Menejer'
+    SOTUVCHI = 'sotuvchi', 'Sotuvchi'
+
+
+# ============================================================
+# PERMISSION KODLARI (Frontendning bo'limlari)
+# ============================================================
+
+# Tizimda mavjud barcha permission kodlar.
+# Har bir kod = frontendda bitta bo'lim (sahifa).
+# O'sha bo'limga kirish ruxsati bor bo'lsa — bo'lim to'liq ochiladi.
+ALL_PERMISSIONS: list[str] = [
+    'boshqaruv',   # Boshqaruv paneli (Dashboard)
+    'sotuv',       # Sotuv oynasi (POS — kassa)
+    'dokonlar',    # Do'konlar va filiallar
+    'sklad',       # Sklad (ombor)
+    'mahsulotlar', # Mahsulotlar katalogi
+    'xodimlar',    # Xodimlarni boshqarish
+    'savdolar',    # Savdolar tarixi va hisobotlar
+    'xarajatlar',  # Xarajatlarni boshqarish
+    'mijozlar',    # Mijozlar bazasi
+    'sozlamalar',  # Do'kon sozlamalari
+]
+
+
+# ============================================================
+# ROLLAR VA ULARNING STANDART PERMISSION'LARI
+# ============================================================
+
+# Har bir rolning standart permission kodlari.
+# Individual worker uchun extra_permissions orqali qo'shish/olib tashlash mumkin.
+ROLE_PERMISSIONS: dict[str, list[str]] = {
+
+    # Egasi — barcha bo'limlarga kirish huquqi bor
+    WorkerRole.OWNER: [
+        'boshqaruv', 'sotuv', 'dokonlar', 'sklad',
+        'mahsulotlar', 'xodimlar', 'savdolar',
+        'xarajatlar', 'mijozlar', 'sozlamalar',
+    ],
+
+    # Menejer — sozlamalardan tashqari hamma bo'lim
+    WorkerRole.MANAGER: [
+        'boshqaruv', 'sotuv', 'dokonlar', 'sklad',
+        'mahsulotlar', 'xodimlar', 'savdolar',
+        'xarajatlar', 'mijozlar',
+        # 'sozlamalar' yo'q — faqat egasi sozlamalarni boshqaradi
+    ],
+
+    # Sotuvchi — faqat savdo va mahsulot bo'limlari
+    WorkerRole.SOTUVCHI: [
+        'sotuv', 'savdolar', 'mijozlar',
+        'sklad', 'mahsulotlar',
+    ],
+}
+
+
+# ============================================================
+# HODIM HOLATLARI
 # ============================================================
 
 class WorkerStatus(models.TextChoices):
     """Hodim faollik holatlari"""
-    ACTIVE = 'active', 'Faol'
+    ACTIVE   = 'active',   'Faol'
     DEACTIVE = 'deactive', 'Faol emas'
 
 
@@ -61,10 +130,7 @@ class UserManager(BaseUserManager):
         is_staff: bool = False,
         phone2: str = None,
     ) -> 'CustomUser':
-        """
-        Oddiy foydalanuvchi yaratish.
-        username va phone1 majburiy maydonlar.
-        """
+        """Oddiy foydalanuvchi yaratish."""
         if not username:
             raise ValueError("Foydalanuvchi 'username' bo'lishi shart!")
 
@@ -88,10 +154,7 @@ class UserManager(BaseUserManager):
         username: str,
         password: str = None,
     ) -> 'CustomUser':
-        """
-        Superadmin yaratish.
-        Barcha ruxsatlar avtomatik beriladi.
-        """
+        """Superadmin yaratish — barcha ruxsatlar avtomatik beriladi."""
         user = self.create_user(
             password=password,
             first_name='Super',
@@ -114,11 +177,11 @@ class CustomUser(AbstractUser):
     """
     Kengaytirilgan foydalanuvchi modeli.
 
-    Django standart User modeliga qo'shimcha maydonlar:
+    Qo'shimcha maydonlar:
       phone1    — Asosiy telefon raqam (majburiy)
       phone2    — Qo'shimcha telefon raqam (ixtiyoriy)
-      status    — Faollik holati (True = faol)
-      created_on — Ro'yxatga olingan sana
+      status    — Faollik holati (True = faol, False = bloklangan)
+      created_on — Ro'yxatga olingan vaqt
     """
 
     phone1 = models.CharField(
@@ -158,85 +221,6 @@ class CustomUser(AbstractUser):
 
 
 # ============================================================
-# PERMISSION (Ruxsat)
-# ============================================================
-
-class Permission(models.Model):
-    """
-    Tizim ruxsatlari.
-    Frontend va backend uchun alohida ruxsat kodlari.
-
-    Misol:
-      name="Mahsulot qo'shish", code="product.add"
-      name="Hisobotni ko'rish", code="report.view"
-    """
-
-    name = models.CharField(
-        max_length=100,
-        verbose_name="Nomi"
-    )
-    code = models.CharField(
-        max_length=100,
-        unique=True,
-        verbose_name="Kodi",
-        help_text="Masalan: product.add, report.view, trade.create"
-    )
-    description = models.TextField(
-        blank=True,
-        verbose_name="Tavsifi"
-    )
-
-    class Meta:
-        verbose_name = 'Ruxsat'
-        verbose_name_plural = 'Ruxsatlar'
-        ordering = ['code']
-
-    def __str__(self) -> str:
-        return self.code
-
-
-# ============================================================
-# ROLE (Rol)
-# ============================================================
-
-class Role(models.Model):
-    """
-    Hodim rollari.
-    Har bir rol bir nechta ruxsatlarni o'z ichiga oladi.
-
-    Standart rollar:
-      owner   — Do'kon egasi (barcha huquqlar)
-      manager — Menejer (boshqaruv huquqlari)
-      cashier — Kassir (savdo huquqlari)
-      viewer  — Kuzatuvchi (faqat ko'rish)
-    """
-
-    name = models.CharField(
-        max_length=100,
-        verbose_name="Nomi"
-    )
-    code = models.CharField(
-        max_length=50,
-        unique=True,
-        verbose_name="Kodi",
-        help_text="Masalan: owner, manager, cashier, viewer"
-    )
-    permissions = models.ManyToManyField(
-        Permission,
-        related_name='roles',
-        blank=True,
-        verbose_name="Ruxsatlar"
-    )
-
-    class Meta:
-        verbose_name = 'Rol'
-        verbose_name_plural = 'Rollar'
-
-    def __str__(self) -> str:
-        return f"{self.name} ({self.code})"
-
-
-# ============================================================
 # WORKER (Hodim)
 # ============================================================
 
@@ -246,11 +230,19 @@ class Worker(models.Model):
 
     Har bir hodim:
       - Bitta CustomUser bilan bog'liq (OneToOne)
-      - Bitta rolga ega (FK → Role)
-      - Qo'shimcha individual ruxsatlarga ega bo'lishi mumkin
-      - Bitta do'kon va filialga biriktiriladi
+      - Sobit rollardan biriga ega: owner, manager, sotuvchi
+      - Do'kon va filialga biriktiriladi
+      - extra_permissions orqali individual permission sozlanishi mumkin
 
-    Do'kon egasi ham Worker hisoblanadi — 'owner' roli bilan.
+    Permission tizimi:
+      1. ROLE_PERMISSIONS[worker.role] → rolning standart permission'lari
+      2. extra_permissions['added']   → qo'shimcha berilgan permission'lar
+      3. extra_permissions['removed'] → olib tashlangan permission'lar
+      Yakuniy = (standart + qo'shilgan) - olib tashlangan
+
+    Misol:
+      sotuvchi + added=['xarajatlar'] − removed=['sklad']
+      → ['sotuv', 'savdolar', 'mijozlar', 'mahsulotlar', 'xarajatlar']
     """
 
     user = models.OneToOneField(
@@ -259,20 +251,11 @@ class Worker(models.Model):
         related_name='worker',
         verbose_name="Foydalanuvchi"
     )
-    role = models.ForeignKey(
-        Role,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='workers',
+    role = models.CharField(
+        max_length=20,
+        choices=WorkerRole.choices,
+        default=WorkerRole.SOTUVCHI,
         verbose_name="Roli"
-    )
-    # Rol ruxsatlaridan tashqari qo'shimcha individual ruxsatlar
-    extra_permissions = models.ManyToManyField(
-        Permission,
-        blank=True,
-        related_name='workers',
-        verbose_name="Qo'shimcha ruxsatlar"
     )
     store = models.ForeignKey(
         'store.Store',
@@ -288,7 +271,7 @@ class Worker(models.Model):
         related_name='workers',
         null=True,
         blank=True,
-        verbose_name="Filioli"
+        verbose_name="Filiali"
     )
     salary = models.DecimalField(
         max_digits=12,
@@ -302,6 +285,18 @@ class Worker(models.Model):
         default=WorkerStatus.ACTIVE,
         verbose_name="Holati"
     )
+
+    # Individual permission o'zgarishlari.
+    # Format: {"added": ["sozlamalar"], "removed": ["sklad"]}
+    # - added   → ushbu hodimga qo'shimcha berilgan bo'limlar
+    # - removed → ushbu hodimdan olib tashlangan bo'limlar
+    extra_permissions = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Individual permission o'zgarishlar",
+        help_text='Format: {"added": ["sozlamalar"], "removed": ["sklad"]}'
+    )
+
     created_on = models.DateTimeField(
         auto_now_add=True,
         verbose_name="Qo'shilgan vaqti"
@@ -312,28 +307,36 @@ class Worker(models.Model):
         verbose_name_plural = 'Hodimlar'
 
     def __str__(self) -> str:
-        return f"{self.user} — {self.role}"
+        return f"{self.user} ({self.get_role_display()})"
 
-    def get_permissions(self) -> set:
+    def get_permissions(self) -> list[str]:
         """
-        Hodimning barcha ruxsatlarini qaytaradi.
-        Rol ruxsatlari + qo'shimcha individual ruxsatlar birlashtirilib
-        Set sifatida qaytariladi (takrorlar yo'q).
+        Hodimning yakuniy permission ro'yxatini qaytaradi.
+
+        Hisoblash:
+          1. Rolning standart permission'larini oladi
+          2. Qo'shimcha berilgan permission'larni qo'shadi
+          3. Olib tashlangan permission'larni chiqaradi
+          4. Alifbo tartibida saralangan ro'yxat qaytaradi
+
+        Returns:
+            Hodim kira oladigan bo'limlar ro'yxati (masalan: ['mahsulotlar', 'sotuv'])
         """
-        role_permissions = self.role.permissions.all() if self.role else Permission.objects.none()
-        extra_permissions = self.extra_permissions.all()
-        return set(role_permissions) | set(extra_permissions)
+        base    = set(ROLE_PERMISSIONS.get(self.role, []))
+        added   = set(self.extra_permissions.get('added', []))
+        removed = set(self.extra_permissions.get('removed', []))
+        return sorted((base | added) - removed)
 
     def has_permission(self, code: str) -> bool:
         """
-        Hodimda berilgan ruxsat mavjudligini tekshiradi.
+        Hodimda berilgan bo'limga kirish ruxsati borligini tekshiradi.
 
         Args:
-            code: Ruxsat kodi (masalan: 'product.add', 'report.view')
+            code: Permission kodi (masalan: 'mahsulotlar', 'sotuv')
         Returns:
-            True — ruxsat mavjud, False — yo'q
+            True — ruxsat mavjud, False — mavjud emas
         """
-        return any(p.code == code for p in self.get_permissions())
+        return code in self.get_permissions()
 
 
 # ============================================================
@@ -346,12 +349,6 @@ class AuditLog(models.Model):
 
     Har qanday muhim amal (yaratish, o'chirish, tizimga kirish va h.k.)
     bu modelda qayd etiladi. Xavfsizlik auditi va monitoring uchun kerak.
-
-    Misol:
-      Kim: Ahmadov Alisher
-      Nima qildi: Mahsulot yaratdi
-      Qaysi ob'ektga: Product #42
-      Qachon: 2026-02-18 10:30:00
     """
 
     class Action(models.TextChoices):
@@ -359,11 +356,11 @@ class AuditLog(models.Model):
         CREATE = 'create', 'Yaratdi'
         UPDATE = 'update', 'Yangiladi'
         DELETE = 'delete', "O'chirdi"
-        LOGIN = 'login', 'Tizimga kirdi'
+        LOGIN  = 'login',  'Tizimga kirdi'
         LOGOUT = 'logout', 'Tizimdan chiqdi'
         ASSIGN = 'assign', "Tayinladi"
 
-    # Kim amal bajardi (foydalanuvchi o'chirilsa, NULL qoladi — log saqlanadi)
+    # Kim amal bajardi (o'chirilsa NULL qoladi — log yo'qolmaydi)
     actor = models.ForeignKey(
         CustomUser,
         on_delete=models.SET_NULL,
@@ -372,36 +369,32 @@ class AuditLog(models.Model):
         related_name='audit_logs',
         verbose_name="Amal bajaruvchi"
     )
-    # Qanday amal bajarildi
     action = models.CharField(
         max_length=20,
         choices=Action.choices,
         verbose_name="Amal turi"
     )
-    # Qaysi model ustida amal bajarildi (masalan: 'Product', 'Trade')
+    # Qaysi model ustida amal bajarildi (masalan: 'Worker', 'Trade')
     target_model = models.CharField(
         max_length=100,
         blank=True,
         verbose_name="Model nomi"
     )
-    # O'sha modelning ID si
     target_id = models.PositiveIntegerField(
         null=True,
         blank=True,
         verbose_name="Ob'ekt ID"
     )
-    # Qisqacha tavsif (masalan: "iPhone 15 Pro qo'shildi")
     description = models.TextField(
         blank=True,
         verbose_name="Tavsifi"
     )
-    # Qo'shimcha ma'lumotlar JSON formatida (eski/yangi qiymatlar va h.k.)
+    # Qo'shimcha ma'lumotlar: eski/yangi qiymatlar, IP manzil va h.k.
     extra_data = models.JSONField(
         null=True,
         blank=True,
         verbose_name="Qo'shimcha ma'lumotlar"
     )
-    # Amal bajarilgan vaqt
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name="Vaqti"
@@ -410,7 +403,7 @@ class AuditLog(models.Model):
     class Meta:
         verbose_name = 'Audit log'
         verbose_name_plural = 'Audit loglar'
-        ordering = ['-created_at']  # Eng yangi log birinchi ko'rsatiladi
+        ordering = ['-created_at']
 
     def __str__(self) -> str:
         actor_name = str(self.actor) if self.actor else "Tizim"

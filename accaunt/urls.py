@@ -1,31 +1,35 @@
-# ❌ urls.py butunlay bo'sh, hech qanday URL yo'q
-# ✅ Kamida quyidagilar bo'lishi kerak:
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
+"""
+============================================================
+ACCAUNT APP — Auth URL'lari
+============================================================
+Faqat autentifikatsiya bilan bog'liq endpointlar.
+Worker CRUD endpointlari → accaunt/api_urls.py da.
 
+Prefix: /api/v1/auth/
+"""
 
+from django.urls import path
 from .views import (
-    UserRegistrationView, UserLoginView, LogoutAPIView,
-    UserChangePasswordView, SendPasswordResetEmailView, UserPasswordResetView,
-    Worker_Profile_View
+    UserRegistrationView,
+    UserLoginView,
+    LogoutAPIView,
+    UserChangePasswordView,
+    ProfileView,
 )
 
-# Router yaratish
-# router = DefaultRouter()
-# router.register(r'profil', Worker_Profile_View, basename='profil')
-
-
 urlpatterns = [
+    # --- Ro'yxatdan o'tish ---
     path('register/', UserRegistrationView.as_view(), name='register'),
-    path('login/', UserLoginView.as_view(), name='login'),
-    path('logout/', LogoutAPIView.as_view(), name='logout'),
+
+    # --- Tizimga kirish / chiqish ---
+    path('login/',   UserLoginView.as_view(),   name='login'),
+    path('logout/',  LogoutAPIView.as_view(),    name='logout'),
+
+    # --- Parol ---
     path('change-password/', UserChangePasswordView.as_view(), name='change-password'),
-    # path('send-reset-email/', SendPasswordResetEmailView.as_view(), name='send-reset-email'),
-    # path('reset-password/<uid>/<token>/', UserPasswordResetView.as_view(), name='reset-password'),
 
-
-    path('profil/', Worker_Profile_View.as_view({'get': 'retrieve'}), name='my-profile'),
-
+    # --- Profil ---
+    # ProfileView — RetrieveModelMixin + GenericViewSet
+    # retrieve action → GET /api/v1/auth/profil/
+    path('profil/', ProfileView.as_view({'get': 'retrieve'}), name='my-profile'),
 ]
-
-
