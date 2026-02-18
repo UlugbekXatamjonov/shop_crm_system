@@ -111,6 +111,7 @@ class UserPasswordResetView(APIView):
         return Response({'message': 'Parol muvaffaqiyatli yangilandi'}, status=status.HTTP_200_OK)
 
 
+""" ----------- Worker viewsets ----------- """
 
 class Worker_Profile_View(
     mixins.RetrieveModelMixin,
@@ -132,3 +133,15 @@ class Worker_Profile_View(
         """Faqat o'z profilini olish"""
         return self.request.user
     
+
+
+
+
+
+
+
+
+
+
+
+

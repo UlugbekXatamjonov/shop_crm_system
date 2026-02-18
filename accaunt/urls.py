@@ -27,5 +27,5 @@ urlpatterns = [
     path('profil/', Worker_Profile_View.as_view({'get': 'retrieve'}), name='my-profile'),
 
 ]
-# urlpatterns += router.urls
+
 
