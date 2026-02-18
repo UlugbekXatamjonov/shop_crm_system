@@ -1,0 +1,9 @@
+# ============================================================
+# LOCAL REQUIREMENTS — Faqat development (ishlab chiqish) uchun
+# ============================================================
+
+# Barcha base paketlarni o'z ichiga oladi
+-r base.txt
+
+# --- Debug Toolbar (development da so'rovlarni kuzatish) ---
+# django-debug-toolbar==4.4.6

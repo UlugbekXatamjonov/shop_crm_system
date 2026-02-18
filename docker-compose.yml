@@ -1,0 +1,176 @@
+# ============================================================
+# DOCKER COMPOSE — CRM Tizimi barcha xizmatlari
+# ============================================================
+# Xizmatlar:
+#   db        — PostgreSQL 16 (ma'lumotlar bazasi)
+#   redis     — Redis 7 (kesh + Celery broker)
+#   web       — Django + Gunicorn (asosiy ilova)
+#   celery    — Celery Worker (asinxron vazifalar)
+#   celery-beat — Celery Beat (rejalashtirilgan vazifalar)
+#   nginx     — Nginx (reverse proxy + statik fayllar)
+# ============================================================
+
+services:
+
+  # ============================================================
+  # POSTGRESQL — Ma'lumotlar bazasi
+  # ============================================================
+  db:
+    image: postgres:16-alpine
+    container_name: crm_db
+    restart: unless-stopped
+    volumes:
+      # Ma'lumotlar o'chib ketmasligi uchun volume ga saqlanadi
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      POSTGRES_DB: ${DB_NAME:-crm_db}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      # Faqat lokal ulanish uchun (127.0.0.1 dan tashqariga chiqmaydi)
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - crm_network
+
+  # ============================================================
+  # REDIS — Kesh va Celery broker
+  # ============================================================
+  redis:
+    image: redis:7-alpine
+    container_name: crm_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes  # Ma'lumotlarni diskka yozadi
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - crm_network
+
+  # ============================================================
+  # WEB — Django + Gunicorn
+  # ============================================================
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crm_web
+    restart: unless-stopped
+    command: >
+      sh -c "
+        python manage.py migrate --settings=config.settings.production &&
+        python manage.py collectstatic --noinput --settings=config.settings.production &&
+        gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3
+      "
+    volumes:
+      - .:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    env_file:
+      - .env
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - crm_network
+
+  # ============================================================
+  # CELERY — Asinxron vazifalar (Excel export, email va h.k.)
+  # ============================================================
+  celery:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crm_celery
+    restart: unless-stopped
+    command: celery -A config.celery worker --loglevel=info
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - crm_network
+
+  # ============================================================
+  # CELERY BEAT — Rejalashtirilgan vazifalar (cron)
+  # Misol: har kuni soat 09:00 da kam mahsulot bildirishi
+  # ============================================================
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crm_celery_beat
+    restart: unless-stopped
+    command: celery -A config.celery beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - crm_network
+
+  # ============================================================
+  # NGINX — Reverse proxy + Statik fayllar
+  # ============================================================
+  nginx:
+    image: nginx:alpine
+    container_name: crm_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      # HTTPS uchun:
+      # - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - static_volume:/app/staticfiles:ro
+      - media_volume:/app/media:ro
+    depends_on:
+      - web
+    networks:
+      - crm_network
+
+
+# ============================================================
+# VOLUMES — Ma'lumotlar doimiy saqlanadi
+# ============================================================
+volumes:
+  postgres_data:    # PostgreSQL ma'lumotlari
+  redis_data:       # Redis ma'lumotlari
+  static_volume:    # Django statik fayllar
+  media_volume:     # Yuklangan media fayllar
+
+
+# ============================================================
+# NETWORK — Barcha xizmatlar bir tarmoqda
+# ============================================================
+networks:
+  crm_network:
+    driver: bridge

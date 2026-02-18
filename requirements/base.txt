@@ -1,0 +1,59 @@
+# ============================================================
+# BASE REQUIREMENTS — Barcha muhitlar uchun umumiy paketlar
+# ============================================================
+# ESLATMA: Django 6.0.x django-celery-beat bilan mos kelmaydi.
+# Django 5.2 LTS (Long-Term Support) versiyasi ishlatiladi.
+# LTS versiya 2028 yilgacha qo'llab-quvvatlanadi.
+# ============================================================
+
+# --- Django va asosiy framework ---
+Django==5.2.11
+djangorestframework==3.16.1
+
+# --- JWT autentifikatsiya ---
+djangorestframework-simplejwt==5.5.1
+
+# --- CORS (Cross-Origin Resource Sharing) ---
+django-cors-headers==4.9.0
+
+# --- API dokumentatsiya (Swagger / ReDoc) ---
+drf-yasg==1.21.14
+
+# --- Filterlash ---
+django-filter==25.2
+
+# --- Rasmlar bilan ishlash ---
+Pillow==12.1.1
+
+# --- PostgreSQL drayveri ---
+psycopg2-binary==2.9.11
+
+# --- .env faylini o'qish ---
+python-dotenv==1.2.1
+
+# --- Redis integratsiya (kesh + session) ---
+django-redis==6.0.0
+
+# --- Celery — asinxron vazifalar ---
+celery==5.6.2
+
+# --- Celery Beat — vazifalarni rejalashtirish (cron) ---
+django-celery-beat==2.8.1
+
+# --- Excel export ---
+openpyxl==3.1.5
+
+# --- PDF export ---
+reportlab==4.4.0
+
+# --- Barcode generatsiya (EAN-13 va boshqalar) ---
+python-barcode==0.15.1
+
+# --- QR kod generatsiya ---
+qrcode[pil]==8.1
+
+# --- Asosiy kutubxonalar ---
+asgiref==3.11.1
+sqlparse==0.5.5
+PyJWT==2.11.0
+pytz==2025.2

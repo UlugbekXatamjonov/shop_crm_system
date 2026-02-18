@@ -1,0 +1,16 @@
+# ============================================================
+# PRODUCTION REQUIREMENTS — Faqat production (ishchi server) uchun
+# ============================================================
+
+# Barcha base paketlarni o'z ichiga oladi
+-r base.txt
+
+# --- WSGI server — Django ni production da ishga tushirish ---
+gunicorn==23.0.0
+
+# --- Xatolarni kuzatish va monitoring (Sentry) ---
+sentry-sdk==2.25.1
+
+# --- Fayl saqlash (AWS S3, Cloudflare R2 va boshqalar) ---
+# django-storages==1.14.4
+# boto3==1.35.0
