@@ -6,7 +6,16 @@
       "Bash(pip install:*)",
       "Bash(python -c:*)",
       "Bash(python manage.py makemigrations:*)",
-      "Bash(pip freeze:*)"
+      "Bash(pip freeze:*)",
+      "Bash(git checkout:*)",
+      "Bash(copy \".claude\\\\worktrees\\\\loving-mcclintock\\\\railway.toml\" \"railway.toml\")",
+      "Bash(copy \".claude\\\\worktrees\\\\loving-mcclintock\\\\Dockerfile\" \"Dockerfile\")",
+      "Bash(copy \".claude\\\\worktrees\\\\loving-mcclintock\\\\requirements\\\\production.txt\" \"requirements\\\\production.txt\")",
+      "Bash(copy \".claude\\\\worktrees\\\\loving-mcclintock\\\\config\\\\settings\\\\production.py\" \"config\\\\settings\\\\production.py\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(test:*)"
     ]
   }
 }
