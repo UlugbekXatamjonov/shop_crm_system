@@ -8,6 +8,9 @@
 # --- WSGI server — Django ni production da ishga tushirish ---
 gunicorn==23.0.0
 
+# --- Railway DATABASE_URL ni parse qilish uchun ---
+dj-database-url==2.3.0
+
 # --- Xatolarni kuzatish va monitoring (Sentry) ---
 sentry-sdk==2.25.1
 

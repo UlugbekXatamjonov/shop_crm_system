@@ -1,0 +1,20 @@
+# ============================================================
+# RAILWAY TOML — Railway deploy konfiguratsiyasi
+# ============================================================
+
+[build]
+# Dockerfile dan build qilinadi
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# Migrate qilib, keyin Gunicorn ishga tushiradi
+startCommand = "python manage.py migrate --settings=config.settings.production && gunicorn --bind 0.0.0.0:$PORT --workers 3 --timeout 120 config.wsgi:application"
+
+# Health check — Railway bu URL ga so'rov yuboradi
+healthcheckPath = "/api/swagger/"
+healthcheckTimeout = 30
+
+# Xato bo'lsa qayta ishga tushiradi
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
