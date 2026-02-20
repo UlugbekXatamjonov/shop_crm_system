@@ -33,20 +33,34 @@ ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',')
 # MA'LUMOTLAR BAZASI (PostgreSQL — production uchun)
 # ============================================================
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ['DB_NAME'],         # Ma'lumotlar bazasi nomi
-        'USER': os.environ['DB_USER'],         # PostgreSQL foydalanuvchi
-        'PASSWORD': os.environ['DB_PASSWORD'], # Parol
-        'HOST': os.environ.get('DB_HOST', 'db'),   # Docker compose da 'db' xizmat nomi
-        'PORT': os.environ.get('DB_PORT', '5432'),  # Standart PostgreSQL porti
-        'OPTIONS': {
-            'connect_timeout': 10,
-        },
-        'CONN_MAX_AGE': 60,  # Ulanishni 60 soniya davomida qayta ishlatish
+_DATABASE_URL = os.environ.get('DATABASE_URL')
+
+if _DATABASE_URL:
+    # Railway — DATABASE_URL formatida beradi (postgresql://user:pass@host/db)
+    import dj_database_url  # noqa: E402 — faqat Railway muhitida o'rnatilgan
+    DATABASES = {
+        'default': dj_database_url.parse(
+            _DATABASE_URL,
+            conn_max_age=60,
+            conn_health_checks=True,
+        )
     }
-}
+else:
+    # Docker Compose yoki boshqa muhit — alohida o'zgaruvchilar orqali
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ['DB_NAME'],
+            'USER': os.environ['DB_USER'],
+            'PASSWORD': os.environ['DB_PASSWORD'],
+            'HOST': os.environ.get('DB_HOST', 'db'),
+            'PORT': os.environ.get('DB_PORT', '5432'),
+            'OPTIONS': {
+                'connect_timeout': 10,
+            },
+            'CONN_MAX_AGE': 60,
+        }
+    }
 
 
 # ============================================================
@@ -124,14 +138,8 @@ LOGGING = {
         },
     },
     'handlers': {
-        # Xatolar faylga yoziladi
-        'file': {
-            'level': 'ERROR',
-            'class': 'logging.FileHandler',
-            'filename': BASE_DIR / 'logs' / 'error.log',
-            'formatter': 'verbose',
-        },
-        # Konsolga ham chiqarish
+        # Railway da fayl tizimi vaqtinchalik — faqat konsolga yozamiz
+        # (Railway dashboard da "Logs" bo'limida ko'rinadi)
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
@@ -139,7 +147,7 @@ LOGGING = {
     },
     'loggers': {
         'django': {
-            'handlers': ['file', 'console'],
+            'handlers': ['console'],
             'level': 'ERROR',
             'propagate': True,
         },

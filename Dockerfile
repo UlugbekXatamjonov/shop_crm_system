@@ -69,16 +69,17 @@ USER appuser
 # PORT VA ISHGA TUSHIRISH
 # ============================================================
 
-# Django porti
-EXPOSE 8000
+# Railway o'zi PORT beradi, 8000 fallback sifatida
+EXPOSE ${PORT:-8000}
 
 # Gunicorn bilan ishga tushirish
+# Railway $PORT o'zgaruvchisini ishlatadi
 # --workers: CPU core soni × 2 + 1 (masalan, 2 core → 5 worker)
-CMD ["gunicorn", \
-     "--bind", "0.0.0.0:8000", \
-     "--workers", "3", \
-     "--worker-class", "sync", \
-     "--timeout", "120", \
-     "--access-logfile", "-", \
-     "--error-logfile", "-", \
-     "config.wsgi:application"]
+CMD gunicorn \
+    --bind "0.0.0.0:${PORT:-8000}" \
+    --workers 3 \
+    --worker-class sync \
+    --timeout 120 \
+    --access-logfile - \
+    --error-logfile - \
+    config.wsgi:application
