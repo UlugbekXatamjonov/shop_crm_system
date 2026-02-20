@@ -19,6 +19,11 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.http import HttpResponse
+
+
+def health_check(request):
+    return HttpResponse("OK", content_type="text/plain", status=200)
 
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
@@ -51,6 +56,9 @@ schema_view = get_schema_view(
 # ============================================================
 
 urlpatterns = [
+    # Railway health check
+    path('health/', health_check, name='health-check'),
+
     # Django admin
     path('admin/', admin.site.urls),
 

@@ -14,6 +14,9 @@ dj-database-url==2.3.0
 # --- Xatolarni kuzatish va monitoring (Sentry) ---
 sentry-sdk==2.25.1
 
+# --- Statik fayllar (Railway da nginx o'rniga) ---
+whitenoise==6.9.0
+
 # --- Fayl saqlash (AWS S3, Cloudflare R2 va boshqalar) ---
 # django-storages==1.14.4
 # boto3==1.35.0

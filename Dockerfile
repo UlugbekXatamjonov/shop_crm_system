@@ -53,11 +53,8 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Keyin barcha kodlar
 COPY . .
 
-# Statik fayllar to'planadi (nginx uzatadi)
-RUN python manage.py collectstatic --noinput --settings=config.settings.production || true
-
-# Logs papkasini yaratish
-RUN mkdir -p logs && chown -R appuser:appuser /app
+# Foydalanuvchiga egalik huquqini berish
+RUN chown -R appuser:appuser /app
 
 # ============================================================
 # FOYDALANUVCHINI O'ZGARTIRISH
