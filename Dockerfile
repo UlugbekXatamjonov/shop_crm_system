@@ -53,6 +53,12 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Keyin barcha kodlar
 COPY . .
 
+# Statik fayllarni build vaqtida yig'ish (Railway healthcheck uchun)
+# Dummy kalitlar ishlatiladi — faqat collectstatic uchun, DB ulanmaydi
+RUN SECRET_KEY=dummy-build-secret-not-for-production \
+    DATABASE_URL=postgres://u:p@localhost/db \
+    python manage.py collectstatic --noinput --settings=config.settings.production
+
 # Foydalanuvchiga egalik huquqini berish
 RUN chown -R appuser:appuser /app
 
