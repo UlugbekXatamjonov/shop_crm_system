@@ -169,6 +169,14 @@ LOGGING = {
 
 
 # ============================================================
+# CELERY — Railway bepul rejimda worker yo'q, sinxron ishlaydi
+# ============================================================
+
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True
+
+
+# ============================================================
 # SENTRY — Xatolarni kuzatish (ixtiyoriy)
 # ============================================================
 
