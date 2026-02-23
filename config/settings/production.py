@@ -104,6 +104,18 @@ X_FRAME_OPTIONS = 'DENY'
 # SECURE_HSTS_SECONDS = 31536000
 
 
+# Railway / reverse proxy orqali HTTPS ishlaganda zarur
+# CSRF_TRUSTED_ORIGINS — admin login va POST so'rovlar uchun
+CSRF_TRUSTED_ORIGINS = os.environ.get(
+    'CSRF_TRUSTED_ORIGINS',
+    'https://shopcrmsystem-production.up.railway.app'
+).split(',')
+
+# Railway proksi orqali SSL belgisini to'g'ri o'qish
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+
+
 # ============================================================
 # CORS (Production da faqat frontend domeniga ruxsat)
 # ============================================================
