@@ -59,6 +59,9 @@ RUN SECRET_KEY=dummy-build-secret-not-for-production \
     DATABASE_URL=postgres://u:p@localhost/db \
     python manage.py collectstatic --noinput --settings=config.settings.production
 
+# Entrypoint scriptni bajariladigan qilib belgilash
+RUN chmod +x /app/entrypoint.sh
+
 # Foydalanuvchiga egalik huquqini berish
 RUN chown -R appuser:appuser /app
 
@@ -73,16 +76,8 @@ USER appuser
 # ============================================================
 
 # Railway o'zi PORT beradi, 8000 fallback sifatida
-EXPOSE ${PORT:-8000}
+EXPOSE 8000
 
-# Gunicorn bilan ishga tushirish
-# Railway $PORT o'zgaruvchisini ishlatadi
-# --workers: CPU core soni × 2 + 1 (masalan, 2 core → 5 worker)
-CMD gunicorn \
-    --bind "0.0.0.0:${PORT:-8000}" \
-    --workers 3 \
-    --worker-class sync \
-    --timeout 120 \
-    --access-logfile - \
-    --error-logfile - \
-    config.wsgi:application
+# Entrypoint: migrate + gunicorn
+# Railway startCommand bu CMD ni override qiladi
+CMD ["/bin/sh", "/app/entrypoint.sh"]
