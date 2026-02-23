@@ -123,6 +123,7 @@ CORS_ORIGIN_WHITELIST = tuple(
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MIDDLEWARE = [
+    'config.middleware.HealthCheckMiddleware',     # BIRINCHI — health check ALLOWED_HOSTS dan oldin
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',

@@ -59,6 +59,7 @@ INSTALLED_APPS = [
 # ============================================================
 
 MIDDLEWARE = [
+    'config.middleware.HealthCheckMiddleware',     # BIRINCHI — health check ALLOWED_HOSTS dan oldin
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',       # CORS — CommonMiddleware DAN OLDIN bo'lishi shart
