@@ -12,6 +12,21 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 
 ---
 
+## 23.02.2026 YANGILANISH — ASOSIY MUAMMO TOPILDI VA TUZATILDI
+
+### Muammo: PORT mismatch
+Railway o'zi `$PORT` o'zgaruvchisini tayinlaydi (masalan 3000). Lekin startCommand da
+`--bind 0.0.0.0:8000` hardcode qilingan edi. Railway 3000 portga healthcheck yuborar,
+gunicorn 8000 da tinglaydi → "service unavailable".
+
+### Tuzatish qilingan fayllar:
+- **`railway.toml`**: `--bind 0.0.0.0:8000` → `--bind 0.0.0.0:${PORT:-8000}`
+- **`accaunt/migrations/0003_alter_worker_branch_verbose_name.py`**: Migration warning tuzatildi
+
+### Commit: `f6bf1f3` — main branchga push qilindi
+
+---
+
 ## BUGUN (21.02.2026) QILINGANLAR — HAMMASI TAYYOR
 
 ### Fayllar holati (main branch da, GitHub da):
