@@ -272,7 +272,10 @@ class WorkerViewSet(viewsets.ModelViewSet):
         )
 
         return Response(
-            WorkerDetailSerializer(worker, context={'request': request}).data,
+            {
+                'message': "Yangi hodim muvaffaqiyatli qo'shildi!",
+                'worker': WorkerDetailSerializer(worker, context={'request': request}).data,
+            },
             status=status.HTTP_201_CREATED
         )
 
