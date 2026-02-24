@@ -2,7 +2,7 @@
 
 ## Sen kim bilan ishlayapsan
 Foydalanuvchi: Ulugbek (Django dasturchisi)
-Loyiha: `D:\projects\shop_crm_system` (GitHub: `UlugbekXatamjonov/shop_crm_system`, `main` branch)
+Loyiha: `C:\Users\U17\my_projects\shop_crm_system` (GitHub: `UlugbekXatamjonov/shop_crm_system`, `main` branch)
 
 ## Loyiha nima
 Django 5.2 REST API — Shop CRM tizimi (backend only, frontend yo'q).
@@ -12,47 +12,78 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 
 ---
 
-## 23.02.2026 YANGILANISH — ASOSIY MUAMMO TOPILDI VA TUZATILDI
+## LOYIHA HOLATI (24.02.2026)
 
-### Muammo: PORT mismatch
-Railway o'zi `$PORT` o'zgaruvchisini tayinlaydi (masalan 3000). Lekin startCommand da
-`--bind 0.0.0.0:8000` hardcode qilingan edi. Railway 3000 portga healthcheck yuborar,
-gunicorn 8000 da tinglaydi → "service unavailable".
-
-### Tuzatish qilingan fayllar:
-- **`railway.toml`**: `--bind 0.0.0.0:8000` → `--bind 0.0.0.0:${PORT:-8000}`
-- **`accaunt/migrations/0003_alter_worker_branch_verbose_name.py`**: Migration warning tuzatildi
-
-### Commit: `f6bf1f3` — main branchga push qilindi
+| App         | Holat              | Izoh                                          |
+|-------------|-------------------|-----------------------------------------------|
+| `accaunt`   | ✅ Tugallangan     | CustomUser, Worker, AuditLog, JWT auth        |
+| `store`     | ✅ Tugallangan     | Store, Branch CRUD (soft delete, multi-tenant)|
+| `warehouse` | ❌ Boshlanmagan   | Navbatda                                      |
+| `trade`     | ❌ Boshlanmagan   | Navbatda                                      |
+| `expense`   | ❌ Boshlanmagan   | Navbatda                                      |
 
 ---
 
-## BUGUN (21.02.2026) QILINGANLAR — HAMMASI TAYYOR
+## STANDART RESPONSE PATTERN (BARCHA APPLACATION)
 
-### Fayllar holati (main branch da, GitHub da):
+Barcha write operatsiyalarda shu pattern ishlatiladi:
 
-**`requirements/production.txt`** ✅ — whitenoise==6.9.0 bor
+| Metod      | Status | Javob formati                          |
+|------------|--------|----------------------------------------|
+| `create`   | 201    | `{'message': '...', 'data': {...}}`    |
+| `update`   | 200    | `{'message': '...', 'data': {...}}`    |
+| `destroy`  | 200    | `{'message': '...'}`                   |
+| `list`     | 200    | faqat `[...]` (message yo'q)           |
+| `retrieve` | 200    | faqat `{...}` (message yo'q)           |
 
-**`config/settings/production.py`** ✅ — quyidagilar qo'shilgan:
-- WhiteNoise MIDDLEWARE (SecurityMiddleware dan keyin)
-- `STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'`
-- LOGGING (faqat console, Railway uchun)
-- `CELERY_TASK_ALWAYS_EAGER = True`
-- `CELERY_TASK_EAGER_PROPAGATES = True`
+---
 
-**`Dockerfile`** ✅ — collectstatic BUILD vaqtida ishlaydi (dummy env bilan):
-```dockerfile
-RUN SECRET_KEY=dummy-build-secret-not-for-production \
-    DATABASE_URL=postgres://u:p@localhost/db \
-    python manage.py collectstatic --noinput --settings=config.settings.production
-```
+## 24.02.2026 QILINGAN ISHLAR
 
-**`config/urls.py`** ✅ — health_check endpoint bor: `path('health/', health_check)`
+### 1. `store/views.py` — message+data pattern joriy qilindi
+- `StoreViewSet.create()` → `{'message': ..., 'data': ...}` (avval faqat data edi)
+- `StoreViewSet.update()` → yangi metod qo'shildi (avval yo'q edi)
+- `BranchViewSet.create()` → `{'message': ..., 'data': ...}` (avval faqat data edi)
+- `BranchViewSet.update()` → yangi metod qo'shildi (avval yo'q edi)
+- Commit: `19125a9`
 
-**`requirements.txt`** (root) ✅ — `-r requirements/production.txt`
+### 2. `accaunt/views.py` — WorkerViewSet yangilandi
+- `WorkerViewSet.create()` → `'worker'` key → `'data'` key ga o'zgartirildi
+- `WorkerViewSet.update()` → yangi metod: message+data+AuditLog (partial=True)
+- `WorkerViewSet.destroy()` → yangi metod: message qaytaradi (200 OK)
+- `WorkerViewSet.perform_destroy()` → AuditLog.DELETE qo'shildi
+- Commit: `acc1d9f`
 
-**`railway.toml`** ✅ — hozirgi holat:
+### 3. `memory/patterns.md` — yangilandi
+- `create() / update() response pattern` bo'limi to'liq qayta yozildi
+- `update()` pattern qo'shildi
+- Qoida yozildi: write → `message+data`, read → faqat `data`
+
+---
+
+## 23.02.2026 QILINGANLAR
+
+### Railway PORT muammosi hal qilindi
+- `railway.toml`: `--bind 0.0.0.0:8000` hardcode (PORT expand bo'lmaydi)
+- Commit: `f6bf1f3`
+
+---
+
+## 21.02.2026 QILINGANLAR
+
+### Production deploy sozlamalari
+- `requirements/production.txt` — whitenoise qo'shildi
+- `config/settings/production.py` — WhiteNoise, LOGGING, Celery eager
+- `Dockerfile` — `collectstatic` BUILD vaqtida ishlaydi
+- `config/urls.py` — `/health/` endpoint
+- `railway.toml` — port 8000 hardcode, healthcheckPath
+
+---
+
+## RAILWAY DEPLOY HOLATI
+
 ```toml
+# railway.toml (hozirgi)
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
@@ -65,126 +96,93 @@ restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
 ```
 
----
-
-## Railway.app HOLATI
-
-### Servislar (hammasi Online):
-- **Postgres** ✅ Online
-- **Redis** ✅ Online
-- **shop_crm_system** ⚠️ — Hali deploy muvaffaqiyatli bo'lmagan
-
-### Variables (to'g'ri sozlangan):
+**Railway Variables (to'g'ri sozlangan):**
 ```
 DJANGO_SETTINGS_MODULE=config.settings.production
 DEBUG=False
 ALLOWED_HOSTS=*
 DATABASE_URL=${{Postgres.DATABASE_URL}}
 REDIS_URL=${{Redis.REDIS_URL}}
-CORS_ALLOWED_ORIGINS=http://localhost:5173
 SECRET_KEY=<o'rnatilgan>
-PORT=8000    ← BU QILINMAGAN, KEYINGI CHATDA QILISH KERAK!
-```
-
----
-
-## MUAMMO VA SABABI (bugun topildi)
-
-### Asosiy muammo: `$PORT` Railway startCommand da expand bo'lmaydi
-Deploy Logs da `PORT=$PORT` (literal dollar belgisi) chiqdi. Bu shuni bildiradi:
-- Railway `startCommand` dagi `$PORT` ni shell variable sifatida tanímaydi
-- Gunicorn qaysi portga bog'lanishni bilmaydi yoki noto'g'ri portga bog'lanadi
-- Railway healthcheck port bilan mos kelmaydi → healthcheck failed
-
-### Yechim (qo'llanildi):
-- `railway.toml` da port **8000 ga hardcode qilindi**: `--bind 0.0.0.0:8000`
-- Railway Variables ga `PORT=8000` qo'shish kerak (HALI QILINMAGAN!)
-
-### Qo'shimcha muammo: `accaunt` app da migration yo'q model o'zgarishlar
-```
-Your models in app(s): 'accaunt' have changes that are not yet reflected in a migration
-```
-Bu warning hozirgacha deployni to'xtatmagan, lekin kelajakda muammo bo'lishi mumkin.
-Lokal terminalda `python manage.py makemigrations accaunt` ishlatib migration yaratish kerak.
-(Local da Celery o'rnatilmagan, shuning uchun avval: `pip install celery`)
-
----
-
-## KEYINGI CHATDA NIMA QILISH KERAK
-
-### 1-QADAM (eng muhim) — Railway Variables ga PORT qo'sh:
-Railway → `shop_crm_system` → Variables → RAW Editor → qo'sh:
-```
 PORT=8000
 ```
-→ "Update Variables" bosing → qayta deploy bo'ladi → Deploy Logs kuzating
 
-### Muvaffaqiyatli deploy ko'rinishi:
-```
-Running migrations: No migrations to apply.
-[INFO] Starting gunicorn 23.0.0
-[INFO] Listening at: http://0.0.0.0:8000
-[INFO] Booting worker with pid: ...
-```
+**Deploy URL:** https://shopcrmsystem-production.up.railway.app/
 
-### 2-QADAM — Deploy muvaffaqiyatli bo'lgandan keyin:
-1. **Domen olish**: Settings → Networking → "Generate Domain"
-   - Misol: `fulfilling-nurturing.up.railway.app`
-2. **ALLOWED_HOSTS yangilash**: Variables da:
-   ```
-   ALLOWED_HOSTS=fulfilling-nurturing.up.railway.app
-   ```
-3. **Superuser yaratish** (Railway CLI kerak):
-   ```bash
-   npm install -g @railway/cli
-   railway login
-   railway link
-   railway run python manage.py createsuperuser
-   ```
-4. **Tekshirish**:
-   - `https://sizning-domen.up.railway.app/health/` → "OK" ko'rinishi kerak
-   - `https://sizning-domen.up.railway.app/admin/` → Login sahifasi
-   - `https://sizning-domen.up.railway.app/swagger/` → API docs
+---
 
-### 3-QADAM — accaunt migration yaratish (ixtiyoriy, lekin tavsiya):
+## KEYINGI ISHLAR (navbat)
+
+### `warehouse` app — to'liq qurish kerak
+Modellar (patterns.md ga ko'ra):
+- `Category` — mahsulot kategoriyasi
+- `Product` — mahsulot (nom, kategoriya, birlik, narx, shtrix-kod)
+- `Stock` — filial bo'yicha qoldiq (Product + Branch + miqdor)
+- `StockMovement` — kirim/chiqim tarixi
+
+Endpointlar:
+- `GET/POST /api/v1/warehouse/categories/`
+- `GET/POST /api/v1/warehouse/products/`
+- `GET/POST /api/v1/warehouse/stocks/`
+- `GET/POST /api/v1/warehouse/movements/`
+
+### `trade` app — to'liq qurish kerak
+- `Sale` — sotuv (Branch, Worker, vaqt, jami summa)
+- `SaleItem` — sotuv tarkibi (Sale, Product, miqdor, narx)
+
+### `expense` app — to'liq qurish kerak
+- `ExpenseCategory` — xarajat kategoriyasi
+- `Expense` — xarajat (Branch, Worker, miqdor, izoh, sana)
+
+---
+
+## MUHIM ESLATMALAR
+
+### Worktree pattern (MAJBURIY)
+- Claude worktree da ishlaydi: `.claude/worktrees/thirsty-cori/`
+- Har o'zgarishdan keyin: `cp worktree/* → main` → `git add` → `git commit`
+- `__pycache__` va `db.sqlite3` ni HECH QACHON commit qilma
+
+### Virtual env
 ```bash
-pip install celery
-python manage.py makemigrations accaunt --settings=config.settings.local
-git add accaunt/migrations/
-git commit -m "feat: accaunt app migration qo'shildi"
-git push origin main
+source /c/Users/U17/my_projects/shop_crm_system/myenv/Scripts/activate
+```
+
+### Migration yaratish (non-interactive)
+```bash
+printf "1\n\n1\n\n" | python manage.py makemigrations appname --settings=config.settings.local
+```
+
+### Git log (so'nggi commitlar)
+```
+acc1d9f  feat(accaunt): WorkerViewSet update/destroy metodlari va message+data pattern
+19125a9  feat(store): create/update javoblariga message+data qo'shildi
+f6bf1f3  fix(railway): PORT mismatch tuzatildi
 ```
 
 ---
 
-## ARXIV: Bugun sinovdan o'tgan va rad etilgan yondashuvlar
+## LOYIHA TUZILMASI
 
-1. `collectstatic` startCommand da → 5 daqiqa vaqt oldi, healthcheck o'tmadi
-2. `$PORT` ni startCommand da ishlatish → Railway expand qilmaydi, literal `$PORT` ko'rsatadi
-3. `migrate` hang qiladi degan taxmin → aslida PORT muammosi edi
-
----
-
-## Loyiha tuzilmasi (muhim fayllar)
 ```
 shop_crm_system/
 ├── config/
-│   ├── __init__.py      ← Celery import (from .celery import app as celery_app)
+│   ├── __init__.py      ← Celery import
 │   ├── celery.py        ← Celery konfiguratsiya
 │   ├── settings/
 │   │   ├── base.py      ← Umumiy sozlamalar
 │   │   ├── local.py     ← Development (SQLite)
 │   │   └── production.py ← Production (PostgreSQL+Redis+WhiteNoise)
-│   ├── urls.py          ← health_check endpoint bor
+│   ├── urls.py          ← /health/ endpoint bor
 │   └── wsgi.py
-├── accaunt/             ← CustomUser, rollar (⚠️ migration kerak)
-├── store/               ← Do'kon, filial
-├── trade/               ← Savdo
-├── warehouse/           ← Mahsulot
-├── expense/             ← Xarajatlar
+├── accaunt/             ✅ CustomUser, Worker, AuditLog, JWT auth
+├── store/               ✅ Store, Branch (soft delete, multi-tenant)
+├── warehouse/           ❌ Hali boshlanmagan
+├── trade/               ❌ Hali boshlanmagan
+├── expense/             ❌ Hali boshlanmagan
 ├── requirements/
-│   ├── base.txt         ← celery, django-redis, psycopg2 va boshqalar
-│   └── production.txt   ← gunicorn, whitenoise, dj-database-url, sentry-sdk
+│   ├── base.txt
+│   └── production.txt   ← gunicorn, whitenoise, dj-database-url
 ├── requirements.txt     ← -r requirements/production.txt
 ├── Dockerfile           ← collectstatic BUILD vaqtida
 └── railway.toml         ← port 8000 hardcode
