@@ -123,9 +123,14 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 CORS_ORIGIN_ALLOW_ALL = False
 
 # Ruxsat etilgan frontend domenlari
-CORS_ORIGIN_WHITELIST = tuple(
-    os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5173').split(',')
-)
+# CORS_ALLOWED_ORIGINS env orqali qo'shimcha domenlar qo'shish mumkin (vergul bilan)
+_extra_origins = [
+    o.strip() for o in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if o.strip()
+]
+CORS_ORIGIN_WHITELIST = tuple([
+    'https://shop-crm-front.vercel.app',   # Vercel production frontend
+    *_extra_origins,
+])
 
 
 # ============================================================
