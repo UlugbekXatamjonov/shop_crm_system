@@ -14,13 +14,13 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 
 ## LOYIHA HOLATI (24.02.2026)
 
-| App         | Holat              | Izoh                                          |
-|-------------|-------------------|-----------------------------------------------|
-| `accaunt`   | ✅ Tugallangan     | CustomUser, Worker, AuditLog, JWT auth        |
-| `store`     | ✅ Tugallangan     | Store, Branch CRUD (soft delete, multi-tenant)|
-| `warehouse` | ❌ Boshlanmagan   | Navbatda                                      |
-| `trade`     | ❌ Boshlanmagan   | Navbatda                                      |
-| `expense`   | ❌ Boshlanmagan   | Navbatda                                      |
+| App         | Holat              | Izoh                                                      |
+|-------------|-------------------|-----------------------------------------------------------|
+| `accaunt`   | ✅ Tugallangan     | CustomUser, Worker, AuditLog, JWT auth                    |
+| `store`     | ✅ Tugallangan     | Store, Branch CRUD (soft delete, multi-tenant)            |
+| `warehouse` | ✅ Tugallangan     | Category, Product, Stock, StockMovement (kirim/chiqim)    |
+| `trade`     | ❌ Boshlanmagan   | Navbatda                                                  |
+| `expense`   | ❌ Boshlanmagan   | Navbatda                                                  |
 
 ---
 
@@ -35,6 +35,34 @@ Barcha write operatsiyalarda shu pattern ishlatiladi:
 | `destroy`  | 200    | `{'message': '...'}`                   |
 | `list`     | 200    | faqat `[...]` (message yo'q)           |
 | `retrieve` | 200    | faqat `{...}` (message yo'q)           |
+
+---
+
+## 24.02.2026 (2) QILINGAN ISHLAR
+
+### `warehouse` app — to'liq qurildi
+- `models.py` → Category, Product, Stock, StockMovement (+ choices: ProductUnit, ProductStatus, MovementType)
+- `serializers.py` → har bir model uchun List/Detail/Create/Update serializers (16 ta)
+- `views.py` → CategoryViewSet, ProductViewSet, StockViewSet, StockMovementViewSet
+- `api_urls.py` → router: categories, products, stocks, movements
+- `admin.py` → 4 ta model registered
+- `warehouse/migrations/0001_initial.py` → migrate OK
+- `config/urls.py` → `/api/v1/warehouse/` qo'shildi
+
+**Endpointlar:**
+- `GET/POST /api/v1/warehouse/categories/`  (+ `/{id}/`)
+- `GET/POST /api/v1/warehouse/products/`    (+ `/{id}/`)
+- `GET/POST /api/v1/warehouse/stocks/`      (+ `/{id}/`)
+- `GET/POST /api/v1/warehouse/movements/`   (+ `/{id}/`)
+
+**Xususiyatlar:**
+- Multi-tenant: worker.store bo'yicha filtrlash
+- Soft delete: Category, Product (status='inactive')
+- StockMovement immutable (faqat GET va POST)
+- StockMovement POST da → Stock.quantity avtomatik yangilanadi
+- Chiqim uchun qoldiq yetarliligi serializer'da tekshiriladi
+- AuditLog barcha write operatsiyalarda yoziladi
+- Permissions: list/retrieve → CanAccess('mahsulotlar'/'sklad'), write → IsManagerOrAbove
 
 ---
 
@@ -112,19 +140,6 @@ PORT=8000
 ---
 
 ## KEYINGI ISHLAR (navbat)
-
-### `warehouse` app — to'liq qurish kerak
-Modellar (patterns.md ga ko'ra):
-- `Category` — mahsulot kategoriyasi
-- `Product` — mahsulot (nom, kategoriya, birlik, narx, shtrix-kod)
-- `Stock` — filial bo'yicha qoldiq (Product + Branch + miqdor)
-- `StockMovement` — kirim/chiqim tarixi
-
-Endpointlar:
-- `GET/POST /api/v1/warehouse/categories/`
-- `GET/POST /api/v1/warehouse/products/`
-- `GET/POST /api/v1/warehouse/stocks/`
-- `GET/POST /api/v1/warehouse/movements/`
 
 ### `trade` app — to'liq qurish kerak
 - `Sale` — sotuv (Branch, Worker, vaqt, jami summa)
