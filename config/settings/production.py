@@ -24,9 +24,13 @@ DEBUG = False
 # .env dan maxfiy kalit olinadi
 SECRET_KEY = os.environ['SECRET_KEY']
 
-# Ruxsat etilgan hostlar (vergul bilan ajratilgan)
-# Misol: .env da ALLOWED_HOSTS=crm.example.com,www.crm.example.com
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',')
+# Ruxsat etilgan hostlar
+# ALLOWED_HOSTS env orqali qo'shimcha domenlar qo'shish mumkin (vergul bilan)
+_extra_hosts = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', '').split(',') if h.strip()]
+ALLOWED_HOSTS = [
+    'shopcrmsystem-production.up.railway.app',  # Railway production URL
+    *_extra_hosts,
+]
 
 
 # ============================================================
