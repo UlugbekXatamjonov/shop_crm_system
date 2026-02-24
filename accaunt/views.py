@@ -244,7 +244,7 @@ class WorkerViewSet(viewsets.ModelViewSet):
         Faqat o'z do'koniga hodim qo'sha oladi.
         """
         worker = self.request.user.worker
-        serializer.save(store=worker.store)
+        return serializer.save(store=worker.store)
 
     def perform_destroy(self, instance: Worker):
         """
@@ -272,7 +272,7 @@ class WorkerViewSet(viewsets.ModelViewSet):
         )
 
         return Response(
-            WorkerDetailSerializer(worker).data,
+            WorkerDetailSerializer(worker, context={'request': request}).data,
             status=status.HTTP_201_CREATED
         )
 
