@@ -108,8 +108,24 @@ class StoreViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         return Response(
-            StoreDetailSerializer(serializer.instance).data,
+            {
+                'message': "Do'kon muvaffaqiyatli yaratildi.",
+                'data': StoreDetailSerializer(serializer.instance).data,
+            },
             status=status.HTTP_201_CREATED,
+        )
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(
+            {
+                'message': "Do'kon muvaffaqiyatli yangilandi.",
+                'data': StoreDetailSerializer(serializer.instance).data,
+            },
+            status=status.HTTP_200_OK,
         )
 
     def destroy(self, request, *args, **kwargs):
@@ -211,11 +227,30 @@ class BranchViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         return Response(
-            BranchDetailSerializer(
-                serializer.instance,
-                context=self.get_serializer_context(),
-            ).data,
+            {
+                'message': "Filial muvaffaqiyatli yaratildi.",
+                'data': BranchDetailSerializer(
+                    serializer.instance,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
             status=status.HTTP_201_CREATED,
+        )
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(
+            {
+                'message': "Filial muvaffaqiyatli yangilandi.",
+                'data': BranchDetailSerializer(
+                    serializer.instance,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_200_OK,
         )
 
     def destroy(self, request, *args, **kwargs):
