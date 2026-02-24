@@ -253,6 +253,13 @@ class WorkerViewSet(viewsets.ModelViewSet):
         """
         instance.status = 'deactive'
         instance.save(update_fields=['status'])
+        AuditLog.objects.create(
+            actor=self.request.user,
+            action=AuditLog.Action.DELETE,
+            target_model='Worker',
+            target_id=instance.id,
+            description=f"Hodim deaktivatsiya qilindi: {instance.user}",
+        )
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(
@@ -274,9 +281,39 @@ class WorkerViewSet(viewsets.ModelViewSet):
         return Response(
             {
                 'message': "Yangi hodim muvaffaqiyatli qo'shildi!",
-                'worker': WorkerDetailSerializer(worker, context={'request': request}).data,
+                'data': WorkerDetailSerializer(worker, context={'request': request}).data,
             },
             status=status.HTTP_201_CREATED
+        )
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditLog.Action.UPDATE,
+            target_model='Worker',
+            target_id=instance.id,
+            description=f"Hodim ma'lumotlari yangilandi: {instance.user}",
+        )
+
+        return Response(
+            {
+                'message': "Hodim ma'lumotlari muvaffaqiyatli yangilandi.",
+                'data': WorkerDetailSerializer(instance, context={'request': request}).data,
+            },
+            status=status.HTTP_200_OK
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response(
+            {'message': "Hodim muvaffaqiyatli deaktivatsiya qilindi."},
+            status=status.HTTP_200_OK
         )
 
     # ----------------------------------------------------------
