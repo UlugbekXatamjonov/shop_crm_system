@@ -130,7 +130,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 SIMPLE_JWT = {
     # Access token muddati — 60 daqiqa
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1), # keyinroq, loyiha tugaganda (minutes=60) qilamiz
 
     # Refresh token muddati — 3 kun
     'REFRESH_TOKEN_LIFETIME': timedelta(days=3),
