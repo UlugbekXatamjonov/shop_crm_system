@@ -9,16 +9,15 @@ View'lar ikki guruhga bo'lingan:
    - UserLoginView          — tizimga kirish (JWT token qaytaradi)
    - LogoutAPIView          — tizimdan chiqish (token blacklist)
    - UserChangePasswordView — parol o'zgartirish
-   - ProfileView            — o'z profilini ko'rish
+   - ProfileView            — o'z profilini ko'rish va yangilash
 
 2. WORKER view'lari (hodimlarni boshqarish):
-   - WorkerViewSet          — CRUD + activate/deactivate/permissions
+   - WorkerViewSet          — CRUD (list, create, retrieve, partial_update)
 """
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework.decorators import action
 from rest_framework import status, viewsets, mixins
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -37,7 +36,6 @@ from .serializers import (
     WorkerDetailSerializer,
     WorkerCreateSerializer,
     WorkerUpdateSerializer,
-    WorkerPermissionSerializer,
 )
 
 
@@ -216,16 +214,15 @@ class WorkerViewSet(viewsets.ModelViewSet):
     Hodimlarni boshqarish.
 
     Endpointlar:
-      GET    /api/v1/workers/                  — ro'yxat
-      POST   /api/v1/workers/                  — yangi hodim qo'shish
-      GET    /api/v1/workers/{id}/             — hodim ma'lumoti
-      PATCH  /api/v1/workers/{id}/             — hodimni yangilash (rol, filial, maosh, status)
-      PATCH  /api/v1/workers/{id}/permissions/ — individual permission o'zgartirish (faqat owner)
+      GET    /api/v1/workers/      — ro'yxat        (manager/seller ham ko'ra oladi)
+      POST   /api/v1/workers/      — hodim qo'shish  (faqat owner)
+      GET    /api/v1/workers/{id}/ — hodim ma'lumoti (manager/seller ham ko'ra oladi)
+      PATCH  /api/v1/workers/{id}/ — hodimni yangilash (faqat owner)
 
-    Status o'zgartirish PATCH orqali amalga oshiriladi:
-      {"status": "active"}        — faollashtirish   (faqat owner)
-      {"status": "tatil"}         — tatilga chiqarish (faqat owner)
-      {"status": "ishdan_ketgan"} — ishdan chiqarish  (faqat owner)
+    PATCH bir so'rovda barchasini o'zgartiradi:
+      - User: first_name, last_name, phone1, phone2
+      - Worker: role, branch, salary, status
+      - Permissions: permissions = ["sotuv", "ombor", ...]
 
     Multi-tenant xavfsizlik:
       Faqat o'z do'konining hodimlarini ko'radi va boshqaradi.
@@ -236,7 +233,6 @@ class WorkerViewSet(viewsets.ModelViewSet):
         """
         list/retrieve  → IsManagerOrAbove  (manager va seller ham ko'ra oladi)
         create/update  → IsOwner           (faqat ega qo'shadi va o'zgartiradi)
-        permissions    → IsOwner           (action dekoratorda belgilangan)
         """
         if self.action in ('list', 'retrieve'):
             return [IsAuthenticated(), IsManagerOrAbove()]
@@ -250,8 +246,6 @@ class WorkerViewSet(viewsets.ModelViewSet):
             return WorkerCreateSerializer
         if self.action in ('update', 'partial_update'):
             return WorkerUpdateSerializer
-        if self.action == 'permissions':
-            return WorkerPermissionSerializer
         return WorkerDetailSerializer
 
     def get_queryset(self):
@@ -326,36 +320,3 @@ class WorkerViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK
         )
 
-    # ----------------------------------------------------------
-    # QO'SHIMCHA ACTION'LAR
-    # ----------------------------------------------------------
-
-    @action(detail=True, methods=['patch'], url_path='permissions',
-            permission_classes=[IsAuthenticated, IsOwner])
-    def permissions(self, request, pk=None):
-        """
-        Hodimning individual permission'larini o'zgartirish.
-        PATCH /api/v1/workers/{id}/permissions/
-
-        Faqat do'kon egasi (owner) permission o'zgartira oladi.
-        So'rov: {"add": ["sozlamalar"], "remove": ["ombor"]}
-        """
-        worker = self.get_object()
-        serializer = WorkerPermissionSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.update(worker, serializer.validated_data)
-
-        AuditLog.objects.create(
-            actor=request.user,
-            action=AuditLog.Action.ASSIGN,
-            target_model='Worker',
-            target_id=worker.id,
-            description=f"Permission o'zgartirildi: {worker.user}",
-            extra_data=serializer.validated_data,
-        )
-        return Response(
-            {
-                'message': "Permission'lar yangilandi.",
-                'permissions': worker.get_permissions(),
-            }
-        )

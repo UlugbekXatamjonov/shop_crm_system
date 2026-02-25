@@ -17,8 +17,7 @@ Serializer'lar ikki guruhga bo'lingan:
    - WorkerListSerializer       — ro'yxat uchun (qisqa)
    - WorkerDetailSerializer     — to'liq ma'lumot
    - WorkerCreateSerializer     — hodim qo'shish
-   - WorkerUpdateSerializer     — hodimni yangilash
-   - WorkerPermissionSerializer — individual permission o'zgartirish
+   - WorkerUpdateSerializer     — hodimni yangilash (user+worker+permissions bitta PATCH da)
 """
 
 from django.contrib.auth import authenticate
@@ -77,6 +76,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             role=WorkerRole.OWNER,
             store=None,
             branch=None,
+            permissions=list(ROLE_PERMISSIONS.get(WorkerRole.OWNER, [])),
         )
         return user
 
@@ -325,8 +325,6 @@ class WorkerDetailSerializer(serializers.ModelSerializer):
     email        = serializers.CharField(source='user.email',    read_only=True)
     role_display = serializers.CharField(source='get_role_display', read_only=True)
     branch_name  = serializers.CharField(source='branch.name',  read_only=True)
-    # Yakuniy permission ro'yxati (rol standart + qo'shilgan − olib tashlangan)
-    permissions  = serializers.SerializerMethodField()
 
     class Meta:
         model = Worker
@@ -336,15 +334,11 @@ class WorkerDetailSerializer(serializers.ModelSerializer):
             'role', 'role_display',
             'branch_name', 'salary', 'status',
             'permissions',
-            'extra_permissions',  # {"added": [...], "removed": [...]}
             'created_on',
         )
 
     def get_full_name(self, obj: Worker) -> str:
         return str(obj.user)
-
-    def get_permissions(self, obj: Worker) -> list[str]:
-        return obj.get_permissions()
 
 
 class WorkerCreateSerializer(serializers.Serializer):
@@ -428,13 +422,14 @@ class WorkerCreateSerializer(serializers.Serializer):
             last_name  = validated_data['last_name'],
         )
 
-        # 2. Worker yaratish
+        # 2. Worker yaratish — permissions rolga qarab avtomatik to'ldiriladi
         worker = Worker.objects.create(
-            user   = user,
-            role   = role,
-            store  = store,
-            branch = branch,
-            salary = salary,
+            user        = user,
+            role        = role,
+            store       = store,
+            branch      = branch,
+            salary      = salary,
+            permissions = list(ROLE_PERMISSIONS.get(role, [])),
         )
         return worker
 
@@ -444,12 +439,63 @@ class WorkerUpdateSerializer(serializers.ModelSerializer):
     Hodim ma'lumotlarini yangilash — faqat do'kon egasi uchun.
     PATCH /api/v1/workers/{id}/ da ishlatiladi.
 
-    Owner istalgan hodimning rol, filial, maosh, statusini o'zgartira oladi.
-    Manager/seller uchun bu endpoint yopiq — ular /auth/profil/ dan foydalanadi.
+    User ma'lumotlari (first_name, last_name, phone1, phone2) va
+    Worker ma'lumotlari (role, branch, salary, status, permissions)
+    bitta PATCH so'rovda tahrirlanadi. Yuborilmagan maydonlar o'zgarmaydi.
+
+    Misol:
+      {"first_name": "Ali", "role": "manager", "permissions": ["sotuv", "ombor"]}
     """
+    # --- CustomUser maydonlari (source='user.*' orqali) ---
+    first_name = serializers.CharField(
+        source='user.first_name', required=False, allow_blank=True, label="Ismi"
+    )
+    last_name  = serializers.CharField(
+        source='user.last_name',  required=False, allow_blank=True, label="Familiyasi"
+    )
+    phone1 = serializers.CharField(
+        source='user.phone1', required=False, label="Asosiy telefon"
+    )
+    phone2 = serializers.CharField(
+        source='user.phone2', required=False, allow_blank=True, allow_null=True,
+        label="Qo'shimcha telefon"
+    )
+
+    # --- Ruxsatlar ro'yxati ---
+    permissions = serializers.ListField(
+        child=serializers.ChoiceField(choices=ALL_PERMISSIONS),
+        required=False,
+        label="Ruxsatlar ro'yxati"
+    )
+
     class Meta:
-        model = Worker
-        fields = ('role', 'branch', 'salary', 'status')
+        model  = Worker
+        fields = (
+            'first_name', 'last_name', 'phone1', 'phone2',
+            'role', 'branch', 'salary', 'status', 'permissions',
+        )
+
+    # --- Validatsiyalar ---
+
+    def validate_phone1(self, value: str) -> str:
+        """Telefon raqami boshqa foydalanuvchida band emasligini tekshiradi."""
+        qs = CustomUser.objects.filter(phone1=value).exclude(pk=self.instance.user.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                "Bu telefon raqami allaqachon boshqa foydalanuvchida band."
+            )
+        return value
+
+    def validate_phone2(self, value: str) -> str:
+        """Qo'shimcha telefon raqami band emasligini tekshiradi."""
+        if not value:
+            return value
+        qs = CustomUser.objects.filter(phone2=value).exclude(pk=self.instance.user.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                "Bu telefon raqami allaqachon boshqa foydalanuvchida band."
+            )
+        return value
 
     def validate_role(self, value: str) -> str:
         """Owner rolini faqat do'kon egasi yoki superadmin belgilay oladi."""
@@ -463,92 +509,34 @@ class WorkerUpdateSerializer(serializers.ModelSerializer):
                 )
         return value
 
-
-class WorkerPermissionSerializer(serializers.Serializer):
-    """
-    Hodimning individual permission'larini o'zgartirish.
-    PATCH /api/v1/workers/{id}/permissions/ da ishlatiladi.
-
-    add    — qo'shish kerak bo'lgan permission kodlar ro'yxati
-    remove — olib tashlash kerak bo'lgan permission kodlar ro'yxati
-
-    Misol so'rov:
-        {"add": ["sozlamalar"], "remove": ["sklad"]}
-
-    Natija: hodimning extra_permissions maydoni yangilanadi.
-    """
-    add = serializers.ListField(
-        child=serializers.CharField(),
-        required=False,
-        default=list,
-        label="Qo'shilayotgan ruxsatlar"
-    )
-    remove = serializers.ListField(
-        child=serializers.CharField(),
-        required=False,
-        default=list,
-        label="Olib tashlanayotgan ruxsatlar"
-    )
-
-    def _validate_codes(self, value: list, field_name: str) -> list:
-        """Faqat mavjud permission kodlarini qabul qiladi."""
-        invalid = [code for code in value if code not in ALL_PERMISSIONS]
+    def validate_permissions(self, value: list) -> list:
+        """Faqat mavjud permission kodlarini qabul qiladi, takrorlanishlarni olib tashlaydi."""
+        invalid = [p for p in value if p not in ALL_PERMISSIONS]
         if invalid:
             raise serializers.ValidationError(
-                f"Noto'g'ri permission kodlar: {invalid}. "
-                f"Mavjud kodlar: {ALL_PERMISSIONS}"
+                f"Noto'g'ri permission kodlar: {invalid}. Mavjud kodlar: {ALL_PERMISSIONS}"
             )
-        return value
+        return sorted(set(value))
 
-    def validate_add(self, value: list) -> list:
-        return self._validate_codes(value, 'add')
+    # --- Saqlash ---
 
-    def validate_remove(self, value: list) -> list:
-        return self._validate_codes(value, 'remove')
-
-    def validate(self, attrs: dict) -> dict:
-        """add va remove da bir xil kod bo'lmasligi kerak."""
-        conflict = set(attrs.get('add', [])) & set(attrs.get('remove', []))
-        if conflict:
-            raise serializers.ValidationError(
-                f"Bir vaqtda qo'shib va olib tashlab bo'lmaydi: {sorted(conflict)}"
-            )
-        return attrs
-
-    def update(self, worker: Worker, validated_data: dict) -> Worker:
+    @transaction.atomic
+    def update(self, instance: Worker, validated_data: dict) -> Worker:
         """
-        Worker.extra_permissions ni yangilaydi.
-
-        Mantiq:
-          - Qo'shilayotganlar 'removed' dan chiqariladi (agar oldin olib tashlangan bo'lsa)
-          - Olib tashlanayotganlar 'added' dan chiqariladi (agar oldin qo'shilgan bo'lsa)
-          - Rolda standart mavjud permission'larni 'added' da saqlash keraksiz — tozalanadi
-          - Rolda mavjud bo'lmagan permission'larni 'removed' da saqlash keraksiz — tozalanadi
+        CustomUser va Worker ma'lumotlarini birgalikda yangilaydi.
+        Faqat yuborilgan maydonlar o'zgaradi (partial=True).
         """
-        extra = worker.extra_permissions or {}
-        cur_added   = set(extra.get('added',   []))
-        cur_removed = set(extra.get('removed', []))
+        # User maydonlarini ajratib olamiz (source='user.*' → 'user' kalitida keladi)
+        user_data = validated_data.pop('user', {})
+        if user_data:
+            user = instance.user
+            for attr, value in user_data.items():
+                setattr(user, attr, value)
+            user.save(update_fields=list(user_data.keys()))
 
-        new_add    = set(validated_data.get('add',    []))
-        new_remove = set(validated_data.get('remove', []))
+        # Worker maydonlarini yangilaymiz
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
 
-        # Qo'shilayotganlar 'removed' dan o'chiriladi
-        cur_removed -= new_add
-        cur_added   |= new_add
-
-        # Olib tashlanayotganlar 'added' dan o'chiriladi
-        cur_added   -= new_remove
-        cur_removed |= new_remove
-
-        # Rolning standart permission'lari 'added' da bo'lishi keraksiz
-        default = set(ROLE_PERMISSIONS.get(worker.role, []))
-        cur_added   -= default
-        # Rolda bo'lmagan permission'lar 'removed' da bo'lishi keraksiz
-        cur_removed &= default
-
-        worker.extra_permissions = {
-            'added':   sorted(cur_added),
-            'removed': sorted(cur_removed),
-        }
-        worker.save(update_fields=['extra_permissions'])
-        return worker
+        return instance

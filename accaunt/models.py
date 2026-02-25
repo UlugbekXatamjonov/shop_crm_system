@@ -13,7 +13,7 @@ Ruxsat tizimi:
   - Rollar sobit: owner, manager, seller
   - Har bir permission = frontendda bitta bo'lim (sahifa)
   - ROLE_PERMISSIONS — har bir rolning standart permission ro'yxati
-  - Worker.extra_permissions — individual qo'shish/olib tashlash (JSONField)
+  - Worker.permissions — hodimning haqiqiy ruxsatlar ro'yxati (to'g'ridan-to'g'ri JSONField)
 """
 
 from django.db import models
@@ -231,19 +231,16 @@ class Worker(models.Model):
 
     Har bir hodim:
       - Bitta CustomUser bilan bog'liq (OneToOne)
-      - Sobit rollardan biriga ega: owner, manager, sotuvchi
+      - Sobit rollardan biriga ega: owner, manager, seller
       - Do'kon va filialga biriktiriladi
-      - extra_permissions orqali individual permission sozlanishi mumkin
+      - permissions — hodimning haqiqiy ruxsatlar ro'yxati (to'g'ridan-to'g'ri saqlanadi)
 
     Permission tizimi:
-      1. ROLE_PERMISSIONS[worker.role] → rolning standart permission'lari
-      2. extra_permissions['added']   → qo'shimcha berilgan permission'lar
-      3. extra_permissions['removed'] → olib tashlangan permission'lar
-      Yakuniy = (standart + qo'shilgan) - olib tashlangan
+      Hodim yaratilganda ROLE_PERMISSIONS[role] dan avtomatik to'ldiriladi.
+      Keyinchalik PATCH /workers/{id}/ orqali istalgan ro'yxat bilan almashtiriladi.
 
     Misol:
-      sotuvchi + added=['xarajatlar'] − removed=['sklad']
-      → ['sotuv', 'savdolar', 'mijozlar', 'mahsulotlar', 'xarajatlar']
+      {"permissions": ["sotuv", "ombor", "mahsulotlar", "xarajatlar"]}
     """
 
     user = models.OneToOneField(
@@ -287,15 +284,15 @@ class Worker(models.Model):
         verbose_name="Holati"
     )
 
-    # Individual permission o'zgarishlari.
-    # Format: {"added": ["sozlamalar"], "removed": ["sklad"]}
-    # - added   → ushbu hodimga qo'shimcha berilgan bo'limlar
-    # - removed → ushbu hodimdan olib tashlangan bo'limlar
-    extra_permissions = models.JSONField(
-        default=dict,
+    # Hodimning haqiqiy ruxsatlar ro'yxati.
+    # Hodim yaratilganda ROLE_PERMISSIONS[role] dan avtomatik to'ldiriladi.
+    # Owner PATCH /workers/{id}/ orqali istalgan ro'yxat bilan almashtiria oladi.
+    # Misol: ["sotuv", "ombor", "mahsulotlar"]
+    permissions = models.JSONField(
+        default=list,
         blank=True,
-        verbose_name="Individual permission o'zgarishlar",
-        help_text='Format: {"added": ["sozlamalar"], "removed": ["sklad"]}'
+        verbose_name="Ruxsatlar",
+        help_text="Hodim kira oladigan bo'lim kodlari ro'yxati"
     )
 
     created_on = models.DateTimeField(
@@ -312,21 +309,12 @@ class Worker(models.Model):
 
     def get_permissions(self) -> list[str]:
         """
-        Hodimning yakuniy permission ro'yxatini qaytaradi.
-
-        Hisoblash:
-          1. Rolning standart permission'larini oladi
-          2. Qo'shimcha berilgan permission'larni qo'shadi
-          3. Olib tashlangan permission'larni chiqaradi
-          4. Alifbo tartibida saralangan ro'yxat qaytaradi
+        Hodimning ruxsatlar ro'yxatini qaytaradi (alifbo tartibida).
 
         Returns:
             Hodim kira oladigan bo'limlar ro'yxati (masalan: ['mahsulotlar', 'sotuv'])
         """
-        base    = set(ROLE_PERMISSIONS.get(self.role, []))
-        added   = set(self.extra_permissions.get('added', []))
-        removed = set(self.extra_permissions.get('removed', []))
-        return sorted((base | added) - removed)
+        return sorted(self.permissions or [])
 
     def has_permission(self, code: str) -> bool:
         """
@@ -337,7 +325,7 @@ class Worker(models.Model):
         Returns:
             True — ruxsat mavjud, False — mavjud emas
         """
-        return code in self.get_permissions()
+        return code in (self.permissions or [])
 
 
 # ============================================================
