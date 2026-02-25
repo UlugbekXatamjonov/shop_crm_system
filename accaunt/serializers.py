@@ -30,7 +30,7 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 
-from .models import CustomUser, Worker, WorkerRole, WorkerStatus, ALL_PERMISSIONS, ROLE_PERMISSIONS
+from .models import CustomUser, Worker, WorkerRole, ALL_PERMISSIONS, ROLE_PERMISSIONS
 from .utils import Util
 
 
@@ -204,6 +204,45 @@ class UserPasswordResetSerializer(serializers.Serializer):
         except (DjangoUnicodeDecodeError, CustomUser.DoesNotExist):
             raise serializers.ValidationError("Token yaroqsiz yoki muddati o'tgan.")
         return attrs
+
+
+# ============================================================
+# PROFIL YANGILASH SERIALIZERI
+# ============================================================
+
+class ProfileUpdateSerializer(serializers.ModelSerializer):
+    """
+    Foydalanuvchi o'z shaxsiy ma'lumotlarini yangilash.
+    PATCH /api/v1/auth/profil/ da ishlatiladi.
+
+    Barcha rollar (owner, manager, seller) foydalana oladi.
+    Faqat o'z profilini tahrirlash mumkin.
+    Parol o'zgartirish uchun: /api/v1/auth/change-password/
+    """
+
+    class Meta:
+        model  = CustomUser
+        fields = ('first_name', 'last_name', 'phone1', 'phone2')
+
+    def validate_phone1(self, value: str) -> str:
+        """Telefon raqami boshqa foydalanuvchida band emasligini tekshiradi."""
+        qs = CustomUser.objects.filter(phone1=value).exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                "Bu telefon raqami allaqachon boshqa foydalanuvchida band."
+            )
+        return value
+
+    def validate_phone2(self, value: str) -> str:
+        """Qo'shimcha telefon raqami band emasligini tekshiradi."""
+        if not value:
+            return value
+        qs = CustomUser.objects.filter(phone2=value).exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                "Bu telefon raqami allaqachon boshqa foydalanuvchida band."
+            )
+        return value
 
 
 # ============================================================
@@ -402,13 +441,11 @@ class WorkerCreateSerializer(serializers.Serializer):
 
 class WorkerUpdateSerializer(serializers.ModelSerializer):
     """
-    Hodim ma'lumotlarini yangilash.
+    Hodim ma'lumotlarini yangilash — faqat do'kon egasi uchun.
     PATCH /api/v1/workers/{id}/ da ishlatiladi.
-    Faqat rol, filial, maosh va holat o'zgartirilishi mumkin.
 
-    Status o'zgartirish qoidalari:
-      - Faqat do'kon egasi (owner) statusni o'zgartira oladi
-      - Do'kon egasini 'ishdan_ketgan' ga o'tkazib bo'lmaydi
+    Owner istalgan hodimning rol, filial, maosh, statusini o'zgartira oladi.
+    Manager/seller uchun bu endpoint yopiq — ular /auth/profil/ dan foydalanadi.
     """
     class Meta:
         model = Worker
@@ -417,28 +454,13 @@ class WorkerUpdateSerializer(serializers.ModelSerializer):
     def validate_role(self, value: str) -> str:
         """Owner rolini faqat do'kon egasi yoki superadmin belgilay oladi."""
         if value == WorkerRole.OWNER:
-            request = self.context.get('request')
+            request    = self.context.get('request')
             cur_worker = getattr(request.user, 'worker', None)
             is_owner   = cur_worker and cur_worker.role == WorkerRole.OWNER
             if not request.user.is_superuser and not is_owner:
                 raise serializers.ValidationError(
                     "Owner rolini faqat do'kon egasi yoki superadmin belgilay oladi."
                 )
-        return value
-
-    def validate_status(self, value: str) -> str:
-        """Statusni faqat do'kon egasi o'zgartira oladi."""
-        request    = self.context.get('request')
-        cur_worker = getattr(request.user, 'worker', None)
-        if not cur_worker or cur_worker.role != WorkerRole.OWNER:
-            raise serializers.ValidationError(
-                "Hodim statusini faqat do'kon egasi o'zgartira oladi."
-            )
-        # Eganing o'zini ishdan chiqarib bo'lmaydi
-        if value == WorkerStatus.ISHDAN_KETGAN and self.instance.role == WorkerRole.OWNER:
-            raise serializers.ValidationError(
-                "Do'kon egasini ishdan chiqarib bo'lmaydi."
-            )
         return value
 
 

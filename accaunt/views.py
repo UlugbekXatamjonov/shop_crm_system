@@ -32,6 +32,7 @@ from .serializers import (
     SendPasswordResetEmailSerializer,
     UserPasswordResetSerializer,
     CustomUserProfileSerializer,
+    ProfileUpdateSerializer,
     WorkerListSerializer,
     WorkerDetailSerializer,
     WorkerCreateSerializer,
@@ -169,22 +170,41 @@ class UserChangePasswordView(APIView):
         )
 
 
-class ProfileView(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+class ProfileView(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet):
     """
-    O'z profilini ko'rish.
-    GET /api/v1/auth/profil/
+    O'z profilini ko'rish va yangilash.
 
-    Ruxsat: autentifikatsiya qilingan foydalanuvchi
-    Javob: foydalanuvchi ma'lumotlari + worker + permission'lar
+    GET   /api/v1/auth/profil/ — profilni ko'rish
+    PATCH /api/v1/auth/profil/ — ism, familiya, telefon raqamlarini yangilash
+
+    Barcha rollar (owner, manager, seller) foydalana oladi.
+    Parol o'zgartirish: /api/v1/auth/change-password/
     """
-    serializer_class   = CustomUserProfileSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.action in ('update', 'partial_update'):
+            return ProfileUpdateSerializer
+        return CustomUserProfileSerializer
 
     def get_queryset(self):
         return CustomUser.objects.filter(id=self.request.user.id)
 
     def get_object(self) -> CustomUser:
         return self.request.user
+
+    def update(self, request, *args, **kwargs):
+        instance   = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(
+            {
+                'message': "Profil muvaffaqiyatli yangilandi.",
+                'data': CustomUserProfileSerializer(instance).data,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 # ============================================================
@@ -210,8 +230,17 @@ class WorkerViewSet(viewsets.ModelViewSet):
     Multi-tenant xavfsizlik:
       Faqat o'z do'konining hodimlarini ko'radi va boshqaradi.
     """
-    permission_classes = [IsAuthenticated, IsManagerOrAbove]
-    http_method_names  = ['get', 'post', 'patch']
+    http_method_names = ['get', 'post', 'patch']
+
+    def get_permissions(self):
+        """
+        list/retrieve  → IsManagerOrAbove  (manager va seller ham ko'ra oladi)
+        create/update  → IsOwner           (faqat ega qo'shadi va o'zgartiradi)
+        permissions    → IsOwner           (action dekoratorda belgilangan)
+        """
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated(), IsManagerOrAbove()]
+        return [IsAuthenticated(), IsOwner()]
 
     def get_serializer_class(self):
         """So'rov turiga qarab to'g'ri serializer tanlanadi."""

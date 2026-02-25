@@ -29,7 +29,7 @@ urlpatterns = [
     path('change-password/', UserChangePasswordView.as_view(), name='change-password'),
 
     # --- Profil ---
-    # ProfileView — RetrieveModelMixin + GenericViewSet
-    # retrieve action → GET /api/v1/auth/profil/
-    path('profil/', ProfileView.as_view({'get': 'retrieve'}), name='my-profile'),
+    # GET   /api/v1/auth/profil/ — profilni ko'rish
+    # PATCH /api/v1/auth/profil/ — ism, familiya, telefon yangilash
+    path('profil/', ProfileView.as_view({'get': 'retrieve', 'patch': 'partial_update'}), name='my-profile'),
 ]
