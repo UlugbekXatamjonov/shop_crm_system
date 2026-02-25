@@ -13,11 +13,11 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 
 ---
 
-## LOYIHA HOLATI (24.02.2026)
+## LOYIHA HOLATI (25.02.2026)
 
 | App         | Holat             | Izoh                                                   |
 |-------------|-------------------|--------------------------------------------------------|
-| `accaunt`   | ✅ Tugallangan    | CustomUser, Worker, AuditLog, JWT auth                 |
+| `accaunt`   | ✅ Tugallangan    | CustomUser, Worker, AuditLog, JWT auth — refactor tugallandi |
 | `store`     | ✅ Tugallangan    | Store, Branch CRUD (soft delete, multi-tenant)         |
 | `warehouse` | ✅ Tugallangan    | Category, Product, Stock, StockMovement (kirim/chiqim) |
 | `trade`     | ❌ Boshlanmagan  | Navbatda                                               |
@@ -36,6 +36,128 @@ Barcha write operatsiyalarda shu pattern ishlatiladi:
 | `destroy`  | 200    | `{'message': '...'}`                |
 | `list`     | 200    | faqat `[...]` (message yo'q)        |
 | `retrieve` | 200    | faqat `{...}` (message yo'q)        |
+
+---
+
+## ACCAUNT APP — TO'LIQ TUZILMA
+
+### Modellar
+
+#### WorkerRole (TextChoices)
+```python
+OWNER   = 'owner',   'Ega'
+MANAGER = 'manager', 'Menejer'
+SELLER  = 'seller',  'Sotuvchi'
+```
+
+#### WorkerStatus (TextChoices)
+```python
+ACTIVE        = 'active',        'Faol'
+TATIL         = 'tatil',         'Tatilda'
+ISHDAN_KETGAN = 'ishdan_ketgan', 'Ishdan ketgan'   # max_length=15
+```
+
+#### ALL_PERMISSIONS (10 ta kod)
+```python
+['boshqaruv', 'sotuv', 'dokonlar', 'ombor', 'mahsulotlar',
+ 'xodimlar', 'savdolar', 'xarajatlar', 'mijozlar', 'sozlamalar']
+```
+
+#### ROLE_PERMISSIONS (standart rol permission'lari)
+```python
+OWNER:   barcha 10 ta permission
+MANAGER: boshqaruv, sotuv, dokonlar, ombor, mahsulotlar, xodimlar, savdolar, xarajatlar, mijozlar
+SELLER:  sotuv, savdolar, mijozlar, ombor, mahsulotlar
+```
+
+#### Worker model maydonlari
+| Maydon        | Turi                  | Izoh                                              |
+|---------------|-----------------------|---------------------------------------------------|
+| `user`        | OneToOneField         | CustomUser bilan bog'liq                          |
+| `role`        | CharField(max_length=20) | WorkerRole choices, default=SELLER              |
+| `store`       | ForeignKey(Store)     | Do'kon (null=True owner uchun)                    |
+| `branch`      | ForeignKey(Branch)    | Filial (null=True)                                |
+| `salary`      | DecimalField          | Maoshi UZS da                                     |
+| `status`      | CharField(max_length=15) | WorkerStatus choices, default=ACTIVE           |
+| `permissions` | JSONField(default=list) | Haqiqiy ruxsatlar ro'yxati, masalan: `["sotuv", "ombor"]` |
+| `created_on`  | DateTimeField         | auto_now_add                                      |
+
+**Muhim:** `Worker.permissions` to'g'ridan-to'g'ri ruxsatlar ro'yxati. Hodim yaratilganda
+`ROLE_PERMISSIONS[role]` dan avtomatik to'ldiriladi. Owner PATCH orqali istalgan ro'yxat bilan
+almashtirishda so'rov formatida `{"permissions": ["sotuv", "ombor"]}` ishlatilinadi.
+
+### Serializerlar
+
+| Serializer                  | Maqsad                                                       |
+|-----------------------------|--------------------------------------------------------------|
+| `UserRegistrationSerializer`| Ro'yxatdan o'tish (auto Worker(owner) + permissions yaratadi)|
+| `UserLoginSerializer`       | Login (username + password)                                  |
+| `LogoutSerializer`          | Token blacklist                                              |
+| `UserChangePasswordSerializer` | Parol o'zgartirish                                        |
+| `ProfileUpdateSerializer`   | PATCH /auth/profil/ — first_name, last_name, phone1, phone2  |
+| `WorkerListSerializer`      | Hodimlar ro'yxati (id, full_name, phone1, role, branch, salary, status) |
+| `WorkerDetailSerializer`    | Hodim to'liq (+ username, email, phone2, permissions)        |
+| `WorkerCreateSerializer`    | Hodim yaratish (user+worker bitta atomic da, permissions auto) |
+| `WorkerUpdateSerializer`    | Hodim yangilash — user+worker+permissions bitta PATCH da     |
+
+**WorkerUpdateSerializer PATCH maydonlari:**
+```python
+# CustomUser maydonlari (source='user.*'):
+first_name, last_name, phone1, phone2
+
+# Worker maydonlari:
+role, branch, salary, status
+
+# Permission ro'yxati:
+permissions  # ["sotuv", "ombor", ...]  — to'liq ro'yxat almashadi
+```
+
+### Permission klasslari (`accaunt/permissions.py`)
+| Klass            | Shart                                          |
+|------------------|------------------------------------------------|
+| `IsOwner`        | `worker.role == 'owner'`                       |
+| `IsManagerOrAbove` | `worker.role in ('owner', 'manager')`        |
+| `CanAccess(code)`| `worker.has_permission(code)`                  |
+
+### Endpointlar
+
+#### Auth (`/api/v1/auth/`)
+| Method | URL                        | Ruxsat     | Izoh                          |
+|--------|----------------------------|------------|-------------------------------|
+| POST   | `/auth/register/`          | AllowAny   | Ro'yxatdan o'tish + JWT token |
+| POST   | `/auth/login/`             | AllowAny   | Kirish + profil + JWT token   |
+| POST   | `/auth/logout/`            | Auth       | Token blacklist               |
+| POST   | `/auth/change-password/`   | Auth       | Parol o'zgartirish            |
+| GET    | `/auth/profil/`            | Auth       | O'z profilini ko'rish         |
+| PATCH  | `/auth/profil/`            | Auth       | first_name, last_name, phone1, phone2 |
+| POST   | `/auth/send-reset-email/`  | AllowAny   | Parol tiklash email           |
+| POST   | `/auth/reset-password/{uid}/{token}/` | AllowAny | Yangi parol o'rnatish |
+
+#### Workers (`/api/v1/workers/`)
+| Method | URL               | Ruxsat          | Izoh                                       |
+|--------|-------------------|-----------------|--------------------------------------------|
+| GET    | `/workers/`       | IsManagerOrAbove | Hodimlar ro'yxati (faqat o'z do'koni)     |
+| POST   | `/workers/`       | IsOwner         | Yangi hodim qo'shish                       |
+| GET    | `/workers/{id}/`  | IsManagerOrAbove | Hodim to'liq ma'lumoti                    |
+| PATCH  | `/workers/{id}/`  | IsOwner         | user+worker+permissions bitta so'rovda    |
+
+**http_method_names = ['get', 'post', 'patch']** — DELETE yo'q (soft delete status orqali).
+
+**Status o'zgartirish PATCH orqali:**
+```json
+{"status": "active"}         // faollashtirish
+{"status": "tatil"}          // tatilga chiqarish
+{"status": "ishdan_ketgan"}  // ishdan chiqarish
+```
+
+### Migratsiyalar
+| Migration | Izoh                                                           |
+|-----------|----------------------------------------------------------------|
+| 0001      | Dastlabki CustomUser va Worker modellari                       |
+| 0002      | role_permissions olib tashlandi, boshqa o'zgarishlar           |
+| 0003      | branch verbose_name                                            |
+| 0004      | WorkerRole (sotuvchi→seller), WorkerStatus (deactive→tatil/ishdan_ketgan), max_length=15 + data migration |
+| 0005      | Worker.extra_permissions → Worker.permissions (flat list) + data migration |
 
 ---
 
@@ -63,7 +185,7 @@ GET/POST   /api/v1/warehouse/movements/    + GET          /{id}/   (immutable)
 ```
 
 ### Ruxsatlar
-- `list/retrieve` → `IsAuthenticated + CanAccess('mahsulotlar')` yoki `CanAccess('sklad')`
+- `list/retrieve` → `IsAuthenticated + CanAccess('mahsulotlar')` yoki `CanAccess('ombor')`
 - `create/update/destroy` → `IsAuthenticated + IsManagerOrAbove`
 - `StockMovement` → faqat `GET` va `POST` (http_method_names = ['get', 'post'])
 
@@ -146,13 +268,17 @@ PORT=8000
 ## MUHIM ESLATMALAR
 
 ### Worktree pattern (MAJBURIY)
-- Claude worktree da ishlaydi: `.claude/worktrees/priceless-brown/`
-- Har o'zgarishdan keyin: `git add` → `git commit`
-- `__pycache__` va `db.sqlite3` ni HECH QACHON commit qilma
+- Claude worktree da ishlaydi: `.claude/worktrees/elegant-bhaskara/`
+- **Har o'zgarishdan keyin:** `git commit` → DARHOL `git cherry-pick` main branchga
+- `__pycache__`, `db.sqlite3`, `.claude/settings.local.json` ni HECH QACHON commit qilma
 
 ### Virtual env
 ```bash
-source /d/projects/shop_crm_system/myenv/Scripts/activate
+# Python executable:
+D:/projects/shop_crm_system/myenv/Scripts/python.exe
+
+# Django management commands:
+"D:/projects/shop_crm_system/myenv/Scripts/python.exe" manage.py <command>
 ```
 
 ### Migration yaratish
@@ -161,13 +287,12 @@ python manage.py makemigrations appname --settings=config.settings.local
 python manage.py migrate appname --settings=config.settings.local
 ```
 
-### Git log (so'nggi commitlar)
+### Git log (so'nggi commitlar, 25.02.2026)
 ```
-e1e0910  feat(cors): Vercel frontend URL qo'shildi
-a4e59f1  feat(warehouse): warehouse app to'liq qurildi
-acc1d9f  feat(accaunt): WorkerViewSet update/destroy metodlari va message+data pattern
-19125a9  feat(store): create/update javoblariga message+data qo'shildi
-f6bf1f3  fix(railway): PORT mismatch tuzatildi
+6ec2689  refactor(accaunt): replace extra_permissions with direct permissions field
+26cfec2  refactor(accaunt): worker/profil tahrirlash huquqlari aniqlantirildi
+7ac4f5d  refactor(accaunt): activate/deactivate o'chirildi, PATCH status ga ko'chirildi
+cd2122b  refactor(accaunt): rol, status va permission kodlari yangilandi
 ```
 
 ---
@@ -187,12 +312,15 @@ shop_crm_system/
 │   ├── urls.py           ← /health/, /api/v1/, /swagger/
 │   └── wsgi.py
 ├── accaunt/              ✅ CustomUser, Worker, AuditLog, JWT auth
-│   ├── models.py         ← CustomUser, Worker, AuditLog + permissions
-│   ├── views.py          ← Register, Login, Logout, Profile, WorkerViewSet
-│   ├── serializers.py
-│   ├── permissions.py    ← IsOwner, IsManagerOrAbove, IsSotuvchiOrAbove, CanAccess
+│   ├── models.py         ← CustomUser, Worker(permissions JSONField), AuditLog
+│   ├── views.py          ← Register, Login, Logout, ProfileView, WorkerViewSet
+│   ├── serializers.py    ← WorkerUpdateSerializer (user+worker+permissions bitta PATCH)
+│   ├── permissions.py    ← IsOwner, IsManagerOrAbove, CanAccess
 │   ├── urls.py           ← /api/v1/auth/
-│   └── api_urls.py       ← /api/v1/workers/
+│   ├── api_urls.py       ← /api/v1/workers/
+│   └── migrations/
+│       ├── 0004_...      ← role/status o'zgarishlar + data migration
+│       └── 0005_...      ← extra_permissions → permissions + data migration
 ├── store/                ✅ Store, Branch (soft delete, multi-tenant)
 │   ├── models.py         ← Store, Branch, StoreStatus
 │   ├── views.py          ← StoreViewSet, BranchViewSet
