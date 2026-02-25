@@ -22,7 +22,7 @@ from rest_framework.decorators import action
 from rest_framework import status, viewsets, mixins
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import CustomUser, Worker, AuditLog, WorkerStatus
+from .models import CustomUser, Worker, AuditLog
 from .permissions import IsManagerOrAbove, IsOwner
 from .serializers import (
     UserRegistrationSerializer,
@@ -199,17 +199,19 @@ class WorkerViewSet(viewsets.ModelViewSet):
       GET    /api/v1/workers/                  — ro'yxat
       POST   /api/v1/workers/                  — yangi hodim qo'shish
       GET    /api/v1/workers/{id}/             — hodim ma'lumoti
-      PATCH  /api/v1/workers/{id}/             — hodimni yangilash
-      DELETE /api/v1/workers/{id}/             — hodimni o'chirish
-      POST   /api/v1/workers/{id}/activate/    — hodimni faollashtirish
-      POST   /api/v1/workers/{id}/deactivate/  — hodimni o'chirish
-      PATCH  /api/v1/workers/{id}/permissions/ — permission o'zgartirish
+      PATCH  /api/v1/workers/{id}/             — hodimni yangilash (rol, filial, maosh, status)
+      PATCH  /api/v1/workers/{id}/permissions/ — individual permission o'zgartirish (faqat owner)
+
+    Status o'zgartirish PATCH orqali amalga oshiriladi:
+      {"status": "active"}        — faollashtirish   (faqat owner)
+      {"status": "tatil"}         — tatilga chiqarish (faqat owner)
+      {"status": "ishdan_ketgan"} — ishdan chiqarish  (faqat owner)
 
     Multi-tenant xavfsizlik:
       Faqat o'z do'konining hodimlarini ko'radi va boshqaradi.
     """
     permission_classes = [IsAuthenticated, IsManagerOrAbove]
-    http_method_names  = ['get', 'post', 'patch', 'delete']
+    http_method_names  = ['get', 'post', 'patch']
 
     def get_serializer_class(self):
         """So'rov turiga qarab to'g'ri serializer tanlanadi."""
@@ -246,21 +248,6 @@ class WorkerViewSet(viewsets.ModelViewSet):
         worker = self.request.user.worker
         return serializer.save(store=worker.store)
 
-    def perform_destroy(self, instance: Worker):
-        """
-        Hodimni o'chirishning o'rniga 'ishdan ketgan' holatiga o'tkaziladi.
-        Ma'lumotlar saqlanadi (savdo tarixi, audit log va h.k.).
-        """
-        instance.status = WorkerStatus.ISHDAN_KETGAN
-        instance.save(update_fields=['status'])
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.DELETE,
-            target_model='Worker',
-            target_id=instance.id,
-            description=f"Hodim deaktivatsiya qilindi: {instance.user}",
-        )
-
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(
             data=request.data,
@@ -269,7 +256,6 @@ class WorkerViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         worker = self.perform_create(serializer)
 
-        # AuditLog: hodim qo'shildi
         AuditLog.objects.create(
             actor=request.user,
             action=AuditLog.Action.CREATE,
@@ -288,7 +274,10 @@ class WorkerViewSet(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer = self.get_serializer(
+            instance, data=request.data, partial=True,
+            context={'request': request},
+        )
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
 
@@ -308,74 +297,9 @@ class WorkerViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK
         )
 
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        self.perform_destroy(instance)
-        return Response(
-            {'message': "Hodim muvaffaqiyatli ishdan ketgan holatiga o'tkazildi."},
-            status=status.HTTP_200_OK
-        )
-
     # ----------------------------------------------------------
     # QO'SHIMCHA ACTION'LAR
     # ----------------------------------------------------------
-
-    @action(detail=True, methods=['post'], url_path='activate')
-    def activate(self, request, pk=None):
-        """
-        Hodimni faollashtirish.
-        POST /api/v1/workers/{id}/activate/
-        """
-        worker = self.get_object()
-        if worker.status == 'active':
-            return Response(
-                {'message': "Hodim allaqachon faol."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        worker.status = 'active'
-        worker.save(update_fields=['status'])
-
-        AuditLog.objects.create(
-            actor=request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='Worker',
-            target_id=worker.id,
-            description=f"Hodim faollashtirildi: {worker.user}",
-        )
-        return Response({'message': "Hodim muvaffaqiyatli faollashtirildi."})
-
-    @action(detail=True, methods=['post'], url_path='deactivate',
-            permission_classes=[IsAuthenticated, IsOwner])
-    def deactivate(self, request, pk=None):
-        """
-        Hodimni deaktivatsiya qilish.
-        POST /api/v1/workers/{id}/deactivate/
-
-        Faqat do'kon egasi (owner) o'chira oladi.
-        """
-        worker = self.get_object()
-        if worker.status == WorkerStatus.ISHDAN_KETGAN:
-            return Response(
-                {'message': "Hodim allaqachon ishdan ketgan."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        # Egani o'chirishga ruxsat yo'q
-        if worker.role == 'owner':
-            return Response(
-                {'message': "Do'kon egasini ishdan ketgan holatiga o'tkazib bo'lmaydi."},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        worker.status = WorkerStatus.ISHDAN_KETGAN
-        worker.save(update_fields=['status'])
-
-        AuditLog.objects.create(
-            actor=request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='Worker',
-            target_id=worker.id,
-            description=f"Hodim deaktivatsiya qilindi: {worker.user}",
-        )
-        return Response({'message': "Hodim muvaffaqiyatli deaktivatsiya qilindi."})
 
     @action(detail=True, methods=['patch'], url_path='permissions',
             permission_classes=[IsAuthenticated, IsOwner])
@@ -385,7 +309,7 @@ class WorkerViewSet(viewsets.ModelViewSet):
         PATCH /api/v1/workers/{id}/permissions/
 
         Faqat do'kon egasi (owner) permission o'zgartira oladi.
-        So'rov: {"add": ["sozlamalar"], "remove": ["sklad"]}
+        So'rov: {"add": ["sozlamalar"], "remove": ["ombor"]}
         """
         worker = self.get_object()
         serializer = WorkerPermissionSerializer(data=request.data)

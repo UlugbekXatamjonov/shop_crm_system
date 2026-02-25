@@ -405,6 +405,10 @@ class WorkerUpdateSerializer(serializers.ModelSerializer):
     Hodim ma'lumotlarini yangilash.
     PATCH /api/v1/workers/{id}/ da ishlatiladi.
     Faqat rol, filial, maosh va holat o'zgartirilishi mumkin.
+
+    Status o'zgartirish qoidalari:
+      - Faqat do'kon egasi (owner) statusni o'zgartira oladi
+      - Do'kon egasini 'ishdan_ketgan' ga o'tkazib bo'lmaydi
     """
     class Meta:
         model = Worker
@@ -420,6 +424,21 @@ class WorkerUpdateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     "Owner rolini faqat do'kon egasi yoki superadmin belgilay oladi."
                 )
+        return value
+
+    def validate_status(self, value: str) -> str:
+        """Statusni faqat do'kon egasi o'zgartira oladi."""
+        request    = self.context.get('request')
+        cur_worker = getattr(request.user, 'worker', None)
+        if not cur_worker or cur_worker.role != WorkerRole.OWNER:
+            raise serializers.ValidationError(
+                "Hodim statusini faqat do'kon egasi o'zgartira oladi."
+            )
+        # Eganing o'zini ishdan chiqarib bo'lmaydi
+        if value == WorkerStatus.ISHDAN_KETGAN and self.instance.role == WorkerRole.OWNER:
+            raise serializers.ValidationError(
+                "Do'kon egasini ishdan chiqarib bo'lmaydi."
+            )
         return value
 
 
