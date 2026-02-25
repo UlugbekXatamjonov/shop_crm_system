@@ -65,8 +65,20 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Kiritilgan parollar bir xil emas!")
         return attrs
 
+    @transaction.atomic
     def create(self, validated_data: dict) -> CustomUser:
-        return CustomUser.objects.create_user(**validated_data)
+        """
+        CustomUser yaratiladi va avtomatik 'owner' Worker profili biriktiriladi.
+        Faqat do'kon egasi ro'yxatdan o'tadi — do'kon keyinchalik qo'shiladi.
+        """
+        user = CustomUser.objects.create_user(**validated_data)
+        Worker.objects.create(
+            user=user,
+            role=WorkerRole.OWNER,
+            store=None,
+            branch=None,
+        )
+        return user
 
 
 class UserLoginSerializer(serializers.Serializer):
@@ -249,11 +261,12 @@ class WorkerListSerializer(serializers.ModelSerializer):
     full_name    = serializers.SerializerMethodField()
     role_display = serializers.CharField(source='get_role_display', read_only=True)
     branch_name  = serializers.CharField(source='branch.name', read_only=True)
+    phone1       = serializers.CharField(source='user.phone1', read_only=True)
 
     class Meta:
         model = Worker
         fields = (
-            'id', 'full_name', 'role', 'role_display',
+            'id', 'full_name', 'phone1', 'role', 'role_display',
             'branch_name', 'salary', 'status',
         )
 
@@ -335,12 +348,15 @@ class WorkerCreateSerializer(serializers.Serializer):
         return value
 
     def validate_role(self, value: str) -> str:
-        """Owner rolini faqat superadmin tayinlay oladi."""
-        request = self.context.get('request')
-        if value == WorkerRole.OWNER and not request.user.is_superuser:
-            raise serializers.ValidationError(
-                "Owner rolini faqat superadmin tayinlay oladi."
-            )
+        """Owner rolini faqat do'kon egasi yoki superadmin tayinlay oladi."""
+        if value == WorkerRole.OWNER:
+            request = self.context.get('request')
+            cur_worker = getattr(request.user, 'worker', None)
+            is_owner   = cur_worker and cur_worker.role == WorkerRole.OWNER
+            if not request.user.is_superuser and not is_owner:
+                raise serializers.ValidationError(
+                    "Owner rolini faqat do'kon egasi yoki superadmin tayinlay oladi."
+                )
         return value
 
     @transaction.atomic
@@ -395,12 +411,15 @@ class WorkerUpdateSerializer(serializers.ModelSerializer):
         fields = ('role', 'branch', 'salary', 'status')
 
     def validate_role(self, value: str) -> str:
-        """Owner rolini faqat superadmin o'zgartira oladi."""
-        request = self.context.get('request')
-        if value == WorkerRole.OWNER and not request.user.is_superuser:
-            raise serializers.ValidationError(
-                "Owner rolini faqat superadmin belgilay oladi."
-            )
+        """Owner rolini faqat do'kon egasi yoki superadmin belgilay oladi."""
+        if value == WorkerRole.OWNER:
+            request = self.context.get('request')
+            cur_worker = getattr(request.user, 'worker', None)
+            is_owner   = cur_worker and cur_worker.role == WorkerRole.OWNER
+            if not request.user.is_superuser and not is_owner:
+                raise serializers.ValidationError(
+                    "Owner rolini faqat do'kon egasi yoki superadmin belgilay oladi."
+                )
         return value
 
 

@@ -22,7 +22,7 @@ from rest_framework.decorators import action
 from rest_framework import status, viewsets, mixins
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import CustomUser, Worker, AuditLog
+from .models import CustomUser, Worker, AuditLog, WorkerStatus
 from .permissions import IsManagerOrAbove, IsOwner
 from .serializers import (
     UserRegistrationSerializer,
@@ -248,10 +248,10 @@ class WorkerViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance: Worker):
         """
-        Hodimni o'chirishning o'rniga deaktivatsiya qilinadi.
+        Hodimni o'chirishning o'rniga 'ishdan ketgan' holatiga o'tkaziladi.
         Ma'lumotlar saqlanadi (savdo tarixi, audit log va h.k.).
         """
-        instance.status = 'deactive'
+        instance.status = WorkerStatus.ISHDAN_KETGAN
         instance.save(update_fields=['status'])
         AuditLog.objects.create(
             actor=self.request.user,
@@ -312,7 +312,7 @@ class WorkerViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(
-            {'message': "Hodim muvaffaqiyatli deaktivatsiya qilindi."},
+            {'message': "Hodim muvaffaqiyatli ishdan ketgan holatiga o'tkazildi."},
             status=status.HTTP_200_OK
         )
 
@@ -354,18 +354,18 @@ class WorkerViewSet(viewsets.ModelViewSet):
         Faqat do'kon egasi (owner) o'chira oladi.
         """
         worker = self.get_object()
-        if worker.status == 'deactive':
+        if worker.status == WorkerStatus.ISHDAN_KETGAN:
             return Response(
-                {'message': "Hodim allaqachon nofaol."},
+                {'message': "Hodim allaqachon ishdan ketgan."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         # Egani o'chirishga ruxsat yo'q
         if worker.role == 'owner':
             return Response(
-                {'message': "Do'kon egasini deaktivatsiya qilib bo'lmaydi."},
+                {'message': "Do'kon egasini ishdan ketgan holatiga o'tkazib bo'lmaydi."},
                 status=status.HTTP_403_FORBIDDEN
             )
-        worker.status = 'deactive'
+        worker.status = WorkerStatus.ISHDAN_KETGAN
         worker.save(update_fields=['status'])
 
         AuditLog.objects.create(

@@ -9,7 +9,7 @@ ViewSet'lar:
   StockMovementViewSet — Kirim/chiqim harakatlarini boshqarish
 
 Ruxsatlar:
-  list/retrieve → CanAccess('mahsulotlar') yoki CanAccess('sklad')
+  list/retrieve → CanAccess('mahsulotlar') yoki CanAccess('ombor')
   create/update/destroy → IsManagerOrAbove
 
 StockMovement:
@@ -318,7 +318,7 @@ class StockViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in ('list', 'retrieve'):
-            return [IsAuthenticated(), CanAccess('sklad')]
+            return [IsAuthenticated(), CanAccess('ombor')]
         return [IsAuthenticated(), IsManagerOrAbove()]
 
     def get_serializer_class(self):
@@ -443,7 +443,7 @@ class StockMovementViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post']
 
     def get_permissions(self):
-        return [IsAuthenticated(), CanAccess('sklad')]
+        return [IsAuthenticated(), CanAccess('ombor')]
 
     def get_serializer_class(self):
         if self.action == 'list':

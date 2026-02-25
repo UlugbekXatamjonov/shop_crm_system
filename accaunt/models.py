@@ -10,7 +10,7 @@ Modellar:
   AuditLog     — Tizim amallari jurnali
 
 Ruxsat tizimi:
-  - Rollar sobit: owner, manager, sotuvchi
+  - Rollar sobit: owner, manager, seller
   - Har bir permission = frontendda bitta bo'lim (sahifa)
   - ROLE_PERMISSIONS — har bir rolning standart permission ro'yxati
   - Worker.extra_permissions — individual qo'shish/olib tashlash (JSONField)
@@ -41,9 +41,9 @@ class WorkerRole(models.TextChoices):
     Har bir rol o'ziga xos permission to'plamiga ega.
     Rollar sobit — kod ichida belgilangan, DB dan o'zgartirib bo'lmaydi.
     """
-    OWNER    = 'owner',    'Egasi'
-    MANAGER  = 'manager',  'Menejer'
-    SOTUVCHI = 'sotuvchi', 'Sotuvchi'
+    OWNER   = 'owner',   'Ega'
+    MANAGER = 'manager', 'Menejer'
+    SELLER  = 'seller',  'Sotuvchi'
 
 
 # ============================================================
@@ -57,7 +57,7 @@ ALL_PERMISSIONS: list[str] = [
     'boshqaruv',   # Boshqaruv paneli (Dashboard)
     'sotuv',       # Sotuv oynasi (POS — kassa)
     'dokonlar',    # Do'konlar va filiallar
-    'sklad',       # Sklad (ombor)
+    'ombor',       # Ombor (sklad)
     'mahsulotlar', # Mahsulotlar katalogi
     'xodimlar',    # Xodimlarni boshqarish
     'savdolar',    # Savdolar tarixi va hisobotlar
@@ -75,25 +75,25 @@ ALL_PERMISSIONS: list[str] = [
 # Individual worker uchun extra_permissions orqali qo'shish/olib tashlash mumkin.
 ROLE_PERMISSIONS: dict[str, list[str]] = {
 
-    # Egasi — barcha bo'limlarga kirish huquqi bor
+    # Ega — barcha bo'limlarga kirish huquqi bor
     WorkerRole.OWNER: [
-        'boshqaruv', 'sotuv', 'dokonlar', 'sklad',
+        'boshqaruv', 'sotuv', 'dokonlar', 'ombor',
         'mahsulotlar', 'xodimlar', 'savdolar',
         'xarajatlar', 'mijozlar', 'sozlamalar',
     ],
 
     # Menejer — sozlamalardan tashqari hamma bo'lim
     WorkerRole.MANAGER: [
-        'boshqaruv', 'sotuv', 'dokonlar', 'sklad',
+        'boshqaruv', 'sotuv', 'dokonlar', 'ombor',
         'mahsulotlar', 'xodimlar', 'savdolar',
         'xarajatlar', 'mijozlar',
-        # 'sozlamalar' yo'q — faqat egasi sozlamalarni boshqaradi
+        # 'sozlamalar' yo'q — faqat ega sozlamalarni boshqaradi
     ],
 
     # Sotuvchi — faqat savdo va mahsulot bo'limlari
-    WorkerRole.SOTUVCHI: [
+    WorkerRole.SELLER: [
         'sotuv', 'savdolar', 'mijozlar',
-        'sklad', 'mahsulotlar',
+        'ombor', 'mahsulotlar',
     ],
 }
 
@@ -104,8 +104,9 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
 
 class WorkerStatus(models.TextChoices):
     """Hodim faollik holatlari"""
-    ACTIVE   = 'active',   'Faol'
-    DEACTIVE = 'deactive', 'Faol emas'
+    ACTIVE        = 'active',        'Faol'
+    TATIL         = 'tatil',         'Tatilda'
+    ISHDAN_KETGAN = 'ishdan_ketgan', 'Ishdan ketgan'
 
 
 # ============================================================
@@ -254,7 +255,7 @@ class Worker(models.Model):
     role = models.CharField(
         max_length=20,
         choices=WorkerRole.choices,
-        default=WorkerRole.SOTUVCHI,
+        default=WorkerRole.SELLER,
         verbose_name="Roli"
     )
     store = models.ForeignKey(
@@ -280,7 +281,7 @@ class Worker(models.Model):
         verbose_name="Maoshi (UZS)"
     )
     status = models.CharField(
-        max_length=10,
+        max_length=15,
         choices=WorkerStatus.choices,
         default=WorkerStatus.ACTIVE,
         verbose_name="Holati"
