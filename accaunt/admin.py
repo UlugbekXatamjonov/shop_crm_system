@@ -51,35 +51,31 @@ class CustomUserAdmin(UserAdmin):
 class WorkerAdmin(admin.ModelAdmin):
     """
     Hodimlarni boshqarish.
-    extra_permissions raw JSON formatda ko'rsatiladi.
+    permissions — to'g'ridan-to'g'ri ruxsatlar ro'yxati (JSONField).
     """
     list_display   = ('user', 'role', 'store', 'branch', 'salary', 'status', 'created_on')
     list_filter    = ('role', 'status', 'store', 'branch')
     search_fields  = ('user__username', 'user__first_name', 'user__last_name')
     ordering       = ('-created_on',)
-    readonly_fields = ('created_on', 'get_computed_permissions')
+    readonly_fields = ('created_on',)
     autocomplete_fields = ('user', 'store', 'branch')
 
     fieldsets = (
         ("Asosiy ma'lumotlar", {
             'fields': ('user', 'role', 'status', 'store', 'branch', 'salary')
         }),
-        ("Individual permission'lar", {
-            'fields': ('extra_permissions', 'get_computed_permissions'),
+        ("Permission'lar", {
+            'fields': ('permissions',),
             'description': (
-                'Format: {"added": ["sozlamalar"], "removed": ["sklad"]}\n'
-                'Yakuniy permission\'lar = Rol standart + qo\'shilgan - olib tashlangan'
+                "Format: [\"sotuv\", \"ombor\", \"xarajatlar\"]\n"
+                "To'liq ro'yxat: boshqaruv, sotuv, dokonlar, ombor, mahsulotlar, "
+                "xodimlar, savdolar, xarajatlar, mijozlar, sozlamalar"
             ),
         }),
         ("Vaqt", {
             'fields': ('created_on',)
         }),
     )
-
-    @admin.display(description="Yakuniy permission'lar")
-    def get_computed_permissions(self, obj: Worker) -> str:
-        """Admin da hodimning yakuniy permission ro'yxatini ko'rsatadi."""
-        return ', '.join(obj.get_permissions()) or '—'
 
 
 # ============================================================
