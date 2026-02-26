@@ -13,11 +13,11 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 
 ---
 
-## LOYIHA HOLATI (25.02.2026)
+## LOYIHA HOLATI (26.02.2026)
 
 | App         | Holat             | Izoh                                                   |
 |-------------|-------------------|--------------------------------------------------------|
-| `accaunt`   | ✅ Tugallangan    | CustomUser, Worker, AuditLog, JWT auth — refactor tugallandi |
+| `accaunt`   | ✅ Tugallangan    | CustomUser, Worker, AuditLog, JWT auth — 7 ta bug fix tugallandi |
 | `store`     | ✅ Tugallangan    | Store, Branch CRUD (soft delete, multi-tenant)         |
 | `warehouse` | ✅ Tugallangan    | Category, Product, Stock, StockMovement (kirim/chiqim) |
 | `trade`     | ❌ Boshlanmagan  | Navbatda                                               |
@@ -134,14 +134,17 @@ permissions  # ["sotuv", "ombor", ...]  — to'liq ro'yxat almashadi
 | POST   | `/auth/reset-password/{uid}/{token}/` | AllowAny | Yangi parol o'rnatish |
 
 #### Workers (`/api/v1/workers/`)
-| Method | URL               | Ruxsat          | Izoh                                       |
-|--------|-------------------|-----------------|--------------------------------------------|
-| GET    | `/workers/`       | IsManagerOrAbove | Hodimlar ro'yxati (faqat o'z do'koni)     |
-| POST   | `/workers/`       | IsOwner         | Yangi hodim qo'shish                       |
-| GET    | `/workers/{id}/`  | IsManagerOrAbove | Hodim to'liq ma'lumoti                    |
-| PATCH  | `/workers/{id}/`  | IsOwner         | user+worker+permissions bitta so'rovda    |
+| Method | URL               | Ruxsat          | Izoh                                                    |
+|--------|-------------------|-----------------|---------------------------------------------------------|
+| GET    | `/workers/`       | IsManagerOrAbove | Hodimlar ro'yxati (faqat o'z do'koni, status tartibda) |
+| POST   | `/workers/`       | IsOwner         | Yangi hodim qo'shish                                    |
+| GET    | `/workers/{id}/`  | IsManagerOrAbove | Hodim to'liq ma'lumoti                                 |
+| PATCH  | `/workers/{id}/`  | IsOwner         | user+worker+permissions bitta so'rovda                  |
+| DELETE | `/workers/{id}/`  | IsOwner         | Soft delete — status='ishdan_ketgan' ga o'tkazadi       |
 
-**http_method_names = ['get', 'post', 'patch']** — DELETE yo'q (soft delete status orqali).
+**http_method_names = ['get', 'post', 'patch', 'delete']**
+
+**Status tartibi (list da):** active → tatil → ishdan_ketgan
 
 **Status o'zgartirish PATCH orqali:**
 ```json
@@ -149,6 +152,27 @@ permissions  # ["sotuv", "ombor", ...]  — to'liq ro'yxat almashadi
 {"status": "tatil"}          // tatilga chiqarish
 {"status": "ishdan_ketgan"}  // ishdan chiqarish
 ```
+
+**Search va filter (GET /workers/):**
+```
+?search=Ali          → ism/familiya/username/telefon bo'yicha qidirish
+?status=active       → holat bo'yicha filter
+?role=manager        → rol bo'yicha filter
+?branch=3            → filial bo'yicha filter
+```
+
+**WorkerCreateSerializer — permissions maydoni:**
+```json
+// Yuborilmasa → ROLE_PERMISSIONS[role] dan avtomatik
+// Yuborilsa → berilgan ro'yxat ishlatiladi
+{"permissions": ["sotuv", "ombor", "xarajatlar"]}
+```
+
+**Branch validatsiyasi:** Worker qo'shganda/yangilaganda faqat owner do'konining filiallari qabul qilinadi.
+
+**Telefon validatsiyasi:** `+998XXXXXXXXX` format majburiy (WorkerCreate, WorkerUpdate, ProfileUpdate).
+
+**Validation xatolari:** Barcha majburiy maydon, format, uzunlik xatolari o'zbek tilida.
 
 ### Migratsiyalar
 | Migration | Izoh                                                           |
@@ -287,12 +311,12 @@ python manage.py makemigrations appname --settings=config.settings.local
 python manage.py migrate appname --settings=config.settings.local
 ```
 
-### Git log (so'nggi commitlar, 25.02.2026)
+### Git log (so'nggi commitlar, 26.02.2026)
 ```
+9556466  fix(accaunt): worker API 7 ta xatolik tuzatildi
 6ec2689  refactor(accaunt): replace extra_permissions with direct permissions field
 26cfec2  refactor(accaunt): worker/profil tahrirlash huquqlari aniqlantirildi
 7ac4f5d  refactor(accaunt): activate/deactivate o'chirildi, PATCH status ga ko'chirildi
-cd2122b  refactor(accaunt): rol, status va permission kodlari yangilandi
 ```
 
 ---
