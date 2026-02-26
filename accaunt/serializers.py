@@ -356,7 +356,7 @@ class WorkerListSerializer(serializers.ModelSerializer):
     """
     full_name    = serializers.SerializerMethodField()
     role_display = serializers.CharField(source='get_role_display', read_only=True)
-    branch_name  = serializers.CharField(source='branch.name', read_only=True)
+    branch_name  = serializers.SerializerMethodField()
     phone1       = serializers.CharField(source='user.phone1', read_only=True)
 
     class Meta:
@@ -368,6 +368,9 @@ class WorkerListSerializer(serializers.ModelSerializer):
 
     def get_full_name(self, obj: Worker) -> str:
         return str(obj.user)
+
+    def get_branch_name(self, obj: Worker) -> str | None:
+        return obj.branch.name if obj.branch else None
 
 
 class WorkerDetailSerializer(serializers.ModelSerializer):
@@ -381,7 +384,7 @@ class WorkerDetailSerializer(serializers.ModelSerializer):
     phone2       = serializers.CharField(source='user.phone2',   read_only=True)
     email        = serializers.CharField(source='user.email',    read_only=True)
     role_display = serializers.CharField(source='get_role_display', read_only=True)
-    branch_name  = serializers.CharField(source='branch.name',  read_only=True)
+    branch_name  = serializers.SerializerMethodField()
 
     class Meta:
         model = Worker
@@ -396,6 +399,9 @@ class WorkerDetailSerializer(serializers.ModelSerializer):
 
     def get_full_name(self, obj: Worker) -> str:
         return str(obj.user)
+
+    def get_branch_name(self, obj: Worker) -> str | None:
+        return obj.branch.name if obj.branch else None
 
 
 class WorkerCreateSerializer(serializers.Serializer):

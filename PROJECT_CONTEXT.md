@@ -95,8 +95,8 @@ almashtirishda so'rov formatida `{"permissions": ["sotuv", "ombor"]}` ishlatilin
 | `LogoutSerializer`          | Token blacklist                                              |
 | `UserChangePasswordSerializer` | Parol o'zgartirish                                        |
 | `ProfileUpdateSerializer`   | PATCH /auth/profil/ — first_name, last_name, phone1, phone2  |
-| `WorkerListSerializer`      | Hodimlar ro'yxati (id, full_name, phone1, role, branch, salary, status) |
-| `WorkerDetailSerializer`    | Hodim to'liq (+ username, email, phone2, permissions)        |
+| `WorkerListSerializer`      | Hodimlar ro'yxati (id, full_name, phone1, role, branch_name, salary, status) — branch_name SerializerMethodField (null safe) |
+| `WorkerDetailSerializer`    | Hodim to'liq (+ username, email, phone2, permissions) — branch_name SerializerMethodField (null safe) |
 | `WorkerCreateSerializer`    | Hodim yaratish (user+worker bitta atomic da, permissions auto) |
 | `WorkerUpdateSerializer`    | Hodim yangilash — user+worker+permissions bitta PATCH da     |
 
@@ -182,6 +182,11 @@ permissions  # ["sotuv", "ombor", ...]  — to'liq ro'yxat almashadi
 | 0003      | branch verbose_name                                            |
 | 0004      | WorkerRole (sotuvchi→seller), WorkerStatus (deactive→tatil/ishdan_ketgan), max_length=15 + data migration |
 | 0005      | Worker.extra_permissions → Worker.permissions (flat list) + data migration |
+
+### admin.py — tuzatilgan (26.02.2026)
+- `WorkerAdmin` da `extra_permissions` → `permissions` ga o'zgartirildi (migration 0005 bilan mos)
+- `get_computed_permissions` method olib tashlandi
+- `permissions` field JSONField sifatida ko'rsatiladi, format: `["sotuv", "ombor"]`
 
 ---
 
@@ -292,31 +297,31 @@ PORT=8000
 ## MUHIM ESLATMALAR
 
 ### Worktree pattern (MAJBURIY)
-- Claude worktree da ishlaydi: `.claude/worktrees/elegant-bhaskara/`
+- Claude worktree da ishlaydi: `.claude/worktrees/unruffled-lewin/`
 - **Har o'zgarishdan keyin:** `git commit` → DARHOL `git cherry-pick` main branchga
 - `__pycache__`, `db.sqlite3`, `.claude/settings.local.json` ni HECH QACHON commit qilma
 
 ### Virtual env
 ```bash
 # Python executable:
-D:/projects/shop_crm_system/myenv/Scripts/python.exe
+C:/Users/U17/my_projects/shop_crm_system/myenv/Scripts/python.exe
 
 # Django management commands:
-"D:/projects/shop_crm_system/myenv/Scripts/python.exe" manage.py <command>
+myenv/Scripts/python.exe manage.py <command> --settings=config.settings.local
 ```
 
 ### Migration yaratish
 ```bash
-python manage.py makemigrations appname --settings=config.settings.local
-python manage.py migrate appname --settings=config.settings.local
+myenv/Scripts/python.exe manage.py makemigrations appname --settings=config.settings.local
+myenv/Scripts/python.exe manage.py migrate appname --settings=config.settings.local
 ```
 
 ### Git log (so'nggi commitlar, 26.02.2026)
 ```
-9556466  fix(accaunt): worker API 7 ta xatolik tuzatildi
-6ec2689  refactor(accaunt): replace extra_permissions with direct permissions field
-26cfec2  refactor(accaunt): worker/profil tahrirlash huquqlari aniqlantirildi
-7ac4f5d  refactor(accaunt): activate/deactivate o'chirildi, PATCH status ga ko'chirildi
+41ce70d  fix(accaunt): branch=None bo'lsa branch_name response dan tushib qolishi tuzatildi
+f579ef8  fix(accaunt): admin.py da extra_permissions -> permissions tuzatildi
+401835b  docs: PROJECT_CONTEXT.md yangilandi (26.02.2026 bug fix aks ettirildi)
+17983b0  fix(accaunt): worker API 7 ta xatolik tuzatildi
 ```
 
 ---
