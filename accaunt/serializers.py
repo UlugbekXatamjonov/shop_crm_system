@@ -29,7 +29,7 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 
-from .models import CustomUser, Worker, WorkerRole, ALL_PERMISSIONS, ROLE_PERMISSIONS
+from .models import CustomUser, Worker, WorkerRole, ALL_PERMISSIONS, ROLE_PERMISSIONS, phone_regex
 from .utils import Util
 
 
@@ -45,7 +45,11 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(
         style={'input_type': 'password'},
         write_only=True,
-        label="Parolni tasdiqlash"
+        label="Parolni tasdiqlash",
+        error_messages={
+            'required': "Parolni tasdiqlash kiritilishi shart.",
+            'blank':    "Parolni tasdiqlash bo'sh bo'lishi mumkin emas.",
+        }
     )
 
     class Meta:
@@ -56,7 +60,55 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             'password', 'password2',
         )
         extra_kwargs = {
-            'password': {'write_only': True},
+            'password': {
+                'write_only': True,
+                'error_messages': {
+                    'required': "Parol kiritilishi shart.",
+                    'blank':    "Parol bo'sh bo'lishi mumkin emas.",
+                },
+            },
+            'username': {
+                'error_messages': {
+                    'required':   "Login (username) kiritilishi shart.",
+                    'blank':      "Login bo'sh bo'lishi mumkin emas.",
+                    'max_length': "Login 150 belgidan oshmasligi kerak.",
+                    'unique':     "Bu login allaqachon band.",
+                },
+            },
+            'first_name': {
+                'required': True,
+                'error_messages': {
+                    'required': "Ism kiritilishi shart.",
+                    'blank':    "Ism bo'sh bo'lishi mumkin emas.",
+                },
+            },
+            'last_name': {
+                'required': True,
+                'error_messages': {
+                    'required': "Familiya kiritilishi shart.",
+                    'blank':    "Familiya bo'sh bo'lishi mumkin emas.",
+                },
+            },
+            'email': {
+                'required': True,
+                'error_messages': {
+                    'required': "Email manzil kiritilishi shart.",
+                    'blank':    "Email manzil bo'sh bo'lishi mumkin emas.",
+                    'invalid':  "To'g'ri email manzil kiriting (masalan: ism@example.com).",
+                },
+            },
+            'phone1': {
+                'error_messages': {
+                    'required': "Telefon raqami kiritilishi shart.",
+                    'blank':    "Telefon raqami bo'sh bo'lishi mumkin emas.",
+                    'invalid':  "Telefon raqami '+998901234567' formatida bo'lishi kerak.",
+                },
+            },
+            'phone2': {
+                'error_messages': {
+                    'invalid': "Telefon raqami '+998901234567' formatida bo'lishi kerak.",
+                },
+            },
         }
 
     def validate(self, attrs: dict) -> dict:
@@ -234,9 +286,14 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
         return value
 
     def validate_phone2(self, value: str) -> str:
-        """Qo'shimcha telefon raqami band emasligini tekshiradi."""
+        """Qo'shimcha telefon raqami — format va band emasligi tekshiriladi."""
+        import re
         if not value:
             return value
+        if not re.match(r'^\+998\d{9}$', value):
+            raise serializers.ValidationError(
+                "Telefon raqami '+998901234567' formatida bo'lishi kerak."
+            )
         qs = CustomUser.objects.filter(phone2=value).exclude(pk=self.instance.pk)
         if qs.exists():
             raise serializers.ValidationError(
@@ -348,31 +405,103 @@ class WorkerCreateSerializer(serializers.Serializer):
     Do'kon — JWT token orqali aniqlanadi (view da beriladi).
 
     POST /api/v1/workers/ da ishlatiladi.
+
+    permissions (ixtiyoriy):
+      - Yuborilmasa → ROLE_PERMISSIONS[role] dan avtomatik to'ldiriladi
+      - Yuborilsa   → berilgan ro'yxat ishlatiladi (to'liq almashtiradi)
     """
     # --- CustomUser maydonlari ---
-    first_name = serializers.CharField(max_length=150, label="Ismi")
-    last_name  = serializers.CharField(max_length=150, label="Familiyasi")
-    username   = serializers.CharField(max_length=150, label="Login (username)")
-    phone1     = serializers.CharField(max_length=13,  label="Telefon raqami")
-    email      = serializers.EmailField(required=False, allow_blank=True, default='', label="Email")
-    password   = serializers.CharField(
+    first_name = serializers.CharField(
+        max_length=150, label="Ismi",
+        error_messages={
+            'required': "Ism kiritilishi shart.",
+            'blank':    "Ism bo'sh bo'lishi mumkin emas.",
+            'max_length': "Ism 150 belgidan oshmasligi kerak.",
+        }
+    )
+    last_name = serializers.CharField(
+        max_length=150, label="Familiyasi",
+        error_messages={
+            'required': "Familiya kiritilishi shart.",
+            'blank':    "Familiya bo'sh bo'lishi mumkin emas.",
+            'max_length': "Familiya 150 belgidan oshmasligi kerak.",
+        }
+    )
+    username = serializers.CharField(
+        max_length=150, label="Login (username)",
+        error_messages={
+            'required':   "Login kiritilishi shart.",
+            'blank':      "Login bo'sh bo'lishi mumkin emas.",
+            'max_length': "Login 150 belgidan oshmasligi kerak.",
+        }
+    )
+    phone1 = serializers.CharField(
+        max_length=13, label="Telefon raqami",
+        validators=[phone_regex],
+        error_messages={
+            'required': "Telefon raqami kiritilishi shart.",
+            'blank':    "Telefon raqami bo'sh bo'lishi mumkin emas.",
+            'max_length': "Telefon raqami 13 belgidan oshmasligi kerak.",
+        }
+    )
+    email = serializers.EmailField(
+        required=False, allow_blank=True, default='', label="Email",
+        error_messages={
+            'invalid': "To'g'ri email manzil kiriting (masalan: ism@example.com).",
+        }
+    )
+    password = serializers.CharField(
         write_only=True,
         min_length=6,
         style={'input_type': 'password'},
-        label="Parol"
+        label="Parol",
+        error_messages={
+            'required':   "Parol kiritilishi shart.",
+            'blank':      "Parol bo'sh bo'lishi mumkin emas.",
+            'min_length': "Parol kamida 6 belgidan iborat bo'lishi kerak.",
+        }
     )
 
     # --- Worker maydonlari ---
-    role   = serializers.ChoiceField(choices=WorkerRole.choices, label="Roli")
-    branch = serializers.IntegerField(required=False, allow_null=True, label="Filial ID")
+    role = serializers.ChoiceField(
+        choices=WorkerRole.choices, label="Roli",
+        error_messages={
+            'required':       "Rol kiritilishi shart.",
+            'invalid_choice': "'{input}' noto'g'ri rol. Mavjud rollar: owner, manager, seller.",
+        }
+    )
+    branch = serializers.IntegerField(
+        required=False, allow_null=True, label="Filial ID",
+        error_messages={
+            'invalid': "Filial ID butun son bo'lishi kerak.",
+        }
+    )
     salary = serializers.DecimalField(
         max_digits=12, decimal_places=2,
-        default=0, label="Maoshi (UZS)"
+        default=0, label="Maoshi (UZS)",
+        error_messages={
+            'invalid':     "Maosh to'g'ri raqam formatida kiritilishi kerak.",
+            'max_digits':  "Maosh 12 raqamdan oshmasligi kerak.",
+            'max_decimal_places': "Maoshda 2 tadan ko'p kasr raqam bo'lishi mumkin emas.",
+        }
+    )
+
+    # --- Ruxsatlar (ixtiyoriy) ---
+    permissions = serializers.ListField(
+        child=serializers.ChoiceField(
+            choices=ALL_PERMISSIONS,
+            error_messages={
+                'invalid_choice': "'{input}' noto'g'ri ruxsat kodi.",
+            }
+        ),
+        required=False,
+        allow_empty=True,
+        label="Ruxsatlar ro'yxati (ixtiyoriy — bo'sh qolsa rol asosida to'ldiriladi)",
     )
 
     def validate_username(self, value: str) -> str:
         if CustomUser.objects.filter(username=value).exists():
-            raise serializers.ValidationError("Bu username allaqachon band.")
+            raise serializers.ValidationError("Bu login allaqachon band.")
         return value
 
     def validate_phone1(self, value: str) -> str:
@@ -392,6 +521,15 @@ class WorkerCreateSerializer(serializers.Serializer):
                 )
         return value
 
+    def validate_permissions(self, value: list) -> list:
+        """Noto'g'ri permission kodlarini qaytaradi."""
+        invalid = [p for p in value if p not in ALL_PERMISSIONS]
+        if invalid:
+            raise serializers.ValidationError(
+                f"Noto'g'ri ruxsat kodlari: {invalid}. Mavjud kodlar: {ALL_PERMISSIONS}"
+            )
+        return sorted(set(value))
+
     @transaction.atomic
     def create(self, validated_data: dict) -> Worker:
         """
@@ -400,17 +538,21 @@ class WorkerCreateSerializer(serializers.Serializer):
         """
         from store.models import Branch
 
-        store     = validated_data.pop('store')       # view da beriladi
-        branch_id = validated_data.pop('branch', None)
-        role      = validated_data.pop('role')
-        salary    = validated_data.pop('salary', 0)
+        store            = validated_data.pop('store')          # view da beriladi
+        branch_id        = validated_data.pop('branch', None)
+        role             = validated_data.pop('role')
+        salary           = validated_data.pop('salary', 0)
+        permissions_data = validated_data.pop('permissions', None)
 
+        # Branch — faqat shu do'konning filiallari qabul qilinadi
         branch = None
         if branch_id:
             try:
-                branch = Branch.objects.get(id=branch_id)
+                branch = Branch.objects.get(id=branch_id, store=store)
             except Branch.DoesNotExist:
-                raise serializers.ValidationError({'branch': "Bunday filial topilmadi."})
+                raise serializers.ValidationError(
+                    {'branch': "Bu filial sizning do'koningizga tegishli emas yoki topilmadi."}
+                )
 
         # 1. CustomUser yaratish
         user = CustomUser.objects.create_user(
@@ -422,14 +564,20 @@ class WorkerCreateSerializer(serializers.Serializer):
             last_name  = validated_data['last_name'],
         )
 
-        # 2. Worker yaratish — permissions rolga qarab avtomatik to'ldiriladi
+        # 2. Permissions: berilsa — berilgani, aks holda rol asosida
+        if permissions_data is not None:
+            permissions = sorted(set(permissions_data))
+        else:
+            permissions = list(ROLE_PERMISSIONS.get(role, []))
+
+        # 3. Worker yaratish
         worker = Worker.objects.create(
             user        = user,
             role        = role,
             store       = store,
             branch      = branch,
             salary      = salary,
-            permissions = list(ROLE_PERMISSIONS.get(role, [])),
+            permissions = permissions,
         )
         return worker
 
@@ -448,22 +596,39 @@ class WorkerUpdateSerializer(serializers.ModelSerializer):
     """
     # --- CustomUser maydonlari (source='user.*' orqali) ---
     first_name = serializers.CharField(
-        source='user.first_name', required=False, allow_blank=True, label="Ismi"
+        source='user.first_name', required=False, allow_blank=True, label="Ismi",
+        error_messages={
+            'blank':      "Ism bo'sh bo'lishi mumkin emas.",
+            'max_length': "Ism 150 belgidan oshmasligi kerak.",
+        }
     )
-    last_name  = serializers.CharField(
-        source='user.last_name',  required=False, allow_blank=True, label="Familiyasi"
+    last_name = serializers.CharField(
+        source='user.last_name', required=False, allow_blank=True, label="Familiyasi",
+        error_messages={
+            'blank':      "Familiya bo'sh bo'lishi mumkin emas.",
+            'max_length': "Familiya 150 belgidan oshmasligi kerak.",
+        }
     )
     phone1 = serializers.CharField(
-        source='user.phone1', required=False, label="Asosiy telefon"
+        source='user.phone1', required=False, label="Asosiy telefon",
+        validators=[phone_regex],
+        error_messages={
+            'blank': "Telefon raqami bo'sh bo'lishi mumkin emas.",
+        }
     )
     phone2 = serializers.CharField(
         source='user.phone2', required=False, allow_blank=True, allow_null=True,
-        label="Qo'shimcha telefon"
+        label="Qo'shimcha telefon",
     )
 
     # --- Ruxsatlar ro'yxati ---
     permissions = serializers.ListField(
-        child=serializers.ChoiceField(choices=ALL_PERMISSIONS),
+        child=serializers.ChoiceField(
+            choices=ALL_PERMISSIONS,
+            error_messages={
+                'invalid_choice': "'{input}' noto'g'ri ruxsat kodi.",
+            }
+        ),
         required=False,
         label="Ruxsatlar ro'yxati"
     )
@@ -474,6 +639,25 @@ class WorkerUpdateSerializer(serializers.ModelSerializer):
             'first_name', 'last_name', 'phone1', 'phone2',
             'role', 'branch', 'salary', 'status', 'permissions',
         )
+        extra_kwargs = {
+            'role': {
+                'error_messages': {
+                    'invalid_choice': "'{input}' noto'g'ri rol. Mavjud rollar: owner, manager, seller.",
+                }
+            },
+            'status': {
+                'error_messages': {
+                    'invalid_choice': "'{input}' noto'g'ri holat. Mavjud holatlar: active, tatil, ishdan_ketgan.",
+                }
+            },
+            'salary': {
+                'error_messages': {
+                    'invalid':            "Maosh to'g'ri raqam formatida kiritilishi kerak.",
+                    'max_digits':         "Maosh 12 raqamdan oshmasligi kerak.",
+                    'max_decimal_places': "Maoshda 2 tadan ko'p kasr raqam bo'lishi mumkin emas.",
+                }
+            },
+        }
 
     # --- Validatsiyalar ---
 
@@ -487,13 +671,28 @@ class WorkerUpdateSerializer(serializers.ModelSerializer):
         return value
 
     def validate_phone2(self, value: str) -> str:
-        """Qo'shimcha telefon raqami band emasligini tekshiradi."""
+        """Qo'shimcha telefon raqami — format va band emasligi tekshiriladi."""
+        import re
         if not value:
             return value
+        if not re.match(r'^\+998\d{9}$', value):
+            raise serializers.ValidationError(
+                "Telefon raqami '+998901234567' formatida bo'lishi kerak."
+            )
         qs = CustomUser.objects.filter(phone2=value).exclude(pk=self.instance.user.pk)
         if qs.exists():
             raise serializers.ValidationError(
                 "Bu telefon raqami allaqachon boshqa foydalanuvchida band."
+            )
+        return value
+
+    def validate_branch(self, value):
+        """Filial shu hodimning do'koniga tegishli ekanligini tekshiradi."""
+        if value is None:
+            return value
+        if self.instance and value.store_id != self.instance.store_id:
+            raise serializers.ValidationError(
+                "Bu filial sizning do'koningizga tegishli emas."
             )
         return value
 
@@ -514,7 +713,7 @@ class WorkerUpdateSerializer(serializers.ModelSerializer):
         invalid = [p for p in value if p not in ALL_PERMISSIONS]
         if invalid:
             raise serializers.ValidationError(
-                f"Noto'g'ri permission kodlar: {invalid}. Mavjud kodlar: {ALL_PERMISSIONS}"
+                f"Noto'g'ri ruxsat kodlari: {invalid}. Mavjud kodlar: {ALL_PERMISSIONS}"
             )
         return sorted(set(value))
 

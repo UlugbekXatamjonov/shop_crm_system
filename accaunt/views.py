@@ -15,13 +15,17 @@ View'lar ikki guruhga bo'lingan:
    - WorkerViewSet          — CRUD (list, create, retrieve, partial_update)
 """
 
+from django.db.models import Case, IntegerField, Value, When
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status, viewsets, mixins
+from rest_framework.filters import SearchFilter
 from rest_framework_simplejwt.tokens import RefreshToken
+from django_filters.rest_framework import DjangoFilterBackend
 
-from .models import CustomUser, Worker, AuditLog
+from .models import CustomUser, Worker, AuditLog, WorkerStatus
 from .permissions import IsManagerOrAbove, IsOwner
 from .serializers import (
     UserRegistrationSerializer,
@@ -218,6 +222,7 @@ class WorkerViewSet(viewsets.ModelViewSet):
       POST   /api/v1/workers/      — hodim qo'shish  (faqat owner)
       GET    /api/v1/workers/{id}/ — hodim ma'lumoti (manager/seller ham ko'ra oladi)
       PATCH  /api/v1/workers/{id}/ — hodimni yangilash (faqat owner)
+      DELETE /api/v1/workers/{id}/ — hodimni ishdan chiqarish (faqat owner, soft delete)
 
     PATCH bir so'rovda barchasini o'zgartiradi:
       - User: first_name, last_name, phone1, phone2
@@ -227,12 +232,26 @@ class WorkerViewSet(viewsets.ModelViewSet):
     Multi-tenant xavfsizlik:
       Faqat o'z do'konining hodimlarini ko'radi va boshqaradi.
     """
-    http_method_names = ['get', 'post', 'patch']
+    http_method_names = ['get', 'post', 'patch', 'delete']
+
+    # Search va filter
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filterset_fields  = {
+        'status': ['exact'],
+        'role':   ['exact'],
+        'branch': ['exact'],
+    }
+    search_fields = [
+        'user__first_name',
+        'user__last_name',
+        'user__username',
+        'user__phone1',
+    ]
 
     def get_permissions(self):
         """
         list/retrieve  → IsManagerOrAbove  (manager va seller ham ko'ra oladi)
-        create/update  → IsOwner           (faqat ega qo'shadi va o'zgartiradi)
+        create/update/destroy → IsOwner   (faqat ega)
         """
         if self.action in ('list', 'retrieve'):
             return [IsAuthenticated(), IsManagerOrAbove()]
@@ -251,6 +270,7 @@ class WorkerViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """
         Faqat o'z do'konining hodimlarini qaytaradi (multi-tenant).
+        Tartib: avval faollar, keyin tatildalgilar, oxirida ishdan ketganlar.
         Worker bo'lmagan foydalanuvchilar (masalan superadmin) uchun — bo'sh.
         """
         worker = getattr(self.request.user, 'worker', None)
@@ -260,8 +280,25 @@ class WorkerViewSet(viewsets.ModelViewSet):
             Worker.objects
             .filter(store=worker.store)
             .select_related('user', 'branch')
-            .order_by('user__first_name', 'user__last_name')
+            .annotate(
+                status_order=Case(
+                    When(status=WorkerStatus.ACTIVE,        then=Value(0)),
+                    When(status=WorkerStatus.TATIL,         then=Value(1)),
+                    When(status=WorkerStatus.ISHDAN_KETGAN, then=Value(2)),
+                    default=Value(3),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by('status_order', 'user__first_name', 'user__last_name')
         )
+
+    def get_serializer_context(self):
+        """store kontekstini serializer ga uzatish (branch validatsiyasi uchun)."""
+        context = super().get_serializer_context()
+        worker = getattr(self.request.user, 'worker', None)
+        if worker:
+            context['store'] = worker.store
+        return context
 
     def perform_create(self, serializer):
         """
@@ -274,7 +311,7 @@ class WorkerViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(
             data=request.data,
-            context={'request': request}
+            context=self.get_serializer_context(),
         )
         serializer.is_valid(raise_exception=True)
         worker = self.perform_create(serializer)
@@ -299,7 +336,7 @@ class WorkerViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(
             instance, data=request.data, partial=True,
-            context={'request': request},
+            context=self.get_serializer_context(),
         )
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
@@ -318,5 +355,27 @@ class WorkerViewSet(viewsets.ModelViewSet):
                 'data': WorkerDetailSerializer(instance, context={'request': request}).data,
             },
             status=status.HTTP_200_OK
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Hodimni ishdan chiqarish — o'chirish o'rniga status='ishdan_ketgan' ga o'tkaziladi.
+        DELETE /api/v1/workers/{id}/
+        """
+        instance = self.get_object()
+        instance.status = WorkerStatus.ISHDAN_KETGAN
+        instance.save(update_fields=['status'])
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditLog.Action.DELETE,
+            target_model='Worker',
+            target_id=instance.id,
+            description=f"Hodim ishdan chiqarildi: {instance.user}",
+        )
+
+        return Response(
+            {'message': "Hodim ishdan chiqarildi."},
+            status=status.HTTP_200_OK,
         )
 
