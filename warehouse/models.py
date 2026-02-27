@@ -157,6 +157,7 @@ class Product(models.Model):
         verbose_name        = 'Mahsulot'
         verbose_name_plural = 'Mahsulotlar'
         ordering            = ['name']
+        unique_together     = [('store', 'name'), ('store', 'barcode')]
 
     def __str__(self) -> str:
         return f"{self.name} ({self.get_unit_display()})"

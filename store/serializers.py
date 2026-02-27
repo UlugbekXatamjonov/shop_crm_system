@@ -99,6 +99,17 @@ class BranchUpdateSerializer(serializers.ModelSerializer):
         model  = Branch
         fields = ('name', 'address', 'phone')
 
+    def validate_name(self, value: str) -> str:
+        """Bir do'kon ichida filial nomi takrorlanmasligi kerak."""
+        qs = Branch.objects.filter(
+            store=self.instance.store, name=value
+        ).exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                "Bu nomli filial ushbu do'konda allaqachon mavjud."
+            )
+        return value
+
 
 # ============================================================
 # DO'KON SERIALIZERLARI
@@ -152,18 +163,12 @@ class StoreCreateSerializer(serializers.ModelSerializer):
     Yangi do'kon yaratish.
     POST /api/v1/stores/ da ishlatiladi.
     Faqat owner yarata oladi.
+    Store.name global unique emas — har bir owner o'z nomini erkin tanlaydi.
     """
 
     class Meta:
         model  = Store
         fields = ('name', 'address', 'phone')
-
-    def validate_name(self, value: str) -> str:
-        if Store.objects.filter(name=value).exists():
-            raise serializers.ValidationError(
-                "Bu nomli do'kon allaqachon mavjud."
-            )
-        return value
 
 
 class StoreUpdateSerializer(serializers.ModelSerializer):

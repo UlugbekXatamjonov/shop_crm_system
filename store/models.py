@@ -110,6 +110,7 @@ class Branch(models.Model):
         verbose_name        = 'Filial'
         verbose_name_plural = 'Filiallar'
         ordering            = ['-created_on']
+        unique_together     = [('store', 'name')]
 
     def __str__(self) -> str:
         return f"{self.name} ({self.store.name if self.store else '—'})"

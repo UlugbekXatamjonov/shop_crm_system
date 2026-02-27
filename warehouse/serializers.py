@@ -174,6 +174,15 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         model  = Product
         fields = ('name', 'category', 'unit', 'purchase_price', 'sale_price', 'barcode')
 
+    def validate_name(self, value: str) -> str:
+        """Bir do'kon ichida mahsulot nomi takrorlanmasligi kerak."""
+        store = self.context.get('store')
+        if store and Product.objects.filter(store=store, name=value).exists():
+            raise serializers.ValidationError(
+                "Bu nomli mahsulot ushbu do'konda allaqachon mavjud."
+            )
+        return value
+
     def validate_category(self, value: Category) -> Category:
         """Kategoriya xuddi shu do'konga tegishli bo'lishi kerak."""
         store = self.context.get('store')
@@ -208,6 +217,17 @@ class ProductUpdateSerializer(serializers.ModelSerializer):
             'purchase_price', 'sale_price',
             'barcode', 'status',
         )
+
+    def validate_name(self, value: str) -> str:
+        """Bir do'kon ichida mahsulot nomi takrorlanmasligi kerak."""
+        qs = Product.objects.filter(
+            store=self.instance.store, name=value
+        ).exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                "Bu nomli mahsulot ushbu do'konda allaqachon mavjud."
+            )
+        return value
 
     def validate_category(self, value: Category) -> Category:
         if value and value.store != self.instance.store:
