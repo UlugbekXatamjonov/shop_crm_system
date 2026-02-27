@@ -14,6 +14,8 @@ from .views import (
     UserLoginView,
     LogoutAPIView,
     UserChangePasswordView,
+    SendPasswordResetEmailView,
+    UserPasswordResetView,
     ProfileView,
 )
 
@@ -26,7 +28,9 @@ urlpatterns = [
     path('logout/',  LogoutAPIView.as_view(),    name='logout'),
 
     # --- Parol ---
-    path('change-password/', UserChangePasswordView.as_view(), name='change-password'),
+    path('change-password/',   UserChangePasswordView.as_view(),     name='change-password'),
+    path('send-reset-email/',  SendPasswordResetEmailView.as_view(), name='send-reset-email'),
+    path('reset-password/<str:uid>/<str:token>/', UserPasswordResetView.as_view(), name='reset-password'),
 
     # --- Profil ---
     # GET   /api/v1/auth/profil/ — profilni ko'rish

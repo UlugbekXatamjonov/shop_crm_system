@@ -209,7 +209,7 @@ class UserChangePasswordSerializer(serializers.Serializer):
             raise serializers.ValidationError("Yangi parollar bir xil emas!")
         user = self.context['user']
         user.set_password(attrs['password'])
-        user.save()
+        user.save(update_fields=['password'])
         return attrs
 
 

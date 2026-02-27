@@ -209,6 +209,47 @@ class ProfileView(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.G
         )
 
 
+class SendPasswordResetEmailView(APIView):
+    """
+    Parolni tiklash uchun email yuborish.
+    POST /api/v1/auth/send-reset-email/
+
+    Ruxsat: hamma (AllowAny)
+    So'rov tanasi: {"email": "user@example.com"}
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = SendPasswordResetEmailSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response(
+            {'message': "Parolni tiklash uchun havola emailga yuborildi."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class UserPasswordResetView(APIView):
+    """
+    Email orqali yuborilgan havola yordamida yangi parol o'rnatish.
+    POST /api/v1/auth/reset-password/<uid>/<token>/
+
+    Ruxsat: hamma (AllowAny)
+    So'rov tanasi: {"password": "...", "password2": "..."}
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request, uid, token):
+        serializer = UserPasswordResetSerializer(
+            data=request.data,
+            context={'uid': uid, 'token': token},
+        )
+        serializer.is_valid(raise_exception=True)
+        return Response(
+            {'message': "Parol muvaffaqiyatli o'zgartirildi!"},
+            status=status.HTTP_200_OK,
+        )
+
+
 # ============================================================
 # WORKER VIEW'LARI
 # ============================================================
