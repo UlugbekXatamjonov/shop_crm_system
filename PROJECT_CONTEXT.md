@@ -13,13 +13,13 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 
 ---
 
-## LOYIHA HOLATI (26.02.2026)
+## LOYIHA HOLATI (27.02.2026)
 
 | App         | Holat             | Izoh                                                   |
 |-------------|-------------------|--------------------------------------------------------|
 | `accaunt`   | ✅ Tugallangan    | CustomUser, Worker, AuditLog, JWT auth — 7 ta bug fix tugallandi |
-| `store`     | ✅ Tugallangan    | Store, Branch CRUD (soft delete, multi-tenant)         |
-| `warehouse` | ✅ Tugallangan    | Category, Product, Stock, StockMovement (kirim/chiqim) |
+| `store`     | ✅ Tugallangan    | Store, Branch CRUD (soft delete, multi-tenant, workers in detail, Uzbek errors) |
+| `warehouse` | ✅ Tugallangan    | Category, Product, Stock, StockMovement (kirim/chiqim, per-store unique) |
 | `trade`     | ❌ Boshlanmagan  | Navbatda                                               |
 | `expense`   | ❌ Boshlanmagan  | Navbatda                                               |
 
@@ -190,20 +190,76 @@ permissions  # ["sotuv", "ombor", ...]  — to'liq ro'yxat almashadi
 
 ---
 
+## STORE APP — TUZILMA (to'liq, 27.02.2026)
+
+### Modellar
+| Model    | Maydonlar                                              | Constraint                        |
+|----------|--------------------------------------------------------|-----------------------------------|
+| `Store`  | name, address, phone, status, created_on               | Yo'q (har owner o'z nomini tanlaydi) |
+| `Branch` | store(FK), name, address, phone, status, created_on    | `unique_together = [('store','name')]` |
+
+- `StoreStatus`: `active`, `inactive`
+- **Soft delete**: `status='inactive'` ga o'tkaziladi (o'chirilmaydi)
+
+### Serializer maydonlari
+
+| Serializer              | Maydonlar                                               |
+|-------------------------|---------------------------------------------------------|
+| `StoreListSerializer`   | id, name, phone, status, status_display, branch_count   |
+| `StoreDetailSerializer` | id, name, address, phone, status, status_display, created_on, **branches**, **workers** |
+| `StoreCreateSerializer` | name, address, phone                                    |
+| `StoreUpdateSerializer` | name, address, phone, **status**                        |
+| `BranchListSerializer`  | id, name, store_name, phone, status, status_display     |
+| `BranchDetailSerializer`| id, name, address, phone, store_id, store_name, status, status_display, created_on, **workers** |
+| `BranchCreateSerializer`| name, address, phone                                    |
+| `BranchUpdateSerializer`| name, address, phone, **status**                        |
+
+**workers maydoni** (faqat detail da): `[{"id": 1, "full_name": "Ali Valiyev"}, ...]`
+**branches maydoni** (faqat StoreDetail da): faqat `active` filiallar, `BranchListSerializer` orqali
+
+### Migratsiyalar
+| Migration | Izoh                                                |
+|-----------|-----------------------------------------------------|
+| 0001      | Store, Branch dastlabki modellar                    |
+| 0002      | ...                                                 |
+| 0003      | Branch unique_together [('store', 'name')] qo'shildi |
+
+### Endpointlar
+| Method | URL                   | Ruxsat                        | Izoh                   |
+|--------|-----------------------|-------------------------------|------------------------|
+| GET    | `/api/v1/stores/`     | IsAuthenticated + CanAccess('dokonlar') | Ro'yxat (branch_count) |
+| POST   | `/api/v1/stores/`     | IsOwner                       | Yaratish               |
+| GET    | `/api/v1/stores/{id}/`| IsAuthenticated + CanAccess('dokonlar') | Detail (branches+workers) |
+| PATCH  | `/api/v1/stores/{id}/`| IsOwner                       | Yangilash (+ status)   |
+| DELETE | `/api/v1/stores/{id}/`| IsOwner                       | Soft delete            |
+| GET    | `/api/v1/branches/`   | IsAuthenticated               | Ro'yxat                |
+| POST   | `/api/v1/branches/`   | IsOwner                       | Yaratish               |
+| GET    | `/api/v1/branches/{id}/`| IsAuthenticated             | Detail (workers)       |
+| PATCH  | `/api/v1/branches/{id}/`| IsOwner                     | Yangilash (+ status)   |
+| DELETE | `/api/v1/branches/{id}/`| IsOwner                     | Soft delete            |
+
+---
+
 ## WAREHOUSE APP — TUZILMA (to'liq)
 
 ### Modellar
-| Model           | Maydonlar                                                                 |
-|-----------------|---------------------------------------------------------------------------|
-| `Category`      | name, description, store(FK), status, created_on                          |
-| `Product`       | name, category(FK), unit, purchase_price, sale_price, barcode, store(FK), status, created_on |
-| `Stock`         | product(FK), branch(FK), quantity, updated_on — unique_together(product, branch) |
-| `StockMovement` | product(FK), branch(FK), movement_type(in/out), quantity, note, worker(FK), created_on |
+| Model           | Maydonlar                                                                 | Constraint |
+|-----------------|---------------------------------------------------------------------------|------------|
+| `Category`      | name, description, store(FK), status, created_on                          | `unique_together = [('store','name')]` |
+| `Product`       | name, category(FK), unit, purchase_price, sale_price, barcode, store(FK), status, created_on | `unique_together = [('store','name'), ('store','barcode')]` |
+| `Stock`         | product(FK), branch(FK), quantity, updated_on                             | `unique_together = [('product','branch')]` |
+| `StockMovement` | product(FK), branch(FK), movement_type(in/out), quantity, note, worker(FK), created_on | — |
 
 ### Choices
 - `ProductUnit`: dona, kg, g, litr, metr, m2, yashik, qop
 - `ProductStatus`: active, inactive
 - `MovementType`: in (Kirim), out (Chiqim)
+
+### Migratsiyalar
+| Migration | Izoh                                                         |
+|-----------|--------------------------------------------------------------|
+| 0001      | Dastlabki modellar                                           |
+| 0002      | Product unique_together [('store','name'), ('store','barcode')] qo'shildi |
 
 ### Endpointlar
 ```
@@ -225,6 +281,34 @@ GET/POST   /api/v1/warehouse/movements/    + GET          /{id}/   (immutable)
 - **Stock** → hard delete (o'chirish mumkin)
 - **Multi-tenant**: `get_queryset()` — `worker.store` bo'yicha filtrlash
 - **AuditLog**: barcha write operatsiyalarda yoziladi
+
+---
+
+## CONFIG — MUHIM SOZLAMALAR (27.02.2026)
+
+### `config/settings/base.py` — REST_FRAMEWORK
+```python
+REST_FRAMEWORK = {
+    ...
+    'DATETIME_FORMAT': '%Y-%m-%d | %H:%M',              # "2026-02-27 | 14:30" formatida
+    'EXCEPTION_HANDLER': 'config.exceptions.custom_exception_handler',
+}
+```
+
+### `config/exceptions.py` — O'zbek tilidagi xato xabarlari
+```python
+UZBEK_ERROR_MESSAGES = {
+    400: "So'rov ma'lumotlari noto'g'ri.",
+    401: "Tizimga kirish talab etiladi. Iltimos, avval login qiling.",
+    403: "Bu amalni bajarishga ruxsatingiz yo'q.",
+    404: "So'ralgan ma'lumot topilmadi.",
+    405: "Bu so'rov turi ({method}) qo'llab-quvvatlanmaydi.",
+    429: "So'rovlar soni limitdan oshdi. Keyinroq urinib ko'ring.",
+    500: "Server xatosi yuz berdi. Iltimos, keyinroq urinib ko'ring.",
+}
+# Faqat {'detail': '...'} ko'rinishdagi xatolarda ishlaydi.
+# Field-level (validation) xatolarga tegmaydi.
+```
 
 ---
 
@@ -316,11 +400,15 @@ myenv/Scripts/python.exe manage.py makemigrations appname --settings=config.sett
 myenv/Scripts/python.exe manage.py migrate appname --settings=config.settings.local
 ```
 
-### Git log (so'nggi commitlar, 26.02.2026)
+### Git log (so'nggi commitlar, 27.02.2026)
 ```
+85beff6  fix(store): StoreListSerializer dan workers olib tashlandi, faqat detail da qoldi
+c5e1bc6  feat: O'zbek tilidagi xato xabarlari va Store/Branch da workers ro'yxati
+a23903a  fix(store): StoreUpdateSerializer va BranchUpdateSerializer ga status maydoni qo'shildi
+9335397  feat: per-store unique constraint qo'shildi (Branch, Product)
+2ec9e40  fix(settings): DATETIME_FORMAT o'zgartirildi — '2026-02-23 | 17:17' formatiga
 41ce70d  fix(accaunt): branch=None bo'lsa branch_name response dan tushib qolishi tuzatildi
 f579ef8  fix(accaunt): admin.py da extra_permissions -> permissions tuzatildi
-401835b  docs: PROJECT_CONTEXT.md yangilandi (26.02.2026 bug fix aks ettirildi)
 17983b0  fix(accaunt): worker API 7 ta xatolik tuzatildi
 ```
 
@@ -333,9 +421,10 @@ shop_crm_system/
 ├── config/
 │   ├── __init__.py       ← Celery import
 │   ├── celery.py         ← Celery konfiguratsiya
+│   ├── exceptions.py     ← ✅ Custom exception handler (o'zbek tilidagi xato xabarlari)
 │   ├── middleware.py     ← HealthCheckMiddleware
 │   ├── settings/
-│   │   ├── base.py       ← Umumiy sozlamalar (CORS, JWT, DRF, Celery)
+│   │   ├── base.py       ← Umumiy sozlamalar (CORS, JWT, DRF, Celery, DATETIME_FORMAT)
 │   │   ├── local.py      ← Development (SQLite)
 │   │   └── production.py ← Production (PostgreSQL+Redis+WhiteNoise+CORS)
 │   ├── urls.py           ← /health/, /api/v1/, /swagger/
@@ -350,17 +439,22 @@ shop_crm_system/
 │   └── migrations/
 │       ├── 0004_...      ← role/status o'zgarishlar + data migration
 │       └── 0005_...      ← extra_permissions → permissions + data migration
-├── store/                ✅ Store, Branch (soft delete, multi-tenant)
-│   ├── models.py         ← Store, Branch, StoreStatus
+├── store/                ✅ Store, Branch (soft delete, multi-tenant, workers in detail)
+│   ├── models.py         ← Store, Branch, StoreStatus; Branch unique_together(store,name)
 │   ├── views.py          ← StoreViewSet, BranchViewSet
-│   ├── serializers.py
-│   └── api_urls.py       ← /api/v1/stores/, /api/v1/branches/
+│   ├── serializers.py    ← workers detail da, status update da, _worker_short helper
+│   ├── api_urls.py       ← /api/v1/stores/, /api/v1/branches/
+│   └── migrations/
+│       ├── 0001_initial.py
+│       └── 0003_alter_branch_unique_together.py ← unique_together qo'shildi
 ├── warehouse/            ✅ Category, Product, Stock, StockMovement
-│   ├── models.py         ← Category, Product, Stock, StockMovement
+│   ├── models.py         ← Category, Product(unique_together store+name, store+barcode), Stock, StockMovement
 │   ├── views.py          ← CategoryViewSet, ProductViewSet, StockViewSet, StockMovementViewSet
-│   ├── serializers.py    ← 14 ta serializer
+│   ├── serializers.py    ← 14 ta serializer (per-store unique validation)
 │   ├── api_urls.py       ← /api/v1/warehouse/
-│   └── migrations/0001_initial.py
+│   └── migrations/
+│       ├── 0001_initial.py
+│       └── 0002_alter_product_unique_together.py ← unique_together qo'shildi
 ├── trade/                ❌ Hali boshlanmagan
 ├── expense/              ❌ Hali boshlanmagan
 ├── requirements/
