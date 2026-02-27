@@ -6,17 +6,11 @@
 
 
 ------ Tugadi ---------
+2) paginationni 10 talik qilish kkk
+1) creted_on ni formatini yaxshilash
 
 
 
 --------- Qoldi ----------
-5) tel raqam + siz boryapdimi ?
-12) sing up da biror maydon bo'lmasa yoki bo'sh ketganda chiqadigan xatolikni chiroyli so'zlarga almashtirish kerak
-1) Workwrlarni statusiga qarab filyerlab joʻnatish
-2) worker qoʻshganda, qoʻshimcha permission larni qoʻshishini sinab koʻrish kerak 
-3) worker uchun search va filter bormi ?
-4) worker oʻchirilganda delete soʻrovida status deactive boʻlishi kerak
-
-
 
 

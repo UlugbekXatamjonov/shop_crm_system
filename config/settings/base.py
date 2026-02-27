@@ -193,7 +193,7 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 10,
 
     # Sana va vaqt formati
-    'DATETIME_FORMAT': '%Y-%m-%d  |  %H:%M',
+    'DATETIME_FORMAT': '%Y-%m-%d | %H:%M',
     'DATE_FORMAT': '%Y-%m-%d',
 }
 
