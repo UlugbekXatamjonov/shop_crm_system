@@ -17,7 +17,7 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 
 | App         | Holat             | Izoh                                                   |
 |-------------|-------------------|--------------------------------------------------------|
-| `accaunt`   | ✅ Tugallangan    | CustomUser, Worker, AuditLog, JWT auth — 7 ta bug fix tugallandi |
+| `accaunt`   | ✅ Tugallangan    | CustomUser, Worker, AuditLog, JWT auth — password reset views qo'shildi, WorkerList/Detail da store+branch maydonlari |
 | `store`     | ✅ Tugallangan    | Store, Branch CRUD (soft delete, multi-tenant, workers in detail, Uzbek errors) |
 | `warehouse` | ✅ Tugallangan    | Category, Product, Stock, StockMovement (kirim/chiqim, per-store unique) |
 | `trade`     | ❌ Boshlanmagan  | Navbatda                                               |
@@ -93,7 +93,9 @@ almashtirishda so'rov formatida `{"permissions": ["sotuv", "ombor"]}` ishlatilin
 | `UserRegistrationSerializer`| Ro'yxatdan o'tish (auto Worker(owner) + permissions yaratadi)|
 | `UserLoginSerializer`       | Login (username + password)                                  |
 | `LogoutSerializer`          | Token blacklist                                              |
-| `UserChangePasswordSerializer` | Parol o'zgartirish                                        |
+| `UserChangePasswordSerializer`        | POST /auth/change-password/ — current_password, password, password2 (save update_fields=['password']) |
+| `SendPasswordResetEmailSerializer`    | POST /auth/send-reset-email/ — email bo'yicha tiklash havolasi yuboradi |
+| `UserPasswordResetSerializer`         | POST /auth/reset-password/<uid>/<token>/ — yangi parol o'rnatadi |
 | `ProfileUpdateSerializer`   | PATCH /auth/profil/ — first_name, last_name, phone1, phone2  |
 | `WorkerListSerializer`      | Hodimlar ro'yxati (id, full_name, phone1, role, branch_id, branch_name, store_id, store_name, salary, status) — null safe SerializerMethodField |
 | `WorkerDetailSerializer`    | Hodim to'liq (+ username, email, phone2, branch_id, branch_name, store_id, store_name, permissions) — null safe SerializerMethodField |
@@ -402,14 +404,11 @@ myenv/Scripts/python.exe manage.py migrate appname --settings=config.settings.lo
 
 ### Git log (so'nggi commitlar, 27.02.2026)
 ```
+213f878  feat(auth): parolni tiklash endpointlari qo'shildi va change-password tuzatildi
+73ba2de  feat(accaunt): WorkerList/Detail da branch_id, branch_name, store_id, store_name qo'shildi
 85beff6  fix(store): StoreListSerializer dan workers olib tashlandi, faqat detail da qoldi
 c5e1bc6  feat: O'zbek tilidagi xato xabarlari va Store/Branch da workers ro'yxati
 a23903a  fix(store): StoreUpdateSerializer va BranchUpdateSerializer ga status maydoni qo'shildi
-9335397  feat: per-store unique constraint qo'shildi (Branch, Product)
-2ec9e40  fix(settings): DATETIME_FORMAT o'zgartirildi — '2026-02-23 | 17:17' formatiga
-41ce70d  fix(accaunt): branch=None bo'lsa branch_name response dan tushib qolishi tuzatildi
-f579ef8  fix(accaunt): admin.py da extra_permissions -> permissions tuzatildi
-17983b0  fix(accaunt): worker API 7 ta xatolik tuzatildi
 ```
 
 ---
