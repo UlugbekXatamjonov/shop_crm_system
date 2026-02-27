@@ -97,7 +97,7 @@ class BranchUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = Branch
-        fields = ('name', 'address', 'phone')
+        fields = ('name', 'address', 'phone', 'status')
 
     def validate_name(self, value: str) -> str:
         """Bir do'kon ichida filial nomi takrorlanmasligi kerak."""
@@ -175,9 +175,8 @@ class StoreUpdateSerializer(serializers.ModelSerializer):
     """
     Do'kon ma'lumotlarini yangilash.
     PATCH /api/v1/stores/{id}/ da ishlatiladi.
-    status maydoni bu yerda yo'q — nofaol qilish DELETE orqali amalga oshiriladi.
     """
 
     class Meta:
         model  = Store
-        fields = ('name', 'address', 'phone')
+        fields = ('name', 'address', 'phone', 'status')
