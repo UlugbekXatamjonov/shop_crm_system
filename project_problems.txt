@@ -6,9 +6,6 @@
 
 
 ------ Tugadi ---------
-2) paginationni 10 talik qilish kkk
-1) creted_on ni formatini yaxshilash
-
 
 
 --------- Qoldi ----------
