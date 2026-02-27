@@ -279,7 +279,7 @@ class WorkerViewSet(viewsets.ModelViewSet):
         return (
             Worker.objects
             .filter(store=worker.store)
-            .select_related('user', 'branch')
+            .select_related('user', 'store', 'branch')
             .annotate(
                 status_order=Case(
                     When(status=WorkerStatus.ACTIVE,        then=Value(0)),

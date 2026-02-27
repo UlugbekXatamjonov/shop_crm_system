@@ -16,7 +16,8 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(test:*)",
-      "Bash(python manage.py migrate:*)"
+      "Bash(python manage.py migrate:*)",
+      "Bash(C:/Users/U17/my_projects/shop_crm_system/myenv/Scripts/python.exe -c \"import django; import os; os.environ.setdefault\\(''DJANGO_SETTINGS_MODULE'', ''config.settings.local''\\); django.setup\\(\\); from accaunt.serializers import WorkerListSerializer, WorkerDetailSerializer; print\\(''OK — import muvaffaqiyatli''\\)\")"
     ]
   }
 }

@@ -95,8 +95,8 @@ almashtirishda so'rov formatida `{"permissions": ["sotuv", "ombor"]}` ishlatilin
 | `LogoutSerializer`          | Token blacklist                                              |
 | `UserChangePasswordSerializer` | Parol o'zgartirish                                        |
 | `ProfileUpdateSerializer`   | PATCH /auth/profil/ — first_name, last_name, phone1, phone2  |
-| `WorkerListSerializer`      | Hodimlar ro'yxati (id, full_name, phone1, role, branch_name, salary, status) — branch_name SerializerMethodField (null safe) |
-| `WorkerDetailSerializer`    | Hodim to'liq (+ username, email, phone2, permissions) — branch_name SerializerMethodField (null safe) |
+| `WorkerListSerializer`      | Hodimlar ro'yxati (id, full_name, phone1, role, branch_id, branch_name, store_id, store_name, salary, status) — null safe SerializerMethodField |
+| `WorkerDetailSerializer`    | Hodim to'liq (+ username, email, phone2, branch_id, branch_name, store_id, store_name, permissions) — null safe SerializerMethodField |
 | `WorkerCreateSerializer`    | Hodim yaratish (user+worker bitta atomic da, permissions auto) |
 | `WorkerUpdateSerializer`    | Hodim yangilash — user+worker+permissions bitta PATCH da     |
 

@@ -356,21 +356,34 @@ class WorkerListSerializer(serializers.ModelSerializer):
     """
     full_name    = serializers.SerializerMethodField()
     role_display = serializers.CharField(source='get_role_display', read_only=True)
+    branch_id    = serializers.SerializerMethodField()
     branch_name  = serializers.SerializerMethodField()
+    store_id     = serializers.SerializerMethodField()
+    store_name   = serializers.SerializerMethodField()
     phone1       = serializers.CharField(source='user.phone1', read_only=True)
 
     class Meta:
         model = Worker
         fields = (
             'id', 'full_name', 'phone1', 'role', 'role_display',
-            'branch_name', 'salary', 'status',
+            'branch_id', 'branch_name', 'store_id', 'store_name',
+            'salary', 'status',
         )
 
     def get_full_name(self, obj: Worker) -> str:
         return str(obj.user)
 
+    def get_branch_id(self, obj: Worker) -> int | None:
+        return obj.branch_id
+
     def get_branch_name(self, obj: Worker) -> str | None:
-        return obj.branch.name if obj.branch else None
+        return obj.branch.name if obj.branch_id else None
+
+    def get_store_id(self, obj: Worker) -> int | None:
+        return obj.store_id
+
+    def get_store_name(self, obj: Worker) -> str | None:
+        return obj.store.name if obj.store_id else None
 
 
 class WorkerDetailSerializer(serializers.ModelSerializer):
@@ -384,7 +397,10 @@ class WorkerDetailSerializer(serializers.ModelSerializer):
     phone2       = serializers.CharField(source='user.phone2',   read_only=True)
     email        = serializers.CharField(source='user.email',    read_only=True)
     role_display = serializers.CharField(source='get_role_display', read_only=True)
+    branch_id    = serializers.SerializerMethodField()
     branch_name  = serializers.SerializerMethodField()
+    store_id     = serializers.SerializerMethodField()
+    store_name   = serializers.SerializerMethodField()
 
     class Meta:
         model = Worker
@@ -392,7 +408,8 @@ class WorkerDetailSerializer(serializers.ModelSerializer):
             'id',
             'full_name', 'username', 'email', 'phone1', 'phone2',
             'role', 'role_display',
-            'branch_name', 'salary', 'status',
+            'branch_id', 'branch_name', 'store_id', 'store_name',
+            'salary', 'status',
             'permissions',
             'created_on',
         )
@@ -400,8 +417,17 @@ class WorkerDetailSerializer(serializers.ModelSerializer):
     def get_full_name(self, obj: Worker) -> str:
         return str(obj.user)
 
+    def get_branch_id(self, obj: Worker) -> int | None:
+        return obj.branch_id
+
     def get_branch_name(self, obj: Worker) -> str | None:
-        return obj.branch.name if obj.branch else None
+        return obj.branch.name if obj.branch_id else None
+
+    def get_store_id(self, obj: Worker) -> int | None:
+        return obj.store_id
+
+    def get_store_name(self, obj: Worker) -> str | None:
+        return obj.store.name if obj.store_id else None
 
 
 class WorkerCreateSerializer(serializers.Serializer):
