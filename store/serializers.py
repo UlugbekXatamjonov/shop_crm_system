@@ -17,6 +17,11 @@ from rest_framework import serializers
 from .models import Branch, Store, StoreStatus
 
 
+def _worker_short(worker) -> dict:
+    """Hodimning qisqa ma'lumoti: id va to'liq ismi."""
+    return {'id': worker.id, 'full_name': str(worker.user)}
+
+
 # ============================================================
 # FILIAL SERIALIZERLARI
 # ============================================================
@@ -57,6 +62,7 @@ class BranchDetailSerializer(serializers.ModelSerializer):
         source='store.id',
         read_only=True
     )
+    workers = serializers.SerializerMethodField()
 
     class Meta:
         model  = Branch
@@ -64,8 +70,15 @@ class BranchDetailSerializer(serializers.ModelSerializer):
             'id', 'name', 'address', 'phone',
             'store_id', 'store_name',
             'status', 'status_display',
-            'created_on',
+            'created_on', 'workers',
         )
+
+    def get_workers(self, obj: Branch) -> list:
+        """Shu filialdagi barcha xodimlar (id + to'liq ismi)."""
+        return [
+            _worker_short(w)
+            for w in obj.workers.select_related('user').order_by('user__first_name')
+        ]
 
 
 class BranchCreateSerializer(serializers.ModelSerializer):
@@ -125,13 +138,21 @@ class StoreListSerializer(serializers.ModelSerializer):
         read_only=True
     )
     branch_count = serializers.SerializerMethodField()
+    workers      = serializers.SerializerMethodField()
 
     class Meta:
         model  = Store
-        fields = ('id', 'name', 'phone', 'status', 'status_display', 'branch_count')
+        fields = ('id', 'name', 'phone', 'status', 'status_display', 'branch_count', 'workers')
 
     def get_branch_count(self, obj: Store) -> int:
         return obj.branches.filter(status=StoreStatus.ACTIVE).count()
+
+    def get_workers(self, obj: Store) -> list:
+        """Do'konga tegishli barcha xodimlar (id + to'liq ismi)."""
+        return [
+            _worker_short(w)
+            for w in obj.workers.select_related('user').order_by('user__first_name')
+        ]
 
 
 class StoreDetailSerializer(serializers.ModelSerializer):
@@ -144,18 +165,26 @@ class StoreDetailSerializer(serializers.ModelSerializer):
         read_only=True
     )
     branches = serializers.SerializerMethodField()
+    workers  = serializers.SerializerMethodField()
 
     class Meta:
         model  = Store
         fields = (
             'id', 'name', 'address', 'phone',
             'status', 'status_display',
-            'created_on', 'branches',
+            'created_on', 'branches', 'workers',
         )
 
     def get_branches(self, obj: Store) -> list:
         qs = obj.branches.filter(status=StoreStatus.ACTIVE).order_by('name')
         return BranchListSerializer(qs, many=True).data
+
+    def get_workers(self, obj: Store) -> list:
+        """Do'konga tegishli barcha xodimlar (id + to'liq ismi)."""
+        return [
+            _worker_short(w)
+            for w in obj.workers.select_related('user').order_by('user__first_name')
+        ]
 
 
 class StoreCreateSerializer(serializers.ModelSerializer):

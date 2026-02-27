@@ -195,6 +195,9 @@ REST_FRAMEWORK = {
     # Sana va vaqt formati
     'DATETIME_FORMAT': '%Y-%m-%d | %H:%M',
     'DATE_FORMAT': '%Y-%m-%d',
+
+    # O'zbek tilidagi xato xabarlari
+    'EXCEPTION_HANDLER': 'config.exceptions.custom_exception_handler',
 }
 
 
