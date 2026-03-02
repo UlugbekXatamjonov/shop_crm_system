@@ -99,7 +99,7 @@ class CategoryUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = Category
-        fields = ('name', 'description')
+        fields = ('name', 'description', 'status')
 
     def validate_name(self, value: str) -> str:
         qs = Category.objects.filter(
