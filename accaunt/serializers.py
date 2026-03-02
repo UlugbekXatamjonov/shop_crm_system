@@ -627,6 +627,18 @@ class WorkerUpdateSerializer(serializers.ModelSerializer):
       {"first_name": "Ali", "role": "manager", "permissions": ["sotuv", "ombor"]}
     """
     # --- CustomUser maydonlari (source='user.*' orqali) ---
+    username = serializers.CharField(
+        source='user.username', required=False, label="Login (username)",
+        error_messages={
+            'blank': "Login bo'sh bo'lishi mumkin emas.",
+        }
+    )
+    email = serializers.EmailField(
+        source='user.email', required=False, allow_blank=True, label="Elektron pochta",
+        error_messages={
+            'invalid': "To'g'ri email manzil kiriting.",
+        }
+    )
     first_name = serializers.CharField(
         source='user.first_name', required=False, allow_blank=True, label="Ismi",
         error_messages={
@@ -668,6 +680,7 @@ class WorkerUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Worker
         fields = (
+            'username', 'email',
             'first_name', 'last_name', 'phone1', 'phone2',
             'role', 'branch', 'salary', 'status', 'permissions',
         )
@@ -692,6 +705,26 @@ class WorkerUpdateSerializer(serializers.ModelSerializer):
         }
 
     # --- Validatsiyalar ---
+
+    def validate_username(self, value: str) -> str:
+        """Login boshqa foydalanuvchida band emasligini tekshiradi."""
+        qs = CustomUser.objects.filter(username=value).exclude(pk=self.instance.user.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                "Bu login allaqachon boshqa foydalanuvchida band."
+            )
+        return value
+
+    def validate_email(self, value: str) -> str:
+        """Email boshqa foydalanuvchida band emasligini tekshiradi."""
+        if not value:
+            return value
+        qs = CustomUser.objects.filter(email=value).exclude(pk=self.instance.user.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                "Bu email allaqachon boshqa foydalanuvchida band."
+            )
+        return value
 
     def validate_phone1(self, value: str) -> str:
         """Telefon raqami boshqa foydalanuvchida band emasligini tekshiradi."""
