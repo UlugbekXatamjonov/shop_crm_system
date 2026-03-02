@@ -11,6 +11,8 @@ Multi-tenant xavfsizlik:
   ma'lumotlarini ko'ra va boshqara oladi.
 """
 
+from django.db.models import Case, IntegerField, Value, When
+
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -69,7 +71,19 @@ class StoreViewSet(viewsets.ModelViewSet):
         worker = getattr(self.request.user, 'worker', None)
         if not worker or not worker.store:
             return Store.objects.none()
-        return Store.objects.filter(id=worker.store.id)
+        return (
+            Store.objects
+            .filter(id=worker.store.id)
+            .annotate(
+                status_order=Case(
+                    When(status='active',   then=Value(0)),
+                    When(status='inactive', then=Value(1)),
+                    default=Value(2),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by('status_order', '-created_on')
+        )
 
     def perform_create(self, serializer):
         instance = serializer.save()
@@ -183,6 +197,15 @@ class BranchViewSet(viewsets.ModelViewSet):
             Branch.objects
             .filter(store=worker.store)
             .select_related('store')
+            .annotate(
+                status_order=Case(
+                    When(status='active',   then=Value(0)),
+                    When(status='inactive', then=Value(1)),
+                    default=Value(2),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by('status_order', 'name')
         )
 
     def get_serializer_context(self):

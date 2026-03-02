@@ -19,6 +19,8 @@ StockMovement:
   Yaratishda Stock qoldig'i avtomatik yangilanadi.
 """
 
+from django.db.models import Case, IntegerField, Value, When
+
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -96,7 +98,19 @@ class CategoryViewSet(viewsets.ModelViewSet):
         worker = getattr(self.request.user, 'worker', None)
         if not worker or not worker.store:
             return Category.objects.none()
-        return Category.objects.filter(store=worker.store)
+        return (
+            Category.objects
+            .filter(store=worker.store)
+            .annotate(
+                status_order=Case(
+                    When(status='active',   then=Value(0)),
+                    When(status='inactive', then=Value(1)),
+                    default=Value(2),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by('status_order', 'name')
+        )
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -220,6 +234,15 @@ class ProductViewSet(viewsets.ModelViewSet):
             Product.objects
             .filter(store=worker.store)
             .select_related('category', 'store')
+            .annotate(
+                status_order=Case(
+                    When(status='active',   then=Value(0)),
+                    When(status='inactive', then=Value(1)),
+                    default=Value(2),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by('status_order', 'name')
         )
 
     def get_serializer_context(self):
@@ -342,7 +365,19 @@ class WarehouseViewSet(viewsets.ModelViewSet):
         worker = getattr(self.request.user, 'worker', None)
         if not worker or not worker.store:
             return Warehouse.objects.none()
-        return Warehouse.objects.filter(store=worker.store)
+        return (
+            Warehouse.objects
+            .filter(store=worker.store)
+            .annotate(
+                status_order=Case(
+                    When(status='active',   then=Value(0)),
+                    When(status='inactive', then=Value(1)),
+                    default=Value(2),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by('status_order', 'name')
+        )
 
     def get_serializer_context(self):
         context = super().get_serializer_context()

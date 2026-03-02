@@ -46,7 +46,7 @@ class BranchListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = Branch
-        fields = ('id', 'name', 'store_id', 'store_name', 'phone', 'status', 'status_display')
+        fields = ('id', 'name', 'address', 'store_id', 'store_name', 'phone', 'status', 'status_display')
 
 
 class BranchDetailSerializer(serializers.ModelSerializer):
