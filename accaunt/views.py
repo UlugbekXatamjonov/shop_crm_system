@@ -263,7 +263,7 @@ class WorkerViewSet(viewsets.ModelViewSet):
       POST   /api/v1/workers/      — hodim qo'shish  (faqat owner)
       GET    /api/v1/workers/{id}/ — hodim ma'lumoti (manager/seller ham ko'ra oladi)
       PATCH  /api/v1/workers/{id}/ — hodimni yangilash (faqat owner)
-      DELETE /api/v1/workers/{id}/ — hodimni ishdan chiqarish (faqat owner, soft delete)
+      DELETE /api/v1/workers/{id}/ — hodimni o'chirish (faqat owner, hard delete)
 
     PATCH bir so'rovda barchasini o'zgartiradi:
       - User: first_name, last_name, phone1, phone2
@@ -400,23 +400,24 @@ class WorkerViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         """
-        Hodimni ishdan chiqarish — o'chirish o'rniga status='ishdan_ketgan' ga o'tkaziladi.
+        Hodimni o'chirish — user va worker ikkalasi ham o'chadi (hard delete).
         DELETE /api/v1/workers/{id}/
         """
         instance = self.get_object()
-        instance.status = WorkerStatus.ISHDAN_KETGAN
-        instance.save(update_fields=['status'])
+        pk   = instance.id
+        name = str(instance.user)
+        instance.user.delete()  # Worker ham CASCADE o'chadi
 
         AuditLog.objects.create(
             actor=request.user,
             action=AuditLog.Action.DELETE,
             target_model='Worker',
-            target_id=instance.id,
-            description=f"Hodim ishdan chiqarildi: {instance.user}",
+            target_id=pk,
+            description=f"Hodim o'chirildi: {name}",
         )
 
         return Response(
-            {'message': "Hodim ishdan chiqarildi."},
+            {'message': "Hodim muvaffaqiyatli o'chirildi."},
             status=status.HTTP_200_OK,
         )
 

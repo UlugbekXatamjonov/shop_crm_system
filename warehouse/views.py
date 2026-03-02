@@ -73,7 +73,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
       POST   /api/v1/warehouse/categories/       — yaratish (manager+)
       GET    /api/v1/warehouse/categories/{id}/  — tafsilotlar
       PATCH  /api/v1/warehouse/categories/{id}/  — yangilash (manager+)
-      DELETE /api/v1/warehouse/categories/{id}/  — nofaol qilish (manager+, soft delete)
+      DELETE /api/v1/warehouse/categories/{id}/  — o'chirish (manager+, hard delete)
 
     Multi-tenant:
       Foydalanuvchi faqat o'z do'konining kategoriyalarini ko'radi.
@@ -141,15 +141,15 @@ class CategoryViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance: Category):
-        """Soft delete — o'chirish o'rniga status='inactive' ga o'tkaziladi."""
-        instance.status = ProductStatus.INACTIVE
-        instance.save(update_fields=['status'])
+        pk   = instance.id
+        name = instance.name
+        instance.delete()
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditLog.Action.DELETE,
             target_model='Category',
-            target_id=instance.id,
-            description=f"Kategoriya nofaol qilindi: '{instance.name}'",
+            target_id=pk,
+            description=f"Kategoriya o'chirildi: '{name}'",
         )
 
     def create(self, request, *args, **kwargs):
@@ -187,7 +187,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(
-            {'message': "Kategoriya muvaffaqiyatli nofaol qilindi."},
+            {'message': "Kategoriya muvaffaqiyatli o'chirildi."},
             status=status.HTTP_200_OK,
         )
 
@@ -205,7 +205,7 @@ class ProductViewSet(viewsets.ModelViewSet):
       POST   /api/v1/warehouse/products/       — yaratish (manager+)
       GET    /api/v1/warehouse/products/{id}/  — tafsilotlar
       PATCH  /api/v1/warehouse/products/{id}/  — yangilash (manager+)
-      DELETE /api/v1/warehouse/products/{id}/  — nofaol qilish (manager+, soft delete)
+      DELETE /api/v1/warehouse/products/{id}/  — o'chirish (manager+, hard delete)
 
     Multi-tenant:
       Foydalanuvchi faqat o'z do'konining mahsulotlarini ko'radi.
@@ -274,15 +274,15 @@ class ProductViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance: Product):
-        """Soft delete — o'chirish o'rniga status='inactive' ga o'tkaziladi."""
-        instance.status = ProductStatus.INACTIVE
-        instance.save(update_fields=['status'])
+        pk   = instance.id
+        name = instance.name
+        instance.delete()
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditLog.Action.DELETE,
             target_model='Product',
-            target_id=instance.id,
-            description=f"Mahsulot nofaol qilindi: '{instance.name}'",
+            target_id=pk,
+            description=f"Mahsulot o'chirildi: '{name}'",
         )
 
     def create(self, request, *args, **kwargs):
@@ -320,7 +320,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(
-            {'message': "Mahsulot muvaffaqiyatli nofaol qilindi."},
+            {'message': "Mahsulot muvaffaqiyatli o'chirildi."},
             status=status.HTTP_200_OK,
         )
 
@@ -338,7 +338,7 @@ class WarehouseViewSet(viewsets.ModelViewSet):
       POST   /api/v1/warehouse/warehouses/       — yaratish (owner)
       GET    /api/v1/warehouse/warehouses/{id}/  — tafsilotlar
       PATCH  /api/v1/warehouse/warehouses/{id}/  — yangilash (manager+)
-      DELETE /api/v1/warehouse/warehouses/{id}/  — nofaol qilish (owner, soft delete)
+      DELETE /api/v1/warehouse/warehouses/{id}/  — o'chirish (owner, hard delete)
 
     Multi-tenant:
       Foydalanuvchi faqat o'z do'konining omborlarini ko'radi.
@@ -408,15 +408,15 @@ class WarehouseViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance: Warehouse):
-        """Soft delete — o'chirish o'rniga status='inactive' ga o'tkaziladi."""
-        instance.status = ProductStatus.INACTIVE
-        instance.save(update_fields=['status'])
+        pk   = instance.id
+        name = instance.name
+        instance.delete()
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditLog.Action.DELETE,
             target_model='Warehouse',
-            target_id=instance.id,
-            description=f"Ombor nofaol qilindi: '{instance.name}'",
+            target_id=pk,
+            description=f"Ombor o'chirildi: '{name}'",
         )
 
     def create(self, request, *args, **kwargs):
@@ -454,7 +454,7 @@ class WarehouseViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(
-            {'message': "Ombor muvaffaqiyatli nofaol qilindi."},
+            {'message': "Ombor muvaffaqiyatli o'chirildi."},
             status=status.HTTP_200_OK,
         )
 

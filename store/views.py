@@ -46,7 +46,7 @@ class StoreViewSet(viewsets.ModelViewSet):
       POST   /api/v1/stores/       — yangi do'kon yaratish (faqat owner)
       GET    /api/v1/stores/{id}/  — do'kon tafsilotlari (dokonlar ruxsati kerak)
       PATCH  /api/v1/stores/{id}/  — do'kon ma'lumotlarini yangilash (faqat owner)
-      DELETE /api/v1/stores/{id}/  — do'konni nofaol qilish (faqat owner, soft delete)
+      DELETE /api/v1/stores/{id}/  — do'konni o'chirish (faqat owner, hard delete)
 
     Multi-tenant:
       Owner faqat o'z do'konini ko'radi va boshqaradi.
@@ -110,15 +110,15 @@ class StoreViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance: Store):
-        """Soft delete — o'chirish o'rniga status='inactive' ga o'tkaziladi."""
-        instance.status = StoreStatus.INACTIVE
-        instance.save(update_fields=['status'])
+        pk   = instance.id
+        name = instance.name
+        instance.delete()
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditLog.Action.DELETE,
             target_model='Store',
-            target_id=instance.id,
-            description=f"Do'kon nofaol qilindi: '{instance.name}'",
+            target_id=pk,
+            description=f"Do'kon o'chirildi: '{name}'",
         )
 
     def create(self, request, *args, **kwargs):
@@ -150,7 +150,7 @@ class StoreViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(
-            {'message': "Do'kon muvaffaqiyatli nofaol qilindi."},
+            {'message': "Do'kon muvaffaqiyatli o'chirildi."},
             status=status.HTTP_200_OK,
         )
 
@@ -168,7 +168,7 @@ class BranchViewSet(viewsets.ModelViewSet):
       POST   /api/v1/branches/       — yangi filial yaratish (faqat owner)
       GET    /api/v1/branches/{id}/  — filial tafsilotlari
       PATCH  /api/v1/branches/{id}/  — filial ma'lumotlarini yangilash (faqat owner)
-      DELETE /api/v1/branches/{id}/  — filialni nofaol qilish (faqat owner, soft delete)
+      DELETE /api/v1/branches/{id}/  — filialni o'chirish (faqat owner, hard delete)
 
     Multi-tenant:
       Faqat o'z do'konining filiallarini ko'radi va boshqaradi.
@@ -238,15 +238,15 @@ class BranchViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance: Branch):
-        """Soft delete — o'chirish o'rniga status='inactive' ga o'tkaziladi."""
-        instance.status = StoreStatus.INACTIVE
-        instance.save(update_fields=['status'])
+        pk   = instance.id
+        name = instance.name
+        instance.delete()
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditLog.Action.DELETE,
             target_model='Branch',
-            target_id=instance.id,
-            description=f"Filial nofaol qilindi: '{instance.name}'",
+            target_id=pk,
+            description=f"Filial o'chirildi: '{name}'",
         )
 
     def create(self, request, *args, **kwargs):
@@ -284,6 +284,6 @@ class BranchViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(
-            {'message': "Filial muvaffaqiyatli nofaol qilindi."},
+            {'message': "Filial muvaffaqiyatli o'chirildi."},
             status=status.HTTP_200_OK,
         )
