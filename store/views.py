@@ -137,6 +137,11 @@ class StoreViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data:
+            return Response(
+                {'message': "Yangilash uchun kamida bitta maydon yuborilishi kerak."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         self.perform_update(serializer)
         return Response(
             {
@@ -268,6 +273,11 @@ class BranchViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data:
+            return Response(
+                {'message': "Yangilash uchun kamida bitta maydon yuborilishi kerak."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         self.perform_update(serializer)
         return Response(
             {

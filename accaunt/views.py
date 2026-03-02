@@ -380,6 +380,11 @@ class WorkerViewSet(viewsets.ModelViewSet):
             context=self.get_serializer_context(),
         )
         serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data:
+            return Response(
+                {'message': "Yangilash uchun kamida bitta maydon yuborilishi kerak."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         self.perform_update(serializer)
 
         AuditLog.objects.create(
