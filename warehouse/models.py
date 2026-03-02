@@ -32,6 +32,7 @@ class ProductUnit(models.TextChoices):
     M2     = 'm2',     'Kvadrat metr'
     YASHIK = 'yashik', 'Yashik'
     QOP    = 'qop',    'Qop'
+    QUTI   = 'quti',    "Quti"
 
 
 class ProductStatus(models.TextChoices):

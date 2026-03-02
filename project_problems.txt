@@ -2,7 +2,6 @@
 
 
 ------ Qilish kerak ---------
-11) worker qo'shyapganimda faqat ownerning do'koni va ularning filiallari ko'rinishi kerak frontda 
 
 
 ------ Tugadi ---------
