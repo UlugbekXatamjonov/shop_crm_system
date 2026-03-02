@@ -3,7 +3,6 @@
 #   - StockMovement: branch o'rniga from_branch/to_branch/from_warehouse/to_warehouse
 #   - StockMovement: 'transfer' turi qo'shildi
 #   - Stock: warehouse FK qo'shildi, branch nullable qilindi, constraint qo'shildi
-#   - Product: unique_together (store, name) va (store, barcode) qo'shildi
 
 import django.db.models.deletion
 import django.db.models
@@ -13,9 +12,8 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('accaunt', '0004_remove_worker_extra_permissions_worker_permissions_and_more'),
-        ('store', '0003_alter_branch_unique_together'),
-        ('warehouse', '0001_initial'),
+        ('accaunt', '0005_worker_permissions_replace_extra'),
+        ('warehouse', '0002_alter_product_unique_together'),
     ]
 
     operations = [
@@ -151,11 +149,5 @@ class Migration(migrations.Migration):
         migrations.AlterUniqueTogether(
             name='stock',
             unique_together={('product', 'branch'), ('product', 'warehouse')},
-        ),
-
-        # ── 13. Product — unique_together qo'shildi ───────────
-        migrations.AlterUniqueTogether(
-            name='product',
-            unique_together={('store', 'name'), ('store', 'barcode')},
         ),
     ]
