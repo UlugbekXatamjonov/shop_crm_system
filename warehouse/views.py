@@ -5,8 +5,9 @@ WAREHOUSE APP — View'lar
 ViewSet'lar:
   CategoryViewSet      — Kategoriyalarni boshqarish
   ProductViewSet       — Mahsulotlarni boshqarish
-  StockViewSet         — Ombor qoldiqlarini boshqarish
-  StockMovementViewSet — Kirim/chiqim harakatlarini boshqarish
+  WarehouseViewSet     — Omborlarni boshqarish
+  StockViewSet         — Qoldiqlarni boshqarish
+  StockMovementViewSet — Kirim/chiqim/ko'chirish harakatlarini boshqarish
 
 Ruxsatlar:
   list/retrieve → CanAccess('mahsulotlar') yoki CanAccess('ombor')
@@ -23,7 +24,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from accaunt.models import AuditLog
-from accaunt.permissions import CanAccess, IsManagerOrAbove
+from accaunt.permissions import CanAccess, IsManagerOrAbove, IsOwner
 
 from .models import (
     Category,
@@ -32,6 +33,7 @@ from .models import (
     ProductStatus,
     Stock,
     StockMovement,
+    Warehouse,
 )
 from .serializers import (
     CategoryCreateSerializer,
@@ -49,6 +51,10 @@ from .serializers import (
     StockDetailSerializer,
     StockListSerializer,
     StockUpdateSerializer,
+    WarehouseCreateSerializer,
+    WarehouseDetailSerializer,
+    WarehouseListSerializer,
+    WarehouseUpdateSerializer,
 )
 
 
@@ -297,12 +303,134 @@ class ProductViewSet(viewsets.ModelViewSet):
 
 
 # ============================================================
-# OMBOR QOLDIG'I VIEWSET
+# OMBOR VIEWSET
+# ============================================================
+
+class WarehouseViewSet(viewsets.ModelViewSet):
+    """
+    Omborlarni boshqarish.
+
+    Endpointlar:
+      GET    /api/v1/warehouse/warehouses/       — ro'yxat
+      POST   /api/v1/warehouse/warehouses/       — yaratish (owner)
+      GET    /api/v1/warehouse/warehouses/{id}/  — tafsilotlar
+      PATCH  /api/v1/warehouse/warehouses/{id}/  — yangilash (manager+)
+      DELETE /api/v1/warehouse/warehouses/{id}/  — nofaol qilish (owner, soft delete)
+
+    Multi-tenant:
+      Foydalanuvchi faqat o'z do'konining omborlarini ko'radi.
+    """
+    http_method_names = ['get', 'post', 'patch', 'delete']
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated(), CanAccess('ombor')]
+        if self.action in ('destroy', 'create'):
+            return [IsAuthenticated(), IsOwner()]
+        return [IsAuthenticated(), IsManagerOrAbove()]
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return WarehouseListSerializer
+        if self.action == 'create':
+            return WarehouseCreateSerializer
+        if self.action in ('update', 'partial_update'):
+            return WarehouseUpdateSerializer
+        return WarehouseDetailSerializer
+
+    def get_queryset(self):
+        worker = getattr(self.request.user, 'worker', None)
+        if not worker or not worker.store:
+            return Warehouse.objects.none()
+        return Warehouse.objects.filter(store=worker.store)
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        worker = getattr(self.request.user, 'worker', None)
+        if worker:
+            context['store'] = worker.store
+        return context
+
+    def perform_create(self, serializer):
+        worker = self.request.user.worker
+        instance = serializer.save(store=worker.store)
+        AuditLog.objects.create(
+            actor=self.request.user,
+            action=AuditLog.Action.CREATE,
+            target_model='Warehouse',
+            target_id=instance.id,
+            description=f"Ombor yaratildi: '{instance.name}'",
+        )
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        AuditLog.objects.create(
+            actor=self.request.user,
+            action=AuditLog.Action.UPDATE,
+            target_model='Warehouse',
+            target_id=instance.id,
+            description=f"Ombor yangilandi: '{instance.name}'",
+        )
+
+    def perform_destroy(self, instance: Warehouse):
+        """Soft delete — o'chirish o'rniga status='inactive' ga o'tkaziladi."""
+        instance.status = ProductStatus.INACTIVE
+        instance.save(update_fields=['status'])
+        AuditLog.objects.create(
+            actor=self.request.user,
+            action=AuditLog.Action.DELETE,
+            target_model='Warehouse',
+            target_id=instance.id,
+            description=f"Ombor nofaol qilindi: '{instance.name}'",
+        )
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(
+            {
+                'message': "Ombor muvaffaqiyatli yaratildi.",
+                'data': WarehouseDetailSerializer(
+                    serializer.instance,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(
+            {
+                'message': "Ombor muvaffaqiyatli yangilandi.",
+                'data': WarehouseDetailSerializer(
+                    serializer.instance,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response(
+            {'message': "Ombor muvaffaqiyatli nofaol qilindi."},
+            status=status.HTTP_200_OK,
+        )
+
+
+# ============================================================
+# QOLDIQ VIEWSET
 # ============================================================
 
 class StockViewSet(viewsets.ModelViewSet):
     """
-    Ombor qoldiqlarini boshqarish.
+    Qoldiqlarni boshqarish (filial va ombor bo'yicha).
 
     Endpointlar:
       GET    /api/v1/warehouse/stocks/       — ro'yxat
@@ -337,7 +465,7 @@ class StockViewSet(viewsets.ModelViewSet):
         return (
             Stock.objects
             .filter(product__store=worker.store)
-            .select_related('product', 'branch')
+            .select_related('product', 'branch', 'warehouse')
         )
 
     def get_serializer_context(self):
@@ -349,40 +477,43 @@ class StockViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         instance = serializer.save()
+        location = instance.branch or instance.warehouse
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditLog.Action.CREATE,
             target_model='Stock',
             target_id=instance.id,
             description=(
-                f"Ombor qoldig'i qo'shildi: '{instance.product.name}' "
-                f"({instance.branch.name}) = {instance.quantity}"
+                f"Qoldiq qo'shildi: '{instance.product.name}' "
+                f"({location.name}) = {instance.quantity}"
             ),
         )
 
     def perform_update(self, serializer):
         instance = serializer.save()
+        location = instance.branch or instance.warehouse
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditLog.Action.UPDATE,
             target_model='Stock',
             target_id=instance.id,
             description=(
-                f"Ombor qoldig'i yangilandi: '{instance.product.name}' "
-                f"({instance.branch.name}) = {instance.quantity}"
+                f"Qoldiq yangilandi: '{instance.product.name}' "
+                f"({location.name}) = {instance.quantity}"
             ),
         )
 
     def perform_destroy(self, instance: Stock):
-        pk   = instance.id
-        name = f"{instance.product.name} ({instance.branch.name})"
+        pk       = instance.id
+        location = instance.branch or instance.warehouse
+        name     = f"{instance.product.name} ({location.name})"
         instance.delete()
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditLog.Action.DELETE,
             target_model='Stock',
             target_id=pk,
-            description=f"Ombor qoldig'i o'chirildi: '{name}'",
+            description=f"Qoldiq o'chirildi: '{name}'",
         )
 
     def create(self, request, *args, **kwargs):
@@ -391,7 +522,7 @@ class StockViewSet(viewsets.ModelViewSet):
         self.perform_create(serializer)
         return Response(
             {
-                'message': "Ombor qoldig'i muvaffaqiyatli qo'shildi.",
+                'message': "Qoldiq muvaffaqiyatli qo'shildi.",
                 'data': StockDetailSerializer(serializer.instance).data,
             },
             status=status.HTTP_201_CREATED,
@@ -404,7 +535,7 @@ class StockViewSet(viewsets.ModelViewSet):
         self.perform_update(serializer)
         return Response(
             {
-                'message': "Ombor qoldig'i muvaffaqiyatli yangilandi.",
+                'message': "Qoldiq muvaffaqiyatli yangilandi.",
                 'data': StockDetailSerializer(serializer.instance).data,
             },
             status=status.HTTP_200_OK,
@@ -414,18 +545,18 @@ class StockViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(
-            {'message': "Ombor qoldig'i muvaffaqiyatli o'chirildi."},
+            {'message': "Qoldiq muvaffaqiyatli o'chirildi."},
             status=status.HTTP_200_OK,
         )
 
 
 # ============================================================
-# HARAKAT (KIRIM/CHIQIM) VIEWSET
+# HARAKAT (KIRIM/CHIQIM/KO'CHIRISH) VIEWSET
 # ============================================================
 
 class StockMovementViewSet(viewsets.ModelViewSet):
     """
-    Mahsulot kirim/chiqim harakatlarini boshqarish.
+    Mahsulot harakatlarini boshqarish (kirim, chiqim, ko'chirish).
 
     Endpointlar:
       GET    /api/v1/warehouse/movements/       — ro'yxat
@@ -437,8 +568,9 @@ class StockMovementViewSet(viewsets.ModelViewSet):
       Xatolikni tuzatish uchun qarama-qarshi harakat yarating.
 
     Yaratishda:
-      - Chiqim uchun qoldiq yetarliligi tekshiriladi (serializer)
-      - Stock.quantity avtomatik yangilanadi (perform_create)
+      - IN:       to_branch/to_warehouse stock (+quantity)
+      - OUT:      from_branch/from_warehouse stock (-quantity)
+      - TRANSFER: from_* stock (-quantity), to_* stock (+quantity)
     """
     http_method_names = ['get', 'post']
 
@@ -459,7 +591,12 @@ class StockMovementViewSet(viewsets.ModelViewSet):
         return (
             StockMovement.objects
             .filter(product__store=worker.store)
-            .select_related('product', 'branch', 'worker__user')
+            .select_related(
+                'product',
+                'from_branch', 'from_warehouse',
+                'to_branch', 'to_warehouse',
+                'worker__user',
+            )
         )
 
     def get_serializer_context(self):
@@ -469,21 +606,62 @@ class StockMovementViewSet(viewsets.ModelViewSet):
             context['store'] = worker.store
         return context
 
+    def _update_stock(self, product, branch, warehouse, delta):
+        """
+        Berilgan joydagi qoldiqni delta ga o'zgartiradi.
+        delta > 0 — qo'shish, delta < 0 — ayirish.
+        """
+        filter_kwargs = {'product': product}
+        if branch:
+            filter_kwargs['branch'] = branch
+        else:
+            filter_kwargs['warehouse'] = warehouse
+
+        stock, _ = Stock.objects.get_or_create(
+            **filter_kwargs,
+            defaults={'quantity': 0},
+        )
+        stock.quantity += delta
+        stock.save(update_fields=['quantity', 'updated_on'])
+
     def perform_create(self, serializer):
         worker   = getattr(self.request.user, 'worker', None)
         instance = serializer.save(worker=worker)
 
-        # Stock qoldig'ini yangilash
-        stock, _ = Stock.objects.get_or_create(
-            product=instance.product,
-            branch=instance.branch,
-            defaults={'quantity': 0},
-        )
+        qty = instance.quantity
+
         if instance.movement_type == MovementType.IN:
-            stock.quantity += instance.quantity
-        else:
-            stock.quantity -= instance.quantity
-        stock.save(update_fields=['quantity', 'updated_on'])
+            self._update_stock(
+                instance.product,
+                instance.to_branch,
+                instance.to_warehouse,
+                +qty,
+            )
+        elif instance.movement_type == MovementType.OUT:
+            self._update_stock(
+                instance.product,
+                instance.from_branch,
+                instance.from_warehouse,
+                -qty,
+            )
+        elif instance.movement_type == MovementType.TRANSFER:
+            self._update_stock(
+                instance.product,
+                instance.from_branch,
+                instance.from_warehouse,
+                -qty,
+            )
+            self._update_stock(
+                instance.product,
+                instance.to_branch,
+                instance.to_warehouse,
+                +qty,
+            )
+
+        from_loc = instance.from_branch or instance.from_warehouse
+        to_loc   = instance.to_branch   or instance.to_warehouse
+        from_name = from_loc.name if from_loc else '—'
+        to_name   = to_loc.name   if to_loc   else '—'
 
         AuditLog.objects.create(
             actor=self.request.user,
@@ -493,7 +671,7 @@ class StockMovementViewSet(viewsets.ModelViewSet):
             description=(
                 f"{instance.get_movement_type_display()}: "
                 f"'{instance.product.name}' × {instance.quantity} "
-                f"({instance.branch.name})"
+                f"({from_name} → {to_name})"
             ),
         )
 

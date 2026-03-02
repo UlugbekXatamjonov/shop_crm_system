@@ -18,6 +18,12 @@ Router avtomatik quyidagi URL'larni yaratadi:
   PATCH  /api/v1/warehouse/products/{id}/        — mahsulot yangilash
   DELETE /api/v1/warehouse/products/{id}/        — mahsulotni nofaol qilish
 
+  GET    /api/v1/warehouse/warehouses/           — omborlar ro'yxati
+  POST   /api/v1/warehouse/warehouses/           — ombor yaratish (owner)
+  GET    /api/v1/warehouse/warehouses/{id}/      — ombor tafsilotlari
+  PATCH  /api/v1/warehouse/warehouses/{id}/      — omborni yangilash
+  DELETE /api/v1/warehouse/warehouses/{id}/      — omborni nofaol qilish (owner)
+
   GET    /api/v1/warehouse/stocks/               — qoldiqlar ro'yxati
   POST   /api/v1/warehouse/stocks/               — qoldiq qo'shish
   GET    /api/v1/warehouse/stocks/{id}/          — qoldiq tafsilotlari
@@ -25,7 +31,7 @@ Router avtomatik quyidagi URL'larni yaratadi:
   DELETE /api/v1/warehouse/stocks/{id}/          — qoldiqni o'chirish
 
   GET    /api/v1/warehouse/movements/            — harakatlar ro'yxati
-  POST   /api/v1/warehouse/movements/            — harakat yaratish (kirim/chiqim)
+  POST   /api/v1/warehouse/movements/            — harakat yaratish (kirim/chiqim/ko'chirish)
   GET    /api/v1/warehouse/movements/{id}/       — harakat tafsilotlari
 """
 
@@ -36,11 +42,13 @@ from .views import (
     ProductViewSet,
     StockMovementViewSet,
     StockViewSet,
+    WarehouseViewSet,
 )
 
 router = DefaultRouter()
 router.register(r'categories', CategoryViewSet,      basename='category')
 router.register(r'products',   ProductViewSet,       basename='product')
+router.register(r'warehouses', WarehouseViewSet,     basename='warehouse')
 router.register(r'stocks',     StockViewSet,         basename='stock')
 router.register(r'movements',  StockMovementViewSet, basename='movement')
 

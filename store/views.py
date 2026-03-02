@@ -73,6 +73,10 @@ class StoreViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         instance = serializer.save()
+        # Do'kon yaratilganda ega worker.store ga avtomatik biriktiriladi
+        worker = self.request.user.worker
+        worker.store = instance
+        worker.save(update_fields=['store'])
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditLog.Action.CREATE,

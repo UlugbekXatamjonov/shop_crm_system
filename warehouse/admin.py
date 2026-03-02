@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Category, Product, Stock, StockMovement
+from .models import Category, Product, Stock, StockMovement, Warehouse
 
 
 @admin.register(Category)
@@ -17,16 +17,28 @@ class ProductAdmin(admin.ModelAdmin):
     search_fields = ('name', 'barcode')
 
 
+@admin.register(Warehouse)
+class WarehouseAdmin(admin.ModelAdmin):
+    list_display  = ('name', 'store', 'address', 'status', 'created_on')
+    list_filter   = ('status', 'store')
+    search_fields = ('name',)
+
+
 @admin.register(Stock)
 class StockAdmin(admin.ModelAdmin):
-    list_display  = ('product', 'branch', 'quantity', 'updated_on')
-    list_filter   = ('branch',)
+    list_display  = ('product', 'branch', 'warehouse', 'quantity', 'updated_on')
+    list_filter   = ('branch', 'warehouse')
     search_fields = ('product__name',)
 
 
 @admin.register(StockMovement)
 class StockMovementAdmin(admin.ModelAdmin):
-    list_display  = ('product', 'branch', 'movement_type', 'quantity', 'worker', 'created_on')
-    list_filter   = ('movement_type', 'branch')
+    list_display  = (
+        'product', 'movement_type', 'quantity',
+        'from_branch', 'from_warehouse',
+        'to_branch', 'to_warehouse',
+        'worker', 'created_on',
+    )
+    list_filter   = ('movement_type',)
     search_fields = ('product__name',)
     readonly_fields = ('created_on',)
