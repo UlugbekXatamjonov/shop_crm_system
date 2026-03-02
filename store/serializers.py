@@ -35,6 +35,10 @@ class BranchListSerializer(serializers.ModelSerializer):
         source='get_status_display',
         read_only=True
     )
+    store_id = serializers.IntegerField(
+        source='store.id',
+        read_only=True
+    )
     store_name = serializers.CharField(
         source='store.name',
         read_only=True
@@ -42,7 +46,7 @@ class BranchListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = Branch
-        fields = ('id', 'name', 'store_name', 'phone', 'status', 'status_display')
+        fields = ('id', 'name', 'store_id', 'store_name', 'phone', 'status', 'status_display')
 
 
 class BranchDetailSerializer(serializers.ModelSerializer):
