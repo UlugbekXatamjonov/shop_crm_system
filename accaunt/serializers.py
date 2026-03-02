@@ -337,7 +337,9 @@ class CustomUserProfileSerializer(serializers.ModelSerializer):
     Foydalanuvchi profili — Worker ma'lumotlari bilan birga.
     Login va GET /api/v1/auth/profil/ da qaytariladi.
     """
-    worker = WorkerProfileSerializer(read_only=True)
+    worker     = WorkerProfileSerializer(read_only=True)
+    store_id   = serializers.SerializerMethodField()
+    store_name = serializers.SerializerMethodField()
 
     class Meta:
         model = CustomUser
@@ -345,8 +347,18 @@ class CustomUserProfileSerializer(serializers.ModelSerializer):
             'id', 'username',
             'first_name', 'last_name',
             'email', 'phone1', 'phone2',
-            'status', 'worker',
+            'status',
+            'store_id', 'store_name',
+            'worker',
         )
+
+    def get_store_id(self, obj: 'CustomUser'):
+        worker = getattr(obj, 'worker', None)
+        return worker.store_id if worker else None
+
+    def get_store_name(self, obj: 'CustomUser'):
+        worker = getattr(obj, 'worker', None)
+        return worker.store.name if (worker and worker.store) else None
 
 
 class WorkerListSerializer(serializers.ModelSerializer):
