@@ -170,7 +170,13 @@ class ProductCreateSerializer(serializers.ModelSerializer):
     Yangi mahsulot yaratish.
     POST /api/v1/warehouse/products/ da ishlatiladi.
     store maydoni view da avtomatik beriladi (perform_create).
+    category — majburiy maydon (serializer darajasida).
     """
+    category = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.all(),
+        required=True,
+        allow_null=False,
+    )
 
     class Meta:
         model  = Product
