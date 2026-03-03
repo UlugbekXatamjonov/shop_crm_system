@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Django Dev Server",
+      "runtimeExecutable": "D:\\projects\\my_projects\\shop_crm_system\\myenv\\Scripts\\python.exe",
+      "runtimeArgs": ["manage.py", "runserver", "8000", "--settings=config.settings.local"],
+      "port": 8000
+    },
+    {
+      "name": "Celery Worker",
+      "runtimeExecutable": "D:\\projects\\my_projects\\shop_crm_system\\myenv\\Scripts\\celery.exe",
+      "runtimeArgs": ["-A", "config.celery", "worker", "--loglevel=info"],
+      "port": 8000
+    },
+    {
+      "name": "Celery Beat",
+      "runtimeExecutable": "D:\\projects\\my_projects\\shop_crm_system\\myenv\\Scripts\\celery.exe",
+      "runtimeArgs": ["-A", "config.celery", "beat", "--loglevel=info", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"],
+      "port": 8000
+    }
+  ]
+}
