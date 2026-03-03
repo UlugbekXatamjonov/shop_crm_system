@@ -53,11 +53,23 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 
 | App         | Holat             | Izoh                                                   |
 |-------------|-------------------|--------------------------------------------------------|
-| `accaunt`   | ✅ Tugallangan    | CustomUser, Worker, AuditLog, JWT auth — password reset views qo'shildi, WorkerList/Detail da store+branch maydonlari |
+| `accaunt`   | ✅ Tugallangan    | CustomUser, Worker, AuditLog, JWT auth — password reset, WorkerList/Detail da store+branch |
 | `store`     | ✅ Tugallangan    | Store, Branch CRUD (soft delete, multi-tenant, workers in detail, Uzbek errors) |
-| `warehouse` | ✅ Tugallangan    | Category, Product, Stock, StockMovement (kirim/chiqim, per-store unique) |
-| `trade`     | ❌ Boshlanmagan  | Navbatda                                               |
-| `expense`   | ❌ Boshlanmagan  | Navbatda                                               |
+| `warehouse` | ✅ Tugallangan    | Category, Product(+image), Warehouse, Stock, StockMovement (IN/OUT/TRANSFER, from/to branch/warehouse, race condition tuzatildi) |
+| `trade`     | ❌ Boshlanmagan  | BOSQICH 4 — Customer, Sale, SaleItem                   |
+| `expense`   | ❌ Boshlanmagan  | BOSQICH 6 — ExpenseCategory, Expense                   |
+| `StoreSettings` | ❌ Boshlanmagan | BOSQICH 2 — store app da, 3 qoida bilan            |
+| `Smena`     | ❌ Boshlanmagan  | BOSQICH 3 — store yoki trade app da                    |
+| `SaleReturn` | ❌ Boshlanmagan | BOSQICH 5 — trade app da                               |
+| `WastageRecord` | ❌ Boshlanmagan | BOSQICH 7 — warehouse app da                        |
+| `StockAudit` | ❌ Boshlanmagan | BOSQICH 8 — warehouse app da                           |
+| `WorkerKPI` | ❌ Boshlanmagan  | BOSQICH 9 — accaunt app da                             |
+| `Z/X-report` | ❌ Boshlanmagan | BOSQICH 10 — trade app da                              |
+| `Telegram bot` | ❌ Boshlanmagan | BOSQICH 11 — config/telegram.py yoki alohida          |
+| `PriceList` | ❌ Boshlanmagan  | BOSQICH 12 — trade app da                              |
+| `Supplier`  | ❌ Boshlanmagan  | BOSQICH 13 — v2, keyingi versiyada                     |
+| `OFD`       | ❌ Boshlanmagan  | BOSQICH 14 — v2, keyingi versiyada (Uzbekistonda MAJBURIY 2026) |
+| `Offline sync` | ❌ Boshlanmagan | BOSQICH 18 — idempotency + sync queue                |
 
 ---
 
@@ -285,14 +297,25 @@ permissions  # ["sotuv", "ombor", ...]  — to'liq ro'yxat almashadi
 | Model           | Maydonlar                                                                 | Constraint |
 |-----------------|---------------------------------------------------------------------------|------------|
 | `Category`      | name, description, store(FK), status, created_on                          | `unique_together = [('store','name')]` |
-| `Product`       | name, category(FK), unit, purchase_price, sale_price, barcode, image(nullable), store(FK), status, created_on | `unique_together = [('store','name'), ('store','barcode')]` |
-| `Stock`         | product(FK), branch(FK), quantity, updated_on                             | `unique_together = [('product','branch')]` |
-| `StockMovement` | product(FK), branch(FK), movement_type(in/out), quantity, note, worker(FK), created_on | — |
+| `Product`       | name, category(FK), unit, purchase_price, sale_price, barcode, **image(nullable)**, store(FK), status, created_on | `unique_together = [('store','name'), ('store','barcode')]` |
+| `Warehouse`     | name, store(FK), address, status, created_on                              | `unique_together = [('store','name')]` |
+| `Stock`         | product(FK), branch(FK,null), **warehouse(FK,null)**, quantity, updated_on | `unique_together = [('product','branch'), ('product','warehouse')]` + `CheckConstraint(exactly_one_location)` |
+| `StockMovement` | product(FK), movement_type(in/out/**transfer**), quantity, **from_branch(null), from_warehouse(null), to_branch(null), to_warehouse(null)**, note, worker(FK), created_on | — |
 
 ### Choices
-- `ProductUnit`: dona, kg, g, litr, metr, m2, yashik, qop
+- `ProductUnit`: dona, kg, g, litr, metr, m2, yashik, qop, quti
 - `ProductStatus`: active, inactive
-- `MovementType`: in (Kirim), out (Chiqim)
+- `MovementType`: in (Kirim), out (Chiqim), **transfer (Ko'chirish)**
+
+### Stock constraint (muhim!)
+```python
+# branch YOKI warehouse — faqat bittasi bo'lishi shart
+CheckConstraint(
+    check=(Q(branch__isnull=False, warehouse__isnull=True) |
+           Q(branch__isnull=True,  warehouse__isnull=False)),
+    name='stock_exactly_one_location',
+)
+```
 
 ### Migratsiyalar
 | Migration | Izoh                                                              |
@@ -416,84 +439,433 @@ PORT=8000
 
 ---
 
-## TO'LIQ LOYIHA REJASI (ASLO UNUTMA)
+## TO'LIQ LOYIHA REJASI — 19 BOSQICH (ASLO UNUTMA)
+
+---
 
 ### BOSQICH 1 — warehouse ni to'ldirish
 | # | Vazifa | Holat |
 |---|--------|-------|
-| 1.1 | SubCategory (Category → SubCategory → Product) | ❌ Qilinmagan |
-| 1.2 | Barcode auto-generate (EAN-13, prefix 2XXXX, python-barcode) | ❌ Qilinmagan |
-| 1.3 | Multi-valyuta: Currency + ExchangeRate + price_currency on Product | ❌ Qilinmagan |
-| 1.4 | Celery task: kurs kunlik avtomatik yangilanishi (CBU API) | ❌ Qilinmagan |
+| 1.1 | SubCategory (Category → SubCategory → Product, ixtiyoriy) | ❌ Qilinmagan |
+| 1.2 | Barcode auto-generate (EAN-13, prefix 2XXXX GS1 in-store, python-barcode) | ❌ Qilinmagan |
+| 1.3 | Multi-valyuta: Currency model + ExchangeRate + price_currency on Product | ❌ Qilinmagan |
+| 1.4 | Celery task: kurs kunlik avtomatik yangilanishi (O'zbekiston CBU API) | ❌ Qilinmagan |
+
+**Barcode format:** `2XXXX` prefix (200000-299999) — hech qachon real GS1 mahsulotlari bilan to'qnashmaydi.
+
+---
 
 ### BOSQICH 2 — StoreSettings (Sozlamalar)
-**Qoida 1, 2, 3 shu yerda qo'llaniladi!**
+**⚠️ QOIDA 1, 2, 3 SHU YERDA QO'LLANILADI!**
 ```
-StoreSettings (OneToOneField → Store):
-  Valyuta:        default_currency, show_usd_price, show_rub_price
-  To'lov:         allow_cash, allow_card, allow_debt (nasiya)
-  Chegirma:       allow_discount, max_discount_percent
-  Chek:           receipt_header, receipt_footer, show_store_logo, show_worker_name
-  Ombor:          low_stock_enabled, low_stock_threshold
-  Smena:          shift_enabled, shifts_per_day (1/2/3), require_cash_count
+StoreSettings (OneToOneField → Store, store app da yashaydi):
+  Valyuta:           default_currency(UZS/USD/RUB), show_usd_price, show_rub_price
+  To'lov:            allow_cash, allow_card, allow_debt (nasiya ruxsati)
+  Chegirma:          allow_discount, max_discount_percent
+  Chek:              receipt_header, receipt_footer, show_store_logo, show_worker_name
+  Ombor:             low_stock_enabled, low_stock_threshold (ogohlantirish chegarasi)
+  Smena:             shift_enabled, shifts_per_day(1/2/3), require_cash_count
+  Telegram:          telegram_enabled, telegram_chat_id
   Yetkazib beruvchi: supplier_credit_enabled
-  Soliq:          tax_enabled, tax_percent
+  Soliq:             tax_enabled, tax_percent
 ```
+**Signal:** Store yaratilganda `StoreSettings` AVTOMATIK yaratiladi (QOIDA 1).
+
+---
 
 ### BOSQICH 3 — Smena (Shift)
 ```
-Smena:
-  branch(FK), store(FK), worker_open(FK), worker_close(FK, null)
-  start_time, end_time(null), status(open/closed)
+Smena model (store app da yashaydi):
+  branch(FK), store(FK)
+  worker_open(FK→Worker), worker_close(FK→Worker, null)
+  start_time, end_time(null)
+  status: open | closed
   cash_start, cash_end(null)
-→ Sale va Expense ga smena(FK, null) qo'shiladi
-→ StoreSettings.shift_enabled=True bo'lsa MAJBURIY
+  note(blank)
+
+→ Sale, SaleReturn, Expense ga smena(FK, null) qo'shiladi
+→ StoreSettings.shift_enabled=True bo'lsa smena ochilmasa sotuv bloklanadi
+→ X-report: smena davomidagi hisobot (smena YOPILMAYDI)
+→ Z-report: smenani yopadi + yakuniy hisobot generatsiya qiladi
+→ Endpoint: POST /api/v1/shifts/ (ochish), PATCH /api/v1/shifts/{id}/close/ (yopish)
 ```
 
-### BOSQICH 4 — trade app
+---
+
+### BOSQICH 4 — trade app (Savdolar + Mijozlar)
 ```
-Customer:    name, phone, address, debt_balance, store(FK), created_on
-Sale:        branch(FK), worker(FK), customer(FK,null), smena(FK,null),
-             total_price, discount_amount, payment_type, created_on
-SaleItem:    sale(FK), product(FK), quantity, unit_price, total_price
-→ Sale yaratilganda: StockMovement(OUT) AVTOMATIK
-→ store.settings.allow_debt tekshiriladi
-→ store.settings.max_discount_percent tekshiriladi
+Customer:  name, phone, address, debt_balance, customer_group(FK,null),
+           store(FK), status, created_on
+
+Sale:      branch(FK), worker(FK), customer(FK,null), smena(FK,null),
+           payment_type(cash|card|mixed|debt), total_price, discount_amount,
+           paid_amount, debt_amount, status(completed|cancelled), created_on
+
+SaleItem:  sale(FK), product(FK), quantity, unit_price, total_price
+
+→ Sale yaratilganda: StockMovement(OUT) AVTOMATIK (har bir SaleItem uchun)
+→ store.settings.allow_debt tekshiriladi (nasiya bloklanishi mumkin)
+→ store.settings.max_discount_percent tekshiriladi (chegirma chegarasi)
+→ PriceList mavjud bo'lsa → unit_price PriceList dan avtomatik olinadi (BOSQICH 12)
+→ Customer.debt_balance nasiyada yangilanadi
+→ Ruxsatlar: IsAuthenticated + CanAccess('savdolar')
 ```
 
-### BOSQICH 5 — expense app
+---
+
+### BOSQICH 5 — SaleReturn (Qaytarish) ← YANGI
 ```
-ExpenseCategory: name, store(FK), status
-Expense:         category(FK), branch(FK), worker(FK), smena(FK,null),
-                 amount, description, date, receipt_image(null)
+SaleReturn (trade app da yashaydi):
+  sale(FK, null)         ← asl savdoga bog'liq (ixtiyoriy)
+  branch(FK)
+  worker(FK)
+  customer(FK, null)
+  smena(FK, null)
+  reason                 ← qaytarish sababi (matn)
+  total_amount
+  status(pending|confirmed|cancelled)
+  created_on
+
+SaleReturnItem:
+  return_obj(FK)
+  product(FK)
+  quantity, unit_price, total_price
+
+→ SaleReturn CONFIRMED bo'lganda: StockMovement(IN) AVTOMATIK (mahsulot omborga qaytadi)
+→ Customer.debt_balance qayta hisoblanadi (agar nasiya bo'lsa)
+→ Z-report da qaytarishlar alohida ko'rsatiladi
+→ Ruxsatlar: IsAuthenticated + IsManagerOrAbove (qaytarishni faqat manager tasdiqlaydi)
 ```
 
-### BOSQICH 6 — Yetkazib beruvchi (Supplier)
+---
+
+### BOSQICH 6 — expense app (Xarajatlar)
 ```
-Supplier:       name, phone, company, store(FK), debt_balance, status
-PurchaseOrder:  supplier(FK), branch/warehouse(FK), worker(FK), total, created_on
-PurchaseItem:   order(FK), product(FK), quantity, unit_price
-→ PurchaseOrder tasdiqlanganda: StockMovement(IN) AVTOMATIK
+ExpenseCategory (expense app):
+  name, store(FK), status
+
+Expense (expense app):
+  category(FK), branch(FK), worker(FK), smena(FK, null),
+  amount, description, date, receipt_image(null, upload_to='expenses/')
+
+→ smena yopilganda (Z-report) xarajatlar ham hisobga olinadi
+→ Ruxsatlar: IsAuthenticated + CanAccess('xarajatlar')
 ```
 
-### BOSQICH 7 — Celery tasks (barcha tasklar)
+---
+
+### BOSQICH 7 — WastageRecord (Isrof / Chiqindi) ← YANGI
 ```
-- ExchangeRate kunlik yangilanishi (CBU API)
-- Low stock ogohlantirish (settings.low_stock_threshold)
-- Kunlik smena hisoboti (email/Telegram)
-- Yetkazib beruvchi qarz eslatmasi
+WastageRecord (warehouse app da yashaydi):
+  product(FK)
+  branch(FK, null)       ← yoki
+  warehouse(FK, null)    ← biri majburiy (Stock constraint kabi)
+  worker(FK)
+  smena(FK, null)
+  quantity
+  reason: expired | damaged | stolen | other
+  note(blank)
+  date
+
+→ WastageRecord yaratilganda: StockMovement(OUT) AVTOMATIK (reason='isrof' note da)
+→ CheckConstraint: branch YOKI warehouse — faqat bittasi
+→ Oylik/kunlik isrof hisoboti (Dashboard + Export)
+→ Ruxsatlar: IsManagerOrAbove
 ```
 
-### BOSQICH 8 — Export + Dashboard
+---
+
+### BOSQICH 8 — StockAudit (Inventarizatsiya) ← YANGI
 ```
-Export (Excel/PDF):  mahsulotlar, harakatlar, savdolar, xarajatlar, smena hisoboti
-Dashboard:           bugungi sotuv, top mahsulotlar, ombor holati, xarajatlar, foyda
+StockAudit (warehouse app da yashaydi):
+  branch(FK, null)       ← yoki
+  warehouse(FK, null)    ← biri majburiy
+  store(FK)
+  worker(FK)             ← kim o'tkazdi
+  status: draft | confirmed | cancelled
+  note(blank)
+  created_on, confirmed_on(null)
+
+StockAuditItem:
+  audit(FK)
+  product(FK)
+  expected_qty     ← tizim ma'lumotiga ko'ra (avtomatik)
+  actual_qty       ← xodim hisobladi (qo'lda kiritiladi)
+  difference       ← actual_qty - expected_qty (computed)
+
+→ Status DRAFT: xodim mahsulotlarni sanab kiritadi
+→ Status CONFIRMED: farq bo'lsa StockMovement(IN yoki OUT) AVTOMATIK
+  - difference > 0 → StockMovement(IN, note='inventarizatsiya oshiqcha')
+  - difference < 0 → StockMovement(OUT, note='inventarizatsiya kamomad')
+→ Faqat bitta DRAFT audit bir vaqtda (unikal constraint)
+→ Ruxsatlar: IsManagerOrAbove
 ```
 
-### BOSQICH 9 — QR kod + AuditLog API
+---
+
+### BOSQICH 9 — WorkerKPI ← YANGI
 ```
-QR kod: mahsulot uchun, savdo cheki uchun
-AuditLog read API: /api/v1/audit-logs/ (faqat GET)
+WorkerKPI (accaunt app da yashaydi):
+  worker(FK), store(FK)
+  month(1-12), year
+  sales_count, sales_amount
+  returns_count, returns_amount
+  net_sales_amount     ← sales_amount - returns_amount
+  target_amount        ← oylik maqsad (manager tomonidan belgilanadi)
+  target_reached       ← BooleanField (net >= target)
+  bonus_amount         ← bonus (agar target_reached)
+
+unique_together: [('worker', 'month', 'year')]
+
+→ Sale yaratilganda real-time yangilanadi (worker uchun KPI += )
+→ SaleReturn tasdiqlanganda kamayadi (worker uchun KPI -= )
+→ Celery oylik task (har oy 1-kuni yaratiladi)
+→ Endpointlar:
+  GET /api/v1/workers/{id}/kpi/?month=3&year=2026   ← 1 ta hodim
+  GET /api/v1/kpi/?month=3&year=2026               ← barcha hodimlar (manager)
+→ Ruxsatlar: IsManagerOrAbove
+```
+
+---
+
+### BOSQICH 10 — Z/X-report ← YANGI
+```
+Z-report (smena yakunida, smena YOPILADI):
+  - Jami sotuv: soni + summasi
+  - To'lov turlari: naqd / karta / aralash / nasiya
+  - Qaytarishlar: soni + summasi
+  - Xarajatlar: kategoriya bo'yicha
+  - Sof tushum (naqd kirim - naqd xarajat)
+  - Hodim bo'yicha sotuv jadvali
+  - Ombor harakatlari (kirim/chiqim/isrof)
+  - Boshlanish va yakunlanish naqdi
+
+X-report (smena davomida, smena YOPILMAYDI):
+  - Xuddi Z-report lekin smena davom etadi
+  - Istalgan vaqtda chiqariladi
+
+Texnik:
+  → trade app da Smena viewida (close action)
+  → PDF (reportlab) + JSON javob
+  → Endpoint: POST /api/v1/shifts/{id}/z-report/  ← yopadi + PDF
+              GET  /api/v1/shifts/{id}/x-report/  ← yopilmaydi + PDF
+```
+
+---
+
+### BOSQICH 11 — Telegram bot ← YANGI
+```
+Bildirishnomalar (config/telegram.py yoki alohida utility):
+  - Kam qoldiq: mahsulot low_stock_threshold ga yetganda DARHOL
+  - Kunlik sotuv hisoboti: har kuni kechki 20:00 (Celery beat)
+  - Smena hisoboti: Z-report ma'lumotlari smena yopilganda
+  - WorkerKPI: oylik natijalar (har oy 1-kuni)
+
+Sozlash:
+  StoreSettings ga qo'shiladi:
+    telegram_enabled = BooleanField(default=False)
+    telegram_chat_id = CharField(null=True)  ← owner o'z chat_id ni kiritadi
+
+Texnik:
+  TELEGRAM_BOT_TOKEN → env variable (settings.py da)
+  httpx.post() yoki python-telegram-bot (async)
+  Barcha xabarlar Celery task orqali (async, queue da)
+  → requirements/base.txt ga python-telegram-bot yoki httpx qo'shiladi
+```
+
+---
+
+### BOSQICH 12 — PriceList (Narx ro'yxati) ← YANGI
+```
+CustomerGroup (trade app da):
+  name, store(FK), discount_percent(default=0)
+
+PriceList (trade app da):
+  product(FK), customer_group(FK), price
+  store(FK), valid_from, valid_to(null)
+
+Customer modeliga qo'shiladi:
+  customer_group(FK, null)
+
+→ Sale yaratilganda unit_price qanday aniqlanadi:
+  1. Mijozning customer_group mavjudmi?
+  2. Agar ha → PriceList da aktiv narx bormi?
+     (valid_from ≤ today ≤ valid_to YOKI valid_to is null)
+  3. Agar ha → PriceList.price ishlatiladi
+  4. Agar yo'q → Product.sale_price standart narx
+→ Vaqtinchalik aksiya uchun valid_to o'rnatiladi
+→ Ruxsatlar: IsManagerOrAbove (narx ro'yxatini boshqarish)
+```
+
+---
+
+### BOSQICH 13 — Supplier + PurchaseOrder (v2 — KEYINGI VERSIYA) ← KEYINGI VERSIYA
+```
+⚠️ BU BOSQICH KEYINGI VERSIYADA QILINADI (hozirgi versiyada emas)
+⚠️ Dizayn eslab qolinsin!
+
+Supplier (warehouse app da):
+  name, phone, company, address
+  store(FK), debt_balance, status
+
+PurchaseOrder (warehouse app da):
+  supplier(FK), branch(FK, null), warehouse(FK, null)
+  worker(FK), status(draft|confirmed|cancelled)
+  total_amount, created_on
+
+PurchaseItem:
+  order(FK), product(FK), quantity, unit_price, total_price
+
+→ PurchaseOrder CONFIRMED bo'lganda: StockMovement(IN) AVTOMATIK
+→ Supplier.debt_balance yangilanadi (qarz hisobi)
+→ Celery task: qarz eslatma (haftalik)
+```
+
+---
+
+### BOSQICH 14 — Online Kassa / OFD (v2 — KEYINGI VERSIYA) ← KEYINGI VERSIYA
+```
+⚠️ BU BOSQICH KEYINGI VERSIYADA QILINADI (hozirgi versiyada emas)
+⚠️ O'ZBEKISTONDA 2026 YILDAN MAJBURIY — ESDAN CHIQARMA!
+
+OFD (Online Fiskal Daftarxona) integratsiyasi:
+  - Soliq.uz yoki ATIX API bilan integratsiya
+  - Sale yaratilganda chek OFD ga yuboriladi (async Celery task)
+  - StoreSettings.tax_enabled + tax_percent ishlatiladi
+  - Fiskal kvitansiya raqami javobda qaytariladi
+  - Muvaffaqiyatsiz bo'lsa → retry (3 marta), keyin manual
+
+StoreSettings ga qo'shiladi (v2 da):
+  ofd_enabled, ofd_token, ofd_device_id
+```
+
+---
+
+### BOSQICH 15 — Celery tasks (barcha tasklar)
+```
+Barcha Celery tasklar config/celery.py va tasks.py da:
+
+PERIODIC (Celery beat):
+  - ExchangeRate kunlik yangilanishi  → har kuni 09:00 (CBU API)
+  - Low stock tekshirish              → har 6 soatda
+  - WorkerKPI oylik generatsiya       → har oy 1-kuni 00:01
+  - Telegram kunlik hisobot           → har kuni 20:00
+  - Telegram qarz eslatmasi (v2)      → har hafta dushanba 10:00
+
+ASYNC (on demand):
+  - Telegram xabar yuborish           → Sale/WastageRecord/StockAudit da trigger
+  - OFD chek yuborish (v2)            → Sale da trigger
+  - Export fayl generatsiya           → PDF/Excel so'rovi bo'lganda
+```
+
+---
+
+### BOSQICH 16 — Export (Excel / PDF)
+```
+Excel (openpyxl — allaqachon o'rnatilgan):
+  - Mahsulotlar ro'yxati (barcode, narx, qoldiq)
+  - Kirim/chiqim/ko'chirish harakatlari
+  - Savdolar hisoboti (sana oralig'i bo'yicha)
+  - Xarajatlar hisoboti
+  - WorkerKPI hisoboti
+  - Inventarizatsiya natijasi
+
+PDF (reportlab — allaqachon o'rnatilgan):
+  - Z/X-report (smena hisoboti)
+  - Sotuv cheki (receipt)
+  - Inventarizatsiya natijasi
+  - Savdolar hisoboti
+
+Endpoint pattern:
+  GET /api/v1/products/export/?format=excel
+  GET /api/v1/shifts/{id}/z-report/?format=pdf
+```
+
+---
+
+### BOSQICH 17 — Dashboard (Tahlil paneli)
+```
+Real-time ko'rsatkichlar (annotate/aggregate, N+1 YO'Q):
+  - Bugungi sotuv (soni + summasi)
+  - Haftalik/oylik sotuv grafigi (kunlik breakdown)
+  - Top 10 mahsulot (sotuv hajmi bo'yicha)
+  - Ombor holati: kam qolgan mahsulotlar (< threshold)
+  - Bugungi xarajatlar (kategoriya bo'yicha)
+  - Sof tushum: bugun / hafta / oy
+  - Hodim samaradorligi (WorkerKPI rank)
+  - Qaytarishlar foizi (returns / sales)
+
+→ Redis kesh: 5-15 daqiqa TTL (har do'kon uchun alohida key)
+→ Endpoint: GET /api/v1/dashboard/
+→ Filter: ?date=2026-03-01 (aniq kun), ?period=week|month
+```
+
+---
+
+### BOSQICH 18 — Offline rejim ← YANGI
+```
+Muammo: Internet uzilsa kassa to'xtaydi.
+Yechim: Idempotency keys + Sync queue pattern
+
+Backend qismi:
+  - Har POST so'rovga X-Idempotency-Key header qabul qilinadi
+  - Duplicate so'rovlar (bir xil key) birinchi javob qaytariladi
+  - IdempotencyKey model: key, response_body, created_on (24h TTL)
+  - Batch sync endpoint: POST /api/v1/sync/batch/
+    Body: [{"operation": "create_sale", "data": {...}, "idempotency_key": "uuid"}, ...]
+
+Frontend qismi (eslatma):
+  - IndexedDB ga offline operatsiyalar saqlanadi
+  - Internet kelganda batch sync yuboriladi
+
+Qaysi operatsiyalar offline ishlaydi:
+  - Sale yaratish ✅
+  - SaleReturn ✅
+  - Expense ✅
+  - StockMovement (IN) ✅
+
+→ Middleware yoki mixin orqali barcha ViewSet larga qo'shiladi
+```
+
+---
+
+### BOSQICH 19 — QR kod + AuditLog API
+```
+QR kod (qrcode[pil] — allaqachon o'rnatilgan):
+  - Mahsulot QR kodi → barcode/mahsulot URL embed
+  - Sotuv cheki QR kodi → chek URL yoki PDF link
+  - Endpoint: GET /api/v1/products/{id}/qr/  → PNG image response
+
+AuditLog read API (accaunt app da):
+  - GET /api/v1/audit-logs/  (faqat GET, IsManagerOrAbove)
+  - Filter: ?user=, ?action=create|update|delete, ?model=, ?date_from=, ?date_to=
+  - Sahifalash: PageNumberPagination
+  - Export: GET /api/v1/audit-logs/export/?format=excel
+```
+
+---
+
+### REJANING UMUMIY KETMA-KETLIGI (QAYTA ESLATMA)
+```
+1  ✅→❌  warehouse (SubCategory, Barcode, Currency, Celery kurs)
+2  ❌     StoreSettings (3 QOIDA!)
+3  ❌     Smena (shift)
+4  ❌     trade (Customer, Sale, SaleItem)
+5  ❌     SaleReturn (qaytarish)           ← YANGI
+6  ❌     expense (xarajatlar)
+7  ❌     WastageRecord (isrof)            ← YANGI
+8  ❌     StockAudit (inventarizatsiya)    ← YANGI
+9  ❌     WorkerKPI                        ← YANGI
+10 ❌     Z/X-report                       ← YANGI
+11 ❌     Telegram bot                     ← YANGI
+12 ❌     PriceList (narx ro'yxati)        ← YANGI
+13 ❌ V2  Supplier + PurchaseOrder         ← KEYINGI VERSIYA
+14 ❌ V2  Online Kassa / OFD              ← KEYINGI VERSIYA (MAJBURIY 2026!)
+15 ❌     Celery tasks (barcha)
+16 ❌     Export (Excel/PDF)
+17 ❌     Dashboard
+18 ❌     Offline rejim                    ← YANGI
+19 ❌     QR kod + AuditLog API
 ```
 
 ---
@@ -501,8 +873,9 @@ AuditLog read API: /api/v1/audit-logs/ (faqat GET)
 ## MUHIM ESLATMALAR
 
 ### Worktree pattern (MAJBURIY)
-- Claude worktree da ishlaydi: `.claude/worktrees/unruffled-lewin/`
-- **Har o'zgarishdan keyin:** `git commit` → DARHOL `git cherry-pick` main branchga
+- Claude worktree da ishlaydi: `.claude/worktrees/festive-kirch/`
+- Branch: `claude/festive-kirch` → main ga cherry-pick
+- **Har o'zgarishdan keyin:** `git commit` (worktree) → DARHOL `git cherry-pick` main branchga
 - `__pycache__`, `db.sqlite3`, `.claude/settings.local.json` ni HECH QACHON commit qilma
 
 ### Virtual env
@@ -522,11 +895,11 @@ myenv/Scripts/python.exe manage.py migrate appname --settings=config.settings.lo
 
 ### Git log (so'nggi commitlar, 03.03.2026)
 ```
-9466a72  fix: 3 ta muhim xato tuzatildi (main branch)
-0ccbf63  fix: 3 ta muammo tuzatildi — race condition, hardcoded URL, string comparison (worktree)
-0dd85b0  docs: PROJECT_CONTEXT.md yangilandi (27.02.2026)
-2652da4  feat(auth): parolni tiklash endpointlari qo'shildi va change-password tuzatildi
-73ba2de  feat(accaunt): WorkerList/Detail da branch_id, branch_name, store_id, store_name qo'shildi
+d5cfc0e  docs: 3 qoida + to'liq loyiha rejasi PROJECT_CONTEXT ga qo'shildi (worktree)
+e60b59b  feat(warehouse): Product.image qo'shildi (worktree)
+9ce1d81  docs: 3 qoida + to'liq loyiha rejasi PROJECT_CONTEXT ga qo'shildi (main, cherry-pick)
+d1fc1b8  feat(warehouse): Product.image + WarehouseListSerializer.address (main)
+9466a72  fix: 3 ta muhim xato tuzatildi — race condition, hardcoded URL, string comparison (main)
 ```
 
 ### Qo'shilgan xususiyatlar (03.03.2026)
