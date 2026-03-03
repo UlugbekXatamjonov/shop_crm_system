@@ -3,15 +3,19 @@
 STORE APP — View'lar
 ============================================================
 ViewSet'lar:
-  StoreViewSet  — Do'konni boshqarish (faqat egasi uchun)
-  BranchViewSet — Filiallarni boshqarish
+  StoreViewSet         — Do'konni boshqarish (faqat egasi uchun)
+  BranchViewSet        — Filiallarni boshqarish
+  StoreSettingsViewSet — Do'kon sozlamalarini boshqarish (BOSQICH 2)
 
 Multi-tenant xavfsizlik:
   Har bir foydalanuvchi faqat o'z do'konining
   ma'lumotlarini ko'ra va boshqara oladi.
-"""
 
-from django.db.models import Case, IntegerField, Value, When
+StoreSettings qoidalari:
+  QOIDA 1: Signal (store/signals.py) — avtomatik yaratiladi
+  QOIDA 2: select_related('settings') bilan get_queryset
+  QOIDA 3: invalidate_store_settings(store_id) — keshni tozalash
+"""
 
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
@@ -20,7 +24,9 @@ from rest_framework.response import Response
 from accaunt.models import AuditLog
 from accaunt.permissions import CanAccess, IsOwner
 
-from .models import Branch, Store, StoreStatus
+from config.cache_utils import invalidate_store_settings
+
+from .models import Branch, Store, StoreSettings, StoreStatus
 from .serializers import (
     BranchCreateSerializer,
     BranchDetailSerializer,
@@ -29,6 +35,8 @@ from .serializers import (
     StoreCreateSerializer,
     StoreDetailSerializer,
     StoreListSerializer,
+    StoreSettingsSerializer,
+    StoreSettingsUpdateSerializer,
     StoreUpdateSerializer,
 )
 
@@ -46,7 +54,7 @@ class StoreViewSet(viewsets.ModelViewSet):
       POST   /api/v1/stores/       — yangi do'kon yaratish (faqat owner)
       GET    /api/v1/stores/{id}/  — do'kon tafsilotlari (dokonlar ruxsati kerak)
       PATCH  /api/v1/stores/{id}/  — do'kon ma'lumotlarini yangilash (faqat owner)
-      DELETE /api/v1/stores/{id}/  — do'konni o'chirish (faqat owner, hard delete)
+      DELETE /api/v1/stores/{id}/  — do'konni nofaol qilish (faqat owner, soft delete)
 
     Multi-tenant:
       Owner faqat o'z do'konini ko'radi va boshqaradi.
@@ -71,26 +79,10 @@ class StoreViewSet(viewsets.ModelViewSet):
         worker = getattr(self.request.user, 'worker', None)
         if not worker or not worker.store:
             return Store.objects.none()
-        return (
-            Store.objects
-            .filter(id=worker.store.id)
-            .annotate(
-                status_order=Case(
-                    When(status='active',   then=Value(0)),
-                    When(status='inactive', then=Value(1)),
-                    default=Value(2),
-                    output_field=IntegerField(),
-                )
-            )
-            .order_by('status_order', '-created_on')
-        )
+        return Store.objects.filter(id=worker.store.id)
 
     def perform_create(self, serializer):
         instance = serializer.save()
-        # Do'kon yaratilganda ega worker.store ga avtomatik biriktiriladi
-        worker = self.request.user.worker
-        worker.store = instance
-        worker.save(update_fields=['store'])
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditLog.Action.CREATE,
@@ -110,15 +102,15 @@ class StoreViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance: Store):
-        pk   = instance.id
-        name = instance.name
-        instance.delete()
+        """Soft delete — o'chirish o'rniga status='inactive' ga o'tkaziladi."""
+        instance.status = StoreStatus.INACTIVE
+        instance.save(update_fields=['status'])
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditLog.Action.DELETE,
             target_model='Store',
-            target_id=pk,
-            description=f"Do'kon o'chirildi: '{name}'",
+            target_id=instance.id,
+            description=f"Do'kon nofaol qilindi: '{instance.name}'",
         )
 
     def create(self, request, *args, **kwargs):
@@ -137,11 +129,6 @@ class StoreViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        if not serializer.validated_data:
-            return Response(
-                {'message': "Yangilash uchun kamida bitta maydon yuborilishi kerak."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
         self.perform_update(serializer)
         return Response(
             {
@@ -155,7 +142,7 @@ class StoreViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(
-            {'message': "Do'kon muvaffaqiyatli o'chirildi."},
+            {'message': "Do'kon muvaffaqiyatli nofaol qilindi."},
             status=status.HTTP_200_OK,
         )
 
@@ -173,7 +160,7 @@ class BranchViewSet(viewsets.ModelViewSet):
       POST   /api/v1/branches/       — yangi filial yaratish (faqat owner)
       GET    /api/v1/branches/{id}/  — filial tafsilotlari
       PATCH  /api/v1/branches/{id}/  — filial ma'lumotlarini yangilash (faqat owner)
-      DELETE /api/v1/branches/{id}/  — filialni o'chirish (faqat owner, hard delete)
+      DELETE /api/v1/branches/{id}/  — filialni nofaol qilish (faqat owner, soft delete)
 
     Multi-tenant:
       Faqat o'z do'konining filiallarini ko'radi va boshqaradi.
@@ -202,15 +189,6 @@ class BranchViewSet(viewsets.ModelViewSet):
             Branch.objects
             .filter(store=worker.store)
             .select_related('store')
-            .annotate(
-                status_order=Case(
-                    When(status='active',   then=Value(0)),
-                    When(status='inactive', then=Value(1)),
-                    default=Value(2),
-                    output_field=IntegerField(),
-                )
-            )
-            .order_by('status_order', 'name')
         )
 
     def get_serializer_context(self):
@@ -243,15 +221,15 @@ class BranchViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance: Branch):
-        pk   = instance.id
-        name = instance.name
-        instance.delete()
+        """Soft delete — o'chirish o'rniga status='inactive' ga o'tkaziladi."""
+        instance.status = StoreStatus.INACTIVE
+        instance.save(update_fields=['status'])
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditLog.Action.DELETE,
             target_model='Branch',
-            target_id=pk,
-            description=f"Filial o'chirildi: '{name}'",
+            target_id=instance.id,
+            description=f"Filial nofaol qilindi: '{instance.name}'",
         )
 
     def create(self, request, *args, **kwargs):
@@ -273,11 +251,6 @@ class BranchViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        if not serializer.validated_data:
-            return Response(
-                {'message': "Yangilash uchun kamida bitta maydon yuborilishi kerak."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
         self.perform_update(serializer)
         return Response(
             {
@@ -294,6 +267,85 @@ class BranchViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(
-            {'message': "Filial muvaffaqiyatli o'chirildi."},
+            {'message': "Filial muvaffaqiyatli nofaol qilindi."},
+            status=status.HTTP_200_OK,
+        )
+
+
+# ============================================================
+# DO'KON SOZLAMALARI VIEWSET — BOSQICH 2
+# ============================================================
+
+class StoreSettingsViewSet(viewsets.ModelViewSet):
+    """
+    Do'kon sozlamalarini boshqarish.
+
+    Endpointlar:
+      GET   /api/v1/settings/      — o'z do'koni sozlamalarini ko'rish
+      PATCH /api/v1/settings/{id}/ — sozlamalarni yangilash (faqat owner)
+
+    Ruxsatlar:
+      GET   → IsAuthenticated + CanAccess('sozlamalar')
+      PATCH → IsAuthenticated + IsOwner
+
+    Muhim:
+      - create/delete yo'q (signal avtomatik yaratadi, o'chirish mumkin emas)
+      - perform_update: Redis keshni tozalaydi (QOIDA 3)
+      - get_queryset: QOIDA 2 — select_related('store') bilan
+    """
+    http_method_names = ['get', 'patch']
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated(), CanAccess('sozlamalar')]
+        return [IsAuthenticated(), IsOwner()]
+
+    def get_serializer_class(self):
+        if self.action in ('update', 'partial_update'):
+            return StoreSettingsUpdateSerializer
+        return StoreSettingsSerializer
+
+    def get_queryset(self):
+        """
+        QOIDA 2: select_related('store') bilan tortish.
+        Faqat o'z do'konining sozlamalarini ko'radi.
+        """
+        worker = getattr(self.request.user, 'worker', None)
+        if not worker or not worker.store:
+            return StoreSettings.objects.none()
+        return (
+            StoreSettings.objects
+            .filter(store=worker.store)
+            .select_related('store')
+        )
+
+    def perform_update(self, serializer):
+        """
+        Sozlamalarni saqlab, Redis keshni tozalaydi.
+        QOIDA 3: invalidate_store_settings — keyingi so'rovda DB dan yangi ma'lumot.
+        """
+        instance = serializer.save()
+        # QOIDA 3 — keshni tozalash
+        invalidate_store_settings(instance.store_id)
+        AuditLog.objects.create(
+            actor=self.request.user,
+            action=AuditLog.Action.UPDATE,
+            target_model='StoreSettings',
+            target_id=instance.id,
+            description=(
+                f"Do'kon sozlamalari yangilandi: '{instance.store.name}'"
+            ),
+        )
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(
+            {
+                'message': "Do'kon sozlamalari muvaffaqiyatli yangilandi.",
+                'data': StoreSettingsSerializer(serializer.instance).data,
+            },
             status=status.HTTP_200_OK,
         )

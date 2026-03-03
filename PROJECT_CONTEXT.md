@@ -58,7 +58,7 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 | `warehouse` | ✅ Tugallangan    | Category, **SubCategory**, Product(+image, +barcode EAN-13, +subcategory, +price_currency), **Currency**, **ExchangeRate**, Stock, StockMovement (race condition tuzatildi) — BOSQICH 1 ✅ |
 | `trade`     | ❌ Boshlanmagan  | BOSQICH 4 — Customer, Sale, SaleItem                   |
 | `expense`   | ❌ Boshlanmagan  | BOSQICH 6 — ExpenseCategory, Expense                   |
-| `StoreSettings` | ❌ Boshlanmagan | BOSQICH 2 — store app da, 3 qoida bilan            |
+| `StoreSettings` | ✅ Tugallangan  | BOSQICH 2 ✅ — 10 guruh, 30+ maydon, signal+Redis kesh |
 | `Smena`     | ❌ Boshlanmagan  | BOSQICH 3 — store yoki trade app da                    |
 | `SaleReturn` | ❌ Boshlanmagan | BOSQICH 5 — trade app da                               |
 | `WastageRecord` | ❌ Boshlanmagan | BOSQICH 7 — warehouse app da                        |
@@ -482,7 +482,7 @@ PORT=8000
 
 ---
 
-### BOSQICH 2 — StoreSettings (Sozlamalar)
+### BOSQICH 2 — StoreSettings (Sozlamalar) ✅ BAJARILDI (03.03.2026)
 **⚠️ QOIDA 1, 2, 3 SHU YERDA QO'LLANILADI!**
 
 ```python
@@ -569,6 +569,16 @@ def perform_create(self, serializer):
 ```
 
 **Signal:** Store yaratilganda `StoreSettings` AVTOMATIK yaratiladi (QOIDA 1).
+
+**Yangi fayllar:**
+- `store/signals.py` — `create_store_settings` post_save signal (QOIDA 1)
+- `store/apps.py` — `ready()` → `import store.signals`
+- `config/cache_utils.py` — `get_store_settings()` + `invalidate_store_settings()` (QOIDA 3)
+- `store/migrations/0004_storesettings.py` — StoreSettings jadval yaratish
+
+**Endpointlar:**
+- `GET  /api/v1/settings/`      — o'z do'koni sozlamalarini ko'rish (`CanAccess('sozlamalar')`)
+- `PATCH /api/v1/settings/{id}/` — sozlamalarni yangilash (`IsOwner`)
 
 ---
 
@@ -947,8 +957,8 @@ AuditLog read API (accaunt app da):
 ### REJANING UMUMIY KETMA-KETLIGI (QAYTA ESLATMA)
 ```
 0  ✅     Tayyorlov: MEDIA fayllar, CORS headers (x-idempotency-key) ← BAJARILDI
-1  ❌     warehouse (SubCategory, Barcode, Currency, Celery kurs)
-2  ❌     StoreSettings (3 QOIDA! + barcha ixtiyoriy flaglar)
+1  ✅     warehouse (SubCategory, Barcode, Currency, Celery kurs) ← BAJARILDI
+2  ✅     StoreSettings (3 QOIDA! + barcha ixtiyoriy flaglar) ← BAJARILDI
 3  ❌     Smena (shift)
 4  ❌     trade (Customer, Sale, SaleItem)
 5  ❌     SaleReturn (qaytarish)           ← YANGI
@@ -1008,7 +1018,8 @@ myenv/Scripts/python.exe manage.py migrate appname --settings=config.settings.lo
 
 ### Git log (so'nggi commitlar, 03.03.2026)
 ```
-(joriy)  feat(warehouse): BOSQICH 1 — SubCategory, barcode EAN-13, Currency, ExchangeRate, Celery task
+(joriy)  feat(store): BOSQICH 2 — StoreSettings, signal, Redis cache, 10 guruh sozlamalar
+1272c60  feat(warehouse): BOSQICH 1 — SubCategory, barcode EAN-13, Currency, ExchangeRate, Celery task
 bc70380  feat: BOSQICH 0 bajarildi — CORS x-idempotency-key, 20-bosqichli to'liq reja
 e69d660  docs: loyiha rejasi 9 bosqichdan 19 bosqichga yangilandi (worktree)
 b55551b  docs: loyiha rejasi 9 bosqichdan 19 bosqichga yangilandi (main, cherry-pick)
@@ -1029,6 +1040,10 @@ d1fc1b8  feat(warehouse): Product.image + WarehouseListSerializer.address (main)
 | **BOSQICH 1** — Barcode EAN-13 auto-generate | `warehouse/utils.py`, `views.py` | `generate_unique_barcode(store_id)`, prefix `20XXXXXYYYYY` + check digit, `GET /products/{id}/barcode/?format=png\|svg` |
 | **BOSQICH 1** — `Currency` + `ExchangeRate` modellari | `warehouse/models.py` + migration 0005 | UZS/USD/EUR/RUB/CNY seed, `Product.price_currency FK` |
 | **BOSQICH 1** — Celery task: valyuta kursi | `warehouse/tasks.py`, `config/settings/base.py` | CBU API, `crontab(hour=9, minute=0)`, retry 3×5min |
+| **BOSQICH 2** — `StoreSettings` modeli | `store/models.py` + migration 0004 | 10 guruh, 30+ maydon, OneToOne → Store |
+| **BOSQICH 2** — Signal QOIDA 1 | `store/signals.py`, `store/apps.py` | `post_save(Store)` → auto `StoreSettings.get_or_create()` |
+| **BOSQICH 2** — Redis kesh QOIDA 3 | `config/cache_utils.py` | `get_store_settings(store_id)` TTL=5min, `invalidate_store_settings()` |
+| **BOSQICH 2** — `StoreSettingsViewSet` | `store/views.py`, `store/api_urls.py` | `GET/PATCH /api/v1/settings/`, kesh invalidatsiya perform_update da |
 
 ### Tuzatilgan xatolar (03.03.2026)
 | Xato | Joyi | Tuzatish |
@@ -1046,6 +1061,7 @@ shop_crm_system/
 ├── config/
 │   ├── __init__.py       ← Celery import
 │   ├── celery.py         ← Celery konfiguratsiya
+│   ├── cache_utils.py    ← ✅ BOSQICH 2 — QOIDA 3 (get_store_settings + invalidate)
 │   ├── exceptions.py     ← ✅ Custom exception handler (o'zbek tilidagi xato xabarlari)
 │   ├── middleware.py     ← HealthCheckMiddleware
 │   ├── settings/
@@ -1068,7 +1084,8 @@ shop_crm_system/
 │   ├── models.py         ← Store, Branch, StoreStatus; Branch unique_together(store,name)
 │   ├── views.py          ← StoreViewSet, BranchViewSet
 │   ├── serializers.py    ← workers detail da, status update da, _worker_short helper
-│   ├── api_urls.py       ← /api/v1/stores/, /api/v1/branches/
+│   ├── api_urls.py       ← /api/v1/stores/, /api/v1/branches/, /api/v1/settings/
+│   ├── signals.py        ← ✅ BOSQICH 2 — QOIDA 1 (auto StoreSettings yaratish)
 │   └── migrations/
 │       ├── 0001_initial.py
 │       └── 0003_alter_branch_unique_together.py ← unique_together qo'shildi

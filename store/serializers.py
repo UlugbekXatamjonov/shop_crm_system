@@ -10,11 +10,15 @@ Har bir ViewSet action uchun alohida serializer:
 
 Tartib: Branch serializers birinchi (StoreDetailSerializer
         ular ga murojaat qiladi).
+
+StoreSettings serializerlari (BOSQICH 2):
+  StoreSettingsSerializer       — GET (to'liq, 10 guruh)
+  StoreSettingsUpdateSerializer — PATCH (validatsiya bilan)
 """
 
 from rest_framework import serializers
 
-from .models import Branch, Store, StoreStatus
+from .models import Branch, Store, StoreSettings, StoreStatus
 
 
 def _worker_short(worker) -> dict:
@@ -35,10 +39,6 @@ class BranchListSerializer(serializers.ModelSerializer):
         source='get_status_display',
         read_only=True
     )
-    store_id = serializers.IntegerField(
-        source='store.id',
-        read_only=True
-    )
     store_name = serializers.CharField(
         source='store.name',
         read_only=True
@@ -46,7 +46,7 @@ class BranchListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = Branch
-        fields = ('id', 'name', 'address', 'store_id', 'store_name', 'phone', 'status', 'status_display')
+        fields = ('id', 'name', 'store_name', 'phone', 'status', 'status_display')
 
 
 class BranchDetailSerializer(serializers.ModelSerializer):
@@ -205,3 +205,152 @@ class StoreUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Store
         fields = ('name', 'address', 'phone', 'status')
+
+
+# ============================================================
+# DO'KON SOZLAMALARI SERIALIZERLARI — BOSQICH 2
+# ============================================================
+
+class StoreSettingsSerializer(serializers.ModelSerializer):
+    """
+    Do'kon sozlamalarining to'liq ko'rinishi.
+    GET /api/v1/settings/ da ishlatiladi.
+
+    store va id faqat o'qish uchun — o'zgartirib bo'lmaydi.
+    """
+    store_name = serializers.CharField(
+        source='store.name',
+        read_only=True
+    )
+
+    class Meta:
+        model  = StoreSettings
+        fields = (
+            'id', 'store', 'store_name',
+            # Guruh 1 — Modul flaglari
+            'subcategory_enabled', 'sale_return_enabled',
+            'wastage_enabled', 'stock_audit_enabled',
+            'kpi_enabled', 'price_list_enabled',
+            # Guruh 2 — Valyuta
+            'default_currency', 'show_usd_price', 'show_rub_price',
+            # Guruh 3 — To'lov
+            'allow_cash', 'allow_card', 'allow_debt',
+            # Guruh 4 — Chegirma
+            'allow_discount', 'max_discount_percent',
+            # Guruh 5 — Chek
+            'receipt_header', 'receipt_footer',
+            'show_store_logo', 'show_worker_name',
+            # Guruh 6 — Ombor
+            'low_stock_enabled', 'low_stock_threshold',
+            # Guruh 7 — Smena
+            'shift_enabled', 'shifts_per_day', 'require_cash_count',
+            # Guruh 8 — Telegram
+            'telegram_enabled', 'telegram_chat_id',
+            # Guruh 9 — Soliq/OFD
+            'tax_enabled', 'tax_percent', 'ofd_enabled',
+            'ofd_token', 'ofd_device_id',
+            # Guruh 10 — Yetkazib beruvchi
+            'supplier_credit_enabled',
+        )
+        read_only_fields = ('id', 'store', 'store_name')
+
+
+class StoreSettingsUpdateSerializer(serializers.ModelSerializer):
+    """
+    Do'kon sozlamalarini yangilash.
+    PATCH /api/v1/settings/{id}/ da ishlatiladi.
+    Barcha maydonlar ixtiyoriy (partial=True).
+
+    Validatsiyalar:
+      - max_discount_percent: 0–100 oralig'ida bo'lishi shart
+      - tax_percent: 0–100 oralig'ida bo'lishi shart
+      - shifts_per_day: faqat 1, 2 yoki 3 qabul qilinadi
+      - telegram_chat_id: telegram_enabled=True bo'lsa majburiy
+      - allow_cash + allow_card: ikkalasi ham False bo'lmasligi shart
+    """
+
+    class Meta:
+        model  = StoreSettings
+        fields = (
+            # Guruh 1 — Modul flaglari
+            'subcategory_enabled', 'sale_return_enabled',
+            'wastage_enabled', 'stock_audit_enabled',
+            'kpi_enabled', 'price_list_enabled',
+            # Guruh 2 — Valyuta
+            'default_currency', 'show_usd_price', 'show_rub_price',
+            # Guruh 3 — To'lov
+            'allow_cash', 'allow_card', 'allow_debt',
+            # Guruh 4 — Chegirma
+            'allow_discount', 'max_discount_percent',
+            # Guruh 5 — Chek
+            'receipt_header', 'receipt_footer',
+            'show_store_logo', 'show_worker_name',
+            # Guruh 6 — Ombor
+            'low_stock_enabled', 'low_stock_threshold',
+            # Guruh 7 — Smena
+            'shift_enabled', 'shifts_per_day', 'require_cash_count',
+            # Guruh 8 — Telegram
+            'telegram_enabled', 'telegram_chat_id',
+            # Guruh 9 — Soliq/OFD
+            'tax_enabled', 'tax_percent', 'ofd_enabled',
+            'ofd_token', 'ofd_device_id',
+            # Guruh 10 — Yetkazib beruvchi
+            'supplier_credit_enabled',
+        )
+
+    def validate_max_discount_percent(self, value):
+        """Chegirma foizi 0 dan 100 gacha bo'lishi shart."""
+        if value < 0 or value > 100:
+            raise serializers.ValidationError(
+                "Chegirma foizi 0 dan 100 gacha bo'lishi shart."
+            )
+        return value
+
+    def validate_tax_percent(self, value):
+        """Soliq foizi 0 dan 100 gacha bo'lishi shart."""
+        if value < 0 or value > 100:
+            raise serializers.ValidationError(
+                "Soliq foizi 0 dan 100 gacha bo'lishi shart."
+            )
+        return value
+
+    def validate_shifts_per_day(self, value):
+        """Smena soni faqat 1, 2 yoki 3 bo'lishi mumkin."""
+        if value not in (1, 2, 3):
+            raise serializers.ValidationError(
+                "Kunlik smena soni 1, 2 yoki 3 bo'lishi shart."
+            )
+        return value
+
+    def validate(self, attrs):
+        """Bir necha maydon bir vaqtda tekshiriladigan validatsiyalar."""
+
+        # Telegram: enabled bo'lsa chat_id majburiy
+        telegram_enabled = attrs.get(
+            'telegram_enabled',
+            self.instance.telegram_enabled if self.instance else False
+        )
+        telegram_chat_id = attrs.get(
+            'telegram_chat_id',
+            self.instance.telegram_chat_id if self.instance else None
+        )
+        if telegram_enabled and not telegram_chat_id:
+            raise serializers.ValidationError({
+                'telegram_chat_id': "Telegram yoqilgan bo'lsa, chat ID kiritilishi shart."
+            })
+
+        # To'lov: naqd ham, karta ham o'chirilmasligi kerak
+        allow_cash = attrs.get(
+            'allow_cash',
+            self.instance.allow_cash if self.instance else True
+        )
+        allow_card = attrs.get(
+            'allow_card',
+            self.instance.allow_card if self.instance else True
+        )
+        if not allow_cash and not allow_card:
+            raise serializers.ValidationError({
+                'allow_cash': "Naqd va karta to'lov ikkalasi ham o'chirilishi mumkin emas."
+            })
+
+        return attrs
