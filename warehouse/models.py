@@ -140,6 +140,12 @@ class Product(models.Model):
         null=True,
         verbose_name="Shtrix-kod"
     )
+    image          = models.ImageField(
+        upload_to='products/',
+        null=True,
+        blank=True,
+        verbose_name="Rasm"
+    )
     store          = models.ForeignKey(
         Store,
         on_delete=models.CASCADE,

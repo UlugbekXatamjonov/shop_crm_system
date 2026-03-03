@@ -132,7 +132,7 @@ class ProductListSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'name', 'category_name',
             'unit', 'unit_display',
-            'sale_price', 'barcode',
+            'sale_price', 'barcode', 'image',
             'status', 'status_display',
         )
 
@@ -159,7 +159,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             'category_id', 'category_name',
             'unit', 'unit_display',
             'purchase_price', 'sale_price',
-            'barcode', 'store_name',
+            'barcode', 'image', 'store_name',
             'status', 'status_display',
             'created_on',
         )
@@ -180,7 +180,7 @@ class ProductCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = Product
-        fields = ('name', 'category', 'unit', 'purchase_price', 'sale_price', 'barcode')
+        fields = ('name', 'category', 'unit', 'purchase_price', 'sale_price', 'barcode', 'image')
 
     def validate_name(self, value: str) -> str:
         """Bir do'kon ichida mahsulot nomi takrorlanmasligi kerak."""
@@ -223,7 +223,7 @@ class ProductUpdateSerializer(serializers.ModelSerializer):
         fields = (
             'name', 'category', 'unit',
             'purchase_price', 'sale_price',
-            'barcode', 'status',
+            'barcode', 'image', 'status',
         )
 
     def validate_name(self, value: str) -> str:
@@ -271,7 +271,7 @@ class WarehouseListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = Warehouse
-        fields = ('id', 'name', 'status', 'status_display', 'stock_count')
+        fields = ('id', 'name', 'address', 'status', 'status_display', 'stock_count')
 
     def get_stock_count(self, obj: Warehouse) -> int:
         return obj.stocks.filter(quantity__gt=0).count()
