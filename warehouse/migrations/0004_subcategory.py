@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('store', '0002_alter_branch_options_alter_store_options_and_more'),
-        ('warehouse', '0003_product_image'),
+        ('warehouse', '0004_product_image'),
     ]
 
     operations = [
