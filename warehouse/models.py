@@ -5,16 +5,17 @@ WAREHOUSE APP — Modellar
 Modellar:
   ProductUnit     — Mahsulot o'lchov birliklari (TextChoices)
   ProductStatus   — Mahsulot/kategoriya holati (TextChoices)
-  MovementType    — Kirim/chiqim/ko'chirish turi (TextChoices)
+  MovementType    — Kirim/chiqim turi (TextChoices)
   Category        — Mahsulot kategoriyasi
-  Product         — Mahsulot (nom, kategoriya, birlik, narx, shtrix-kod)
-  Warehouse       — Alohida ombor joylashuvi (do'konning fizik ombori)
-  Stock           — Filial yoki ombor bo'yicha qoldiq (Product + joylashuv + miqdor)
-  StockMovement   — Kirim/chiqim/ko'chirish tarixi (immutable log)
+  SubCategory     — Mahsulot subkategoriyasi (ixtiyoriy, StoreSettings.subcategory_enabled)
+  Currency        — Valyuta (UZS, USD, EUR, RUB, ...)
+  ExchangeRate    — Valyuta kursi (CBU dan kunlik, Celery task)
+  Product         — Mahsulot (nom, kategoriya, subkat, birlik, narx, shtrix-kod, valyuta)
+  Stock           — Filial bo'yicha qoldiq (Product + Branch + miqdor)
+  StockMovement   — Kirim/chiqim tarixi (immutable log)
 """
 
 from django.db import models
-from django.db.models import Q
 
 from store.models import Branch, Store
 
@@ -32,7 +33,7 @@ class ProductUnit(models.TextChoices):
     M2     = 'm2',     'Kvadrat metr'
     YASHIK = 'yashik', 'Yashik'
     QOP    = 'qop',    'Qop'
-    QUTI   = 'quti',    "Quti"
+    QUTI   = 'quti',   'Quti'
 
 
 class ProductStatus(models.TextChoices):
@@ -41,9 +42,8 @@ class ProductStatus(models.TextChoices):
 
 
 class MovementType(models.TextChoices):
-    IN       = 'in',       'Kirim'
-    OUT      = 'out',      'Chiqim'
-    TRANSFER = 'transfer', "Ko'chirish"
+    IN  = 'in',  'Kirim'
+    OUT = 'out', 'Chiqim'
 
 
 # ============================================================
@@ -92,6 +92,150 @@ class Category(models.Model):
 
 
 # ============================================================
+# SUBKATEGORIYA (ixtiyoriy — StoreSettings.subcategory_enabled)
+# ============================================================
+
+class SubCategory(models.Model):
+    """
+    Mahsulot subkategoriyasi.
+    Ierarxiya: Category → SubCategory → Product (ixtiyoriy).
+
+    StoreSettings.subcategory_enabled = True bo'lganda frontend ko'rsatadi.
+    False bo'lganda endpoint mavjud lekin Product.subcategory null qoladi.
+
+    Unikal shart: bir do'konda bir kategoriya ichida bir xil nom bo'lmaydi.
+    """
+    name        = models.CharField(
+        max_length=200,
+        verbose_name="Nomi"
+    )
+    description = models.TextField(
+        blank=True,
+        verbose_name="Tavsifi"
+    )
+    category    = models.ForeignKey(
+        Category,
+        on_delete=models.CASCADE,
+        related_name='subcategories',
+        verbose_name="Kategoriyasi"
+    )
+    store       = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name='subcategories',
+        verbose_name="Do'koni"
+    )
+    status      = models.CharField(
+        max_length=10,
+        choices=ProductStatus.choices,
+        default=ProductStatus.ACTIVE,
+        verbose_name="Holati"
+    )
+    created_on  = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Yaratilgan vaqti"
+    )
+
+    class Meta:
+        verbose_name        = 'Subkategoriya'
+        verbose_name_plural = 'Subkategoriyalar'
+        ordering            = ['name']
+        unique_together     = [('store', 'category', 'name')]
+
+    def __str__(self) -> str:
+        return f"{self.category.name} → {self.name}"
+
+
+# ============================================================
+# VALYUTA
+# ============================================================
+
+class Currency(models.Model):
+    """
+    Valyuta modeli.
+    UZS — asosiy valyuta (is_base=True).
+    Boshqa valyutalar (USD, EUR, RUB, CNY) ExchangeRate orqali UZS ga o'tkaziladi.
+
+    Dastlabki valyutalar migration 0005 da seed qilinadi:
+      UZS (asosiy), USD, EUR, RUB, CNY
+    """
+    code    = models.CharField(
+        max_length=3,
+        unique=True,
+        verbose_name="Kod"
+    )
+    name    = models.CharField(
+        max_length=100,
+        verbose_name="Nomi"
+    )
+    symbol  = models.CharField(
+        max_length=5,
+        verbose_name="Belgisi"
+    )
+    is_base = models.BooleanField(
+        default=False,
+        verbose_name="Asosiy valyuta"
+    )
+
+    class Meta:
+        verbose_name        = 'Valyuta'
+        verbose_name_plural = 'Valyutalar'
+        ordering            = ['code']
+
+    def __str__(self) -> str:
+        return f"{self.code} ({self.symbol})"
+
+
+# ============================================================
+# VALYUTA KURSI
+# ============================================================
+
+class ExchangeRate(models.Model):
+    """
+    Valyuta kursi.
+    1 xorijiy valyuta = rate UZS (CBU rasmiy kursi).
+
+    Har kun 09:00 da Celery task (warehouse.tasks.update_exchange_rates)
+    orqali CBU API dan avtomatik yangilanadi:
+    https://cbu.uz/uz/arkhiv-kursov-valyut/json/
+
+    Unikal shart: bir valyuta bir kun uchun faqat bir kurs bo'ladi.
+    """
+    currency   = models.ForeignKey(
+        Currency,
+        on_delete=models.CASCADE,
+        related_name='rates',
+        verbose_name="Valyuta"
+    )
+    rate       = models.DecimalField(
+        max_digits=16,
+        decimal_places=4,
+        verbose_name="Kurs (1 xorijiy = X UZS)"
+    )
+    date       = models.DateField(
+        verbose_name="Sana"
+    )
+    source     = models.CharField(
+        max_length=50,
+        default='CBU',
+        verbose_name="Manba"
+    )
+    created_on = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Yaratilgan vaqti"
+    )
+
+    class Meta:
+        verbose_name        = 'Valyuta kursi'
+        verbose_name_plural = 'Valyuta kurslari'
+        ordering            = ['-date']
+        unique_together     = [('currency', 'date')]
+
+    def __str__(self) -> str:
+        return f"{self.currency.code} — {self.date}: {self.rate} UZS"
+
+
+# ============================================================
 # MAHSULOT
 # ============================================================
 
@@ -99,10 +243,17 @@ class Product(models.Model):
     """
     Mahsulot.
     Har bir mahsulot bitta do'konga tegishli (multi-tenant).
-    Kategoriyaga biriktirilgan (ixtiyoriy).
+    Kategoriya va subkategoriyaga biriktirilgan (ixtiyoriy).
     Soft delete — o'chirish o'rniga status='inactive' ga o'tkaziladi.
 
-    Shtrix-kod: do'kon ichida unikal (null=True — bir nechta null ruxsat).
+    Shtrix-kod:
+      - do'kon ichida unikal (null=True — bir nechta null ruxsat)
+      - avtomatik generatsiya: EAN-13, prefix 2XXXXX (GS1 in-store)
+      - ProductViewSet.perform_create da barcode yo'q bo'lsa auto-generate
+
+    Narx valyutasi:
+      - price_currency null bo'lsa → narx UZS da
+      - null bo'lmasa → narx price_currency da, ExchangeRate orqali UZS konvertatsiya
     """
     name           = models.CharField(
         max_length=300,
@@ -116,6 +267,14 @@ class Product(models.Model):
         related_name='products',
         verbose_name="Kategoriyasi"
     )
+    subcategory    = models.ForeignKey(
+        SubCategory,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='products',
+        verbose_name="Subkategoriyasi"
+    )
     unit           = models.CharField(
         max_length=10,
         choices=ProductUnit.choices,
@@ -126,19 +285,27 @@ class Product(models.Model):
         max_digits=14,
         decimal_places=2,
         default=0,
-        verbose_name="Xarid narxi (UZS)"
+        verbose_name="Xarid narxi"
     )
     sale_price     = models.DecimalField(
         max_digits=14,
         decimal_places=2,
         default=0,
-        verbose_name="Sotish narxi (UZS)"
+        verbose_name="Sotish narxi"
+    )
+    price_currency = models.ForeignKey(
+        Currency,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='products',
+        verbose_name="Narx valyutasi"
     )
     barcode        = models.CharField(
         max_length=100,
         blank=True,
         null=True,
-        verbose_name="Shtrix-kod"
+        verbose_name="Shtrix-kod (EAN-13)"
     )
     image          = models.ImageField(
         upload_to='products/',
@@ -174,66 +341,14 @@ class Product(models.Model):
 
 
 # ============================================================
-# OMBOR (ALOHIDA FIZIK JOY)
-# ============================================================
-
-class Warehouse(models.Model):
-    """
-    Do'konning alohida ombor joylashuvi.
-    Filialdan farqi: bu mahsulot saqlanadigan fizik joy,
-    sotish emas. Mahsulot avval omborga keladi, so'ng
-    filiallarga tarqatiladi.
-
-    Multi-tenant: har bir ombor bitta do'konga tegishli.
-    Soft delete — status='inactive' ga o'tkaziladi.
-    """
-    name       = models.CharField(
-        max_length=200,
-        verbose_name="Nomi"
-    )
-    store      = models.ForeignKey(
-        Store,
-        on_delete=models.CASCADE,
-        related_name='warehouses',
-        verbose_name="Do'koni"
-    )
-    address    = models.CharField(
-        max_length=300,
-        blank=True,
-        verbose_name="Manzili"
-    )
-    status     = models.CharField(
-        max_length=10,
-        choices=ProductStatus.choices,
-        default=ProductStatus.ACTIVE,
-        verbose_name="Holati"
-    )
-    created_on = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name="Yaratilgan vaqti"
-    )
-
-    class Meta:
-        verbose_name        = 'Ombor'
-        verbose_name_plural = 'Omborlar'
-        ordering            = ['name']
-        unique_together     = [('store', 'name')]
-
-    def __str__(self) -> str:
-        return f"{self.name} ({self.store.name})"
-
-
-# ============================================================
-# QOLDIQ (FILIAL YOKI OMBOR BO'YICHA)
+# OMBOR QOLDIG'I
 # ============================================================
 
 class Stock(models.Model):
     """
-    Mahsulot qoldig'i — filial yoki ombor bo'yicha.
-    branch yoki warehouse dan biri albatta bo'lishi kerak (ikkalasi ham emas).
-
+    Filial bo'yicha mahsulot qoldig'i.
+    Har bir mahsulot-filial juftligi uchun bitta yozuv.
     StockMovement yaratilganda avtomatik yangilanadi.
-    Boshlang'ich inventarizatsiya uchun to'g'ridan-to'g'ri POST qilish mumkin.
     """
     product    = models.ForeignKey(
         Product,
@@ -245,17 +360,7 @@ class Stock(models.Model):
         Branch,
         on_delete=models.CASCADE,
         related_name='stocks',
-        null=True,
-        blank=True,
         verbose_name="Filial"
-    )
-    warehouse  = models.ForeignKey(
-        Warehouse,
-        on_delete=models.CASCADE,
-        related_name='stocks',
-        null=True,
-        blank=True,
-        verbose_name="Ombor"
     )
     quantity   = models.DecimalField(
         max_digits=14,
@@ -269,97 +374,54 @@ class Stock(models.Model):
     )
 
     class Meta:
-        verbose_name        = "Qoldiq"
-        verbose_name_plural = "Qoldiqlar"
+        verbose_name        = "Ombor qoldig'i"
+        verbose_name_plural = "Ombor qoldiqlari"
         ordering            = ['product__name']
-        unique_together     = [('product', 'branch'), ('product', 'warehouse')]
-        constraints         = [
-            models.CheckConstraint(
-                check=(
-                    Q(branch__isnull=False, warehouse__isnull=True) |
-                    Q(branch__isnull=True,  warehouse__isnull=False)
-                ),
-                name='stock_exactly_one_location',
-            ),
-        ]
+        unique_together     = [('product', 'branch')]
 
     def __str__(self) -> str:
-        location = self.branch.name if self.branch_id else self.warehouse.name
-        return f"{self.product.name} — {location}: {self.quantity}"
+        return f"{self.product.name} — {self.branch.name}: {self.quantity}"
 
 
 # ============================================================
-# KIRIM / CHIQIM / KO'CHIRISH HARAKATLARI
+# KIRIM / CHIQIM HARAKATLARI
 # ============================================================
 
 class StockMovement(models.Model):
     """
-    Mahsulot harakati tarixi (kirim, chiqim, ko'chirish).
+    Mahsulot kirim/chiqim tarixi.
     Bu yozuvlar o'zgartirilmaydi va o'chirilmaydi (immutable log).
     Xatolikni tuzatish uchun qarama-qarshi harakat yarating.
 
-    Harakat turlari:
-      IN       — tashqaridan kirim (from_* bo'sh, to_* to'ldiriladi)
-      OUT      — tashqariga chiqim/sotish (from_* to'ldiriladi, to_* bo'sh)
-      TRANSFER — joy o'zgarishi (from_* va to_* ikkalasi ham to'ldiriladi)
-
     Yaratilganda Stock.quantity avtomatik yangilanadi (ViewSet.perform_create da).
     """
-    product        = models.ForeignKey(
+    product       = models.ForeignKey(
         Product,
         on_delete=models.CASCADE,
         related_name='movements',
         verbose_name="Mahsulot"
     )
-    movement_type  = models.CharField(
+    branch        = models.ForeignKey(
+        Branch,
+        on_delete=models.CASCADE,
+        related_name='movements',
+        verbose_name="Filial"
+    )
+    movement_type = models.CharField(
         max_length=10,
         choices=MovementType.choices,
         verbose_name="Harakat turi"
     )
-    quantity       = models.DecimalField(
+    quantity      = models.DecimalField(
         max_digits=14,
         decimal_places=3,
         verbose_name="Miqdori"
     )
-    # Qayerdan (IN da bo'sh)
-    from_branch    = models.ForeignKey(
-        Branch,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='movements_from',
-        verbose_name="Filialdan"
-    )
-    from_warehouse = models.ForeignKey(
-        Warehouse,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='movements_from',
-        verbose_name="Ombordan"
-    )
-    # Qayerga (OUT da bo'sh)
-    to_branch      = models.ForeignKey(
-        Branch,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='movements_to',
-        verbose_name="Filialga"
-    )
-    to_warehouse   = models.ForeignKey(
-        Warehouse,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='movements_to',
-        verbose_name="Omborga"
-    )
-    note           = models.TextField(
+    note          = models.TextField(
         blank=True,
         verbose_name="Izoh"
     )
-    worker         = models.ForeignKey(
+    worker        = models.ForeignKey(
         'accaunt.Worker',
         on_delete=models.SET_NULL,
         null=True,
@@ -367,7 +429,7 @@ class StockMovement(models.Model):
         related_name='movements',
         verbose_name="Hodim"
     )
-    created_on     = models.DateTimeField(
+    created_on    = models.DateTimeField(
         auto_now_add=True,
         verbose_name="Vaqti"
     )
@@ -378,10 +440,8 @@ class StockMovement(models.Model):
         ordering            = ['-created_on']
 
     def __str__(self) -> str:
-        from_loc = getattr(self.from_branch or self.from_warehouse, 'name', '—')
-        to_loc   = getattr(self.to_branch   or self.to_warehouse,   'name', '—')
         return (
             f"{self.get_movement_type_display()} — "
             f"{self.product.name} × {self.quantity} "
-            f"({from_loc} → {to_loc})"
+            f"({self.branch.name})"
         )

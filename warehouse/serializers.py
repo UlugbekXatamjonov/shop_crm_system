@@ -10,22 +10,26 @@ Har bir ViewSet action uchun alohida serializer:
 
 Tartib:
   1. Category serializers
-  2. Product serializers
-  3. Warehouse serializers
-  4. Stock serializers
-  5. StockMovement serializers
+  2. SubCategory serializers
+  3. Currency serializers
+  4. ExchangeRate serializers
+  5. Product serializers
+  6. Stock serializers
+  7. StockMovement serializers
 """
 
 from rest_framework import serializers
 
 from .models import (
     Category,
+    Currency,
+    ExchangeRate,
     MovementType,
     Product,
     ProductStatus,
     Stock,
     StockMovement,
-    Warehouse,
+    SubCategory,
 )
 
 
@@ -38,15 +42,19 @@ class CategoryListSerializer(serializers.ModelSerializer):
     Kategoriyalar ro'yxati uchun qisqa serializer.
     GET /api/v1/warehouse/categories/ da ishlatiladi.
     """
-    status_display = serializers.CharField(source='get_status_display', read_only=True)
-    product_count  = serializers.SerializerMethodField()
+    status_display    = serializers.CharField(source='get_status_display', read_only=True)
+    product_count     = serializers.SerializerMethodField()
+    subcategory_count = serializers.SerializerMethodField()
 
     class Meta:
         model  = Category
-        fields = ('id', 'name', 'status', 'status_display', 'product_count')
+        fields = ('id', 'name', 'status', 'status_display', 'product_count', 'subcategory_count')
 
     def get_product_count(self, obj: Category) -> int:
         return obj.products.filter(status=ProductStatus.ACTIVE).count()
+
+    def get_subcategory_count(self, obj: Category) -> int:
+        return obj.subcategories.filter(status=ProductStatus.ACTIVE).count()
 
 
 class CategoryDetailSerializer(serializers.ModelSerializer):
@@ -54,20 +62,24 @@ class CategoryDetailSerializer(serializers.ModelSerializer):
     Kategoriyaning to'liq ma'lumoti.
     GET /api/v1/warehouse/categories/{id}/ da ishlatiladi.
     """
-    status_display = serializers.CharField(source='get_status_display', read_only=True)
-    store_name     = serializers.CharField(source='store.name', read_only=True)
-    product_count  = serializers.SerializerMethodField()
+    status_display    = serializers.CharField(source='get_status_display', read_only=True)
+    store_name        = serializers.CharField(source='store.name', read_only=True)
+    product_count     = serializers.SerializerMethodField()
+    subcategory_count = serializers.SerializerMethodField()
 
     class Meta:
         model  = Category
         fields = (
             'id', 'name', 'description',
             'store_name', 'status', 'status_display',
-            'product_count', 'created_on',
+            'product_count', 'subcategory_count', 'created_on',
         )
 
     def get_product_count(self, obj: Category) -> int:
         return obj.products.filter(status=ProductStatus.ACTIVE).count()
+
+    def get_subcategory_count(self, obj: Category) -> int:
+        return obj.subcategories.filter(status=ProductStatus.ACTIVE).count()
 
 
 class CategoryCreateSerializer(serializers.ModelSerializer):
@@ -99,7 +111,7 @@ class CategoryUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = Category
-        fields = ('name', 'description', 'status')
+        fields = ('name', 'description')
 
     def validate_name(self, value: str) -> str:
         qs = Category.objects.filter(
@@ -113,6 +125,236 @@ class CategoryUpdateSerializer(serializers.ModelSerializer):
 
 
 # ============================================================
+# SUBKATEGORIYA SERIALIZERLARI (BOSQICH 1.1)
+# ============================================================
+
+class SubCategoryListSerializer(serializers.ModelSerializer):
+    """
+    Subkategoriyalar ro'yxati uchun qisqa serializer.
+    GET /api/v1/warehouse/subcategories/ da ishlatiladi.
+    """
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    category_name  = serializers.CharField(source='category.name', read_only=True)
+    product_count  = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = SubCategory
+        fields = (
+            'id', 'name', 'category_id', 'category_name',
+            'status', 'status_display', 'product_count',
+        )
+
+    def get_product_count(self, obj: SubCategory) -> int:
+        return obj.products.filter(status=ProductStatus.ACTIVE).count()
+
+
+class SubCategoryDetailSerializer(serializers.ModelSerializer):
+    """
+    Subkategoriyaning to'liq ma'lumoti.
+    GET /api/v1/warehouse/subcategories/{id}/ da ishlatiladi.
+    """
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    category_id    = serializers.IntegerField(source='category.id', read_only=True)
+    category_name  = serializers.CharField(source='category.name', read_only=True)
+    store_name     = serializers.CharField(source='store.name', read_only=True)
+    product_count  = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = SubCategory
+        fields = (
+            'id', 'name', 'description',
+            'category_id', 'category_name',
+            'store_name', 'status', 'status_display',
+            'product_count', 'created_on',
+        )
+
+    def get_product_count(self, obj: SubCategory) -> int:
+        return obj.products.filter(status=ProductStatus.ACTIVE).count()
+
+
+class SubCategoryCreateSerializer(serializers.ModelSerializer):
+    """
+    Yangi subkategoriya yaratish.
+    POST /api/v1/warehouse/subcategories/ da ishlatiladi.
+    store maydoni view da avtomatik beriladi.
+    """
+
+    class Meta:
+        model  = SubCategory
+        fields = ('name', 'description', 'category')
+
+    def validate_category(self, value: Category) -> Category:
+        """Kategoriya xuddi shu do'konga tegishli bo'lishi kerak."""
+        store = self.context.get('store')
+        if store and value.store != store:
+            raise serializers.ValidationError(
+                "Ushbu kategoriya sizning do'koningizga tegishli emas."
+            )
+        return value
+
+    def validate(self, data: dict) -> dict:
+        """Do'kon ichida bir kategoriyada bir xil nom bo'lmasin."""
+        store = self.context.get('store')
+        if store:
+            if SubCategory.objects.filter(
+                store=store,
+                category=data.get('category'),
+                name=data.get('name'),
+            ).exists():
+                raise serializers.ValidationError(
+                    "Bu kategoriyada bunday nomli subkategoriya allaqachon mavjud."
+                )
+        return data
+
+
+class SubCategoryUpdateSerializer(serializers.ModelSerializer):
+    """
+    Subkategoriya ma'lumotlarini yangilash.
+    PATCH /api/v1/warehouse/subcategories/{id}/ da ishlatiladi.
+    """
+
+    class Meta:
+        model  = SubCategory
+        fields = ('name', 'description', 'category')
+
+    def validate_category(self, value: Category) -> Category:
+        if value and value.store != self.instance.store:
+            raise serializers.ValidationError(
+                "Ushbu kategoriya sizning do'koningizga tegishli emas."
+            )
+        return value
+
+    def validate(self, data: dict) -> dict:
+        category = data.get('category', self.instance.category)
+        name     = data.get('name', self.instance.name)
+        qs = SubCategory.objects.filter(
+            store=self.instance.store,
+            category=category,
+            name=name,
+        ).exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                "Bu kategoriyada bunday nomli subkategoriya allaqachon mavjud."
+            )
+        return data
+
+
+# ============================================================
+# VALYUTA SERIALIZERLARI (BOSQICH 1.3)
+# ============================================================
+
+class CurrencyListSerializer(serializers.ModelSerializer):
+    """
+    Valyutalar ro'yxati.
+    GET /api/v1/warehouse/currencies/ da ishlatiladi.
+    """
+    class Meta:
+        model  = Currency
+        fields = ('id', 'code', 'name', 'symbol', 'is_base')
+
+
+class CurrencyDetailSerializer(serializers.ModelSerializer):
+    """
+    Valyuta to'liq ma'lumoti.
+    """
+    latest_rate = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = Currency
+        fields = ('id', 'code', 'name', 'symbol', 'is_base', 'latest_rate')
+
+    def get_latest_rate(self, obj: Currency) -> dict | None:
+        """Eng oxirgi mavjud kurs."""
+        if obj.is_base:
+            return {'rate': '1.0000', 'date': None, 'source': 'Base'}
+        latest = obj.rates.order_by('-date').first()
+        if latest:
+            return {
+                'rate':   str(latest.rate),
+                'date':   str(latest.date),
+                'source': latest.source,
+            }
+        return None
+
+
+class CurrencyCreateSerializer(serializers.ModelSerializer):
+    """
+    Yangi valyuta qo'shish (admin/manager).
+    POST /api/v1/warehouse/currencies/ da ishlatiladi.
+    """
+    class Meta:
+        model  = Currency
+        fields = ('code', 'name', 'symbol', 'is_base')
+
+    def validate_code(self, value: str) -> str:
+        return value.upper().strip()
+
+    def validate_is_base(self, value: bool) -> bool:
+        if value and Currency.objects.filter(is_base=True).exists():
+            raise serializers.ValidationError(
+                "Asosiy valyuta allaqachon mavjud. Faqat bitta asosiy valyuta bo'lishi mumkin."
+            )
+        return value
+
+
+# ============================================================
+# VALYUTA KURSI SERIALIZERLARI (BOSQICH 1.3)
+# ============================================================
+
+class ExchangeRateListSerializer(serializers.ModelSerializer):
+    """
+    Valyuta kurslari ro'yxati.
+    GET /api/v1/warehouse/exchange-rates/ da ishlatiladi.
+    """
+    currency_code   = serializers.CharField(source='currency.code', read_only=True)
+    currency_symbol = serializers.CharField(source='currency.symbol', read_only=True)
+
+    class Meta:
+        model  = ExchangeRate
+        fields = ('id', 'currency_code', 'currency_symbol', 'rate', 'date', 'source')
+
+
+class ExchangeRateDetailSerializer(serializers.ModelSerializer):
+    """
+    Valyuta kursi to'liq ma'lumoti.
+    """
+    currency_id     = serializers.IntegerField(source='currency.id', read_only=True)
+    currency_code   = serializers.CharField(source='currency.code', read_only=True)
+    currency_name   = serializers.CharField(source='currency.name', read_only=True)
+    currency_symbol = serializers.CharField(source='currency.symbol', read_only=True)
+
+    class Meta:
+        model  = ExchangeRate
+        fields = (
+            'id',
+            'currency_id', 'currency_code', 'currency_name', 'currency_symbol',
+            'rate', 'date', 'source', 'created_on',
+        )
+
+
+class ExchangeRateCreateSerializer(serializers.ModelSerializer):
+    """
+    Qo'lda valyuta kursi kiritish (manager).
+    POST /api/v1/warehouse/exchange-rates/ da ishlatiladi.
+    CBU task avtomatik yangilaydi, bu faqat qo'lda kiritish uchun.
+    """
+    class Meta:
+        model  = ExchangeRate
+        fields = ('currency', 'rate', 'date', 'source')
+
+    def validate(self, data: dict) -> dict:
+        currency = data.get('currency')
+        date     = data.get('date')
+        if currency and date:
+            if ExchangeRate.objects.filter(currency=currency, date=date).exists():
+                raise serializers.ValidationError(
+                    f"{currency.code} uchun {date} sanasida kurs allaqachon mavjud. "
+                    "Yangilash uchun PATCH ishlatil."
+                )
+        return data
+
+
+# ============================================================
 # MAHSULOT SERIALIZERLARI
 # ============================================================
 
@@ -121,18 +363,26 @@ class ProductListSerializer(serializers.ModelSerializer):
     Mahsulotlar ro'yxati uchun qisqa serializer.
     GET /api/v1/warehouse/products/ da ishlatiladi.
     """
-    category_name  = serializers.CharField(
+    category_name    = serializers.CharField(
         source='category.name', read_only=True, default=None
     )
-    unit_display   = serializers.CharField(source='get_unit_display', read_only=True)
-    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    subcategory_name = serializers.CharField(
+        source='subcategory.name', read_only=True, default=None
+    )
+    unit_display     = serializers.CharField(source='get_unit_display', read_only=True)
+    status_display   = serializers.CharField(source='get_status_display', read_only=True)
+    currency_code    = serializers.CharField(
+        source='price_currency.code', read_only=True, default='UZS'
+    )
 
     class Meta:
         model  = Product
         fields = (
-            'id', 'name', 'category_name',
+            'id', 'name',
+            'category_name', 'subcategory_name',
             'unit', 'unit_display',
-            'sale_price', 'barcode', 'image',
+            'sale_price', 'currency_code',
+            'barcode', 'image',
             'status', 'status_display',
         )
 
@@ -142,23 +392,37 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     Mahsulotning to'liq ma'lumoti.
     GET /api/v1/warehouse/products/{id}/ da ishlatiladi.
     """
-    category_id    = serializers.IntegerField(
+    category_id      = serializers.IntegerField(
         source='category.id', read_only=True, default=None
     )
-    category_name  = serializers.CharField(
+    category_name    = serializers.CharField(
         source='category.name', read_only=True, default=None
     )
-    unit_display   = serializers.CharField(source='get_unit_display', read_only=True)
-    status_display = serializers.CharField(source='get_status_display', read_only=True)
-    store_name     = serializers.CharField(source='store.name', read_only=True)
+    subcategory_id   = serializers.IntegerField(
+        source='subcategory.id', read_only=True, default=None
+    )
+    subcategory_name = serializers.CharField(
+        source='subcategory.name', read_only=True, default=None
+    )
+    unit_display     = serializers.CharField(source='get_unit_display', read_only=True)
+    status_display   = serializers.CharField(source='get_status_display', read_only=True)
+    store_name       = serializers.CharField(source='store.name', read_only=True)
+    currency_code    = serializers.CharField(
+        source='price_currency.code', read_only=True, default='UZS'
+    )
+    currency_symbol  = serializers.CharField(
+        source='price_currency.symbol', read_only=True, default='so\'m'
+    )
 
     class Meta:
         model  = Product
         fields = (
             'id', 'name',
             'category_id', 'category_name',
+            'subcategory_id', 'subcategory_name',
             'unit', 'unit_display',
             'purchase_price', 'sale_price',
+            'currency_code', 'currency_symbol',
             'barcode', 'image', 'store_name',
             'status', 'status_display',
             'created_on',
@@ -170,17 +434,16 @@ class ProductCreateSerializer(serializers.ModelSerializer):
     Yangi mahsulot yaratish.
     POST /api/v1/warehouse/products/ da ishlatiladi.
     store maydoni view da avtomatik beriladi (perform_create).
-    category — majburiy maydon (serializer darajasida).
+    barcode bo'sh bo'lsa perform_create da avtomatik EAN-13 generatsiya qilinadi.
     """
-    category = serializers.PrimaryKeyRelatedField(
-        queryset=Category.objects.all(),
-        required=True,
-        allow_null=False,
-    )
 
     class Meta:
         model  = Product
-        fields = ('name', 'category', 'unit', 'purchase_price', 'sale_price', 'barcode', 'image')
+        fields = (
+            'name', 'category', 'subcategory',
+            'unit', 'purchase_price', 'sale_price', 'price_currency',
+            'barcode', 'image',
+        )
 
     def validate_name(self, value: str) -> str:
         """Bir do'kon ichida mahsulot nomi takrorlanmasligi kerak."""
@@ -200,8 +463,19 @@ class ProductCreateSerializer(serializers.ModelSerializer):
             )
         return value
 
-    def validate_barcode(self, value: str):
-        """Shtrix-kod do'kon ichida unikal bo'lishi kerak."""
+    def validate_subcategory(self, value: SubCategory | None) -> SubCategory | None:
+        """Subkategoriya xuddi shu do'konga tegishli bo'lishi kerak."""
+        if not value:
+            return None
+        store = self.context.get('store')
+        if store and value.store != store:
+            raise serializers.ValidationError(
+                "Ushbu subkategoriya sizning do'koningizga tegishli emas."
+            )
+        return value
+
+    def validate_barcode(self, value: str | None) -> str | None:
+        """Shtrix-kod do'kon ichida unikal bo'lishi kerak. Bo'sh bo'lsa — auto-generate."""
         if not value:
             return None
         store = self.context.get('store')
@@ -221,13 +495,12 @@ class ProductUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Product
         fields = (
-            'name', 'category', 'unit',
-            'purchase_price', 'sale_price',
+            'name', 'category', 'subcategory',
+            'unit', 'purchase_price', 'sale_price', 'price_currency',
             'barcode', 'image', 'status',
         )
 
     def validate_name(self, value: str) -> str:
-        """Bir do'kon ichida mahsulot nomi takrorlanmasligi kerak."""
         qs = Product.objects.filter(
             store=self.instance.store, name=value
         ).exclude(pk=self.instance.pk)
@@ -244,7 +517,16 @@ class ProductUpdateSerializer(serializers.ModelSerializer):
             )
         return value
 
-    def validate_barcode(self, value: str):
+    def validate_subcategory(self, value: SubCategory | None) -> SubCategory | None:
+        if not value:
+            return None
+        if value.store != self.instance.store:
+            raise serializers.ValidationError(
+                "Ushbu subkategoriya sizning do'koningizga tegishli emas."
+            )
+        return value
+
+    def validate_barcode(self, value: str | None) -> str | None:
         if not value:
             return None
         qs = Product.objects.filter(
@@ -258,129 +540,36 @@ class ProductUpdateSerializer(serializers.ModelSerializer):
 
 
 # ============================================================
-# OMBOR SERIALIZERLARI
-# ============================================================
-
-class WarehouseListSerializer(serializers.ModelSerializer):
-    """
-    Omborlar ro'yxati uchun qisqa serializer.
-    GET /api/v1/warehouse/warehouses/ da ishlatiladi.
-    """
-    status_display = serializers.CharField(source='get_status_display', read_only=True)
-    stock_count    = serializers.SerializerMethodField()
-
-    class Meta:
-        model  = Warehouse
-        fields = ('id', 'name', 'address', 'status', 'status_display', 'stock_count')
-
-    def get_stock_count(self, obj: Warehouse) -> int:
-        return obj.stocks.filter(quantity__gt=0).count()
-
-
-class WarehouseDetailSerializer(serializers.ModelSerializer):
-    """
-    Omborning to'liq ma'lumoti.
-    GET /api/v1/warehouse/warehouses/{id}/ da ishlatiladi.
-    """
-    status_display = serializers.CharField(source='get_status_display', read_only=True)
-    store_name     = serializers.CharField(source='store.name', read_only=True)
-    stock_count    = serializers.SerializerMethodField()
-
-    class Meta:
-        model  = Warehouse
-        fields = (
-            'id', 'name', 'address',
-            'store_name', 'status', 'status_display',
-            'stock_count', 'created_on',
-        )
-
-    def get_stock_count(self, obj: Warehouse) -> int:
-        return obj.stocks.filter(quantity__gt=0).count()
-
-
-class WarehouseCreateSerializer(serializers.ModelSerializer):
-    """
-    Yangi ombor yaratish.
-    POST /api/v1/warehouse/warehouses/ da ishlatiladi.
-    store maydoni view da avtomatik beriladi (perform_create).
-    """
-
-    class Meta:
-        model  = Warehouse
-        fields = ('name', 'address')
-
-    def validate_name(self, value: str) -> str:
-        """Bir do'kon ichida ombor nomi takrorlanmasligi kerak."""
-        store = self.context.get('store')
-        if store and Warehouse.objects.filter(store=store, name=value).exists():
-            raise serializers.ValidationError(
-                "Bu nomli ombor ushbu do'konda allaqachon mavjud."
-            )
-        return value
-
-
-class WarehouseUpdateSerializer(serializers.ModelSerializer):
-    """
-    Ombor ma'lumotlarini yangilash.
-    PATCH /api/v1/warehouse/warehouses/{id}/ da ishlatiladi.
-    """
-
-    class Meta:
-        model  = Warehouse
-        fields = ('name', 'address', 'status')
-
-    def validate_name(self, value: str) -> str:
-        qs = Warehouse.objects.filter(
-            store=self.instance.store, name=value
-        ).exclude(pk=self.instance.pk)
-        if qs.exists():
-            raise serializers.ValidationError(
-                "Bu nomli ombor ushbu do'konda allaqachon mavjud."
-            )
-        return value
-
-
-# ============================================================
-# QOLDIQ SERIALIZERLARI
+# OMBOR QOLDIG'I SERIALIZERLARI
 # ============================================================
 
 class StockListSerializer(serializers.ModelSerializer):
     """
-    Qoldiqlar ro'yxati uchun qisqa serializer.
+    Ombor qoldiqlari ro'yxati uchun qisqa serializer.
     GET /api/v1/warehouse/stocks/ da ishlatiladi.
-    Filial yoki ombor bo'yicha qoldiqni ko'rsatadi.
     """
-    product_name   = serializers.CharField(source='product.name', read_only=True)
-    product_unit   = serializers.CharField(source='product.get_unit_display', read_only=True)
-    branch_name    = serializers.CharField(source='branch.name', read_only=True, default=None)
-    warehouse_name = serializers.CharField(source='warehouse.name', read_only=True, default=None)
-    location_type  = serializers.SerializerMethodField()
+    product_name = serializers.CharField(source='product.name', read_only=True)
+    product_unit = serializers.CharField(source='product.get_unit_display', read_only=True)
+    branch_name  = serializers.CharField(source='branch.name', read_only=True)
 
     class Meta:
         model  = Stock
         fields = (
             'id', 'product_name', 'product_unit',
-            'branch_name', 'warehouse_name', 'location_type',
-            'quantity', 'updated_on',
+            'branch_name', 'quantity', 'updated_on',
         )
-
-    def get_location_type(self, obj: Stock) -> str:
-        return 'branch' if obj.branch_id else 'warehouse'
 
 
 class StockDetailSerializer(serializers.ModelSerializer):
     """
-    Qoldiqning to'liq ma'lumoti.
+    Ombor qoldig'ining to'liq ma'lumoti.
     GET /api/v1/warehouse/stocks/{id}/ da ishlatiladi.
     """
-    product_id     = serializers.IntegerField(source='product.id', read_only=True)
-    product_name   = serializers.CharField(source='product.name', read_only=True)
-    product_unit   = serializers.CharField(source='product.get_unit_display', read_only=True)
-    branch_id      = serializers.IntegerField(source='branch.id', read_only=True, default=None)
-    branch_name    = serializers.CharField(source='branch.name', read_only=True, default=None)
-    warehouse_id   = serializers.IntegerField(source='warehouse.id', read_only=True, default=None)
-    warehouse_name = serializers.CharField(source='warehouse.name', read_only=True, default=None)
-    location_type  = serializers.SerializerMethodField()
+    product_id   = serializers.IntegerField(source='product.id', read_only=True)
+    product_name = serializers.CharField(source='product.name', read_only=True)
+    product_unit = serializers.CharField(source='product.get_unit_display', read_only=True)
+    branch_id    = serializers.IntegerField(source='branch.id', read_only=True)
+    branch_name  = serializers.CharField(source='branch.name', read_only=True)
 
     class Meta:
         model  = Stock
@@ -388,69 +577,44 @@ class StockDetailSerializer(serializers.ModelSerializer):
             'id',
             'product_id', 'product_name', 'product_unit',
             'branch_id', 'branch_name',
-            'warehouse_id', 'warehouse_name',
-            'location_type', 'quantity', 'updated_on',
+            'quantity', 'updated_on',
         )
-
-    def get_location_type(self, obj: Stock) -> str:
-        return 'branch' if obj.branch_id else 'warehouse'
 
 
 class StockCreateSerializer(serializers.ModelSerializer):
     """
-    Qoldiqni qo'lda qo'shish (boshlang'ich inventarizatsiya).
+    Ombor qoldig'ini qo'lda qo'shish.
     POST /api/v1/warehouse/stocks/ da ishlatiladi.
-    branch yoki warehouse dan biri berilishi kerak.
+    Odatda StockMovement orqali avtomatik yaratiladi.
     """
 
     class Meta:
         model  = Stock
-        fields = ('product', 'branch', 'warehouse', 'quantity')
+        fields = ('product', 'branch', 'quantity')
 
     def validate(self, data: dict) -> dict:
-        branch    = data.get('branch')
-        warehouse = data.get('warehouse')
-        store     = self.context.get('store')
-
-        # branch yoki warehouse dan biri bo'lishi kerak
-        if not branch and not warehouse:
-            raise serializers.ValidationError(
-                "Filial yoki ombor ko'rsatilishi kerak."
-            )
-        if branch and warehouse:
-            raise serializers.ValidationError(
-                "Faqat filial yoki ombor ko'rsatilishi kerak, ikkalasi emas."
-            )
-
+        store = self.context.get('store')
         if store:
             if data['product'].store != store:
                 raise serializers.ValidationError({
                     'product': "Bu mahsulot sizning do'koningizga tegishli emas."
                 })
-            if branch and branch.store != store:
+            if data['branch'].store != store:
                 raise serializers.ValidationError({
                     'branch': "Bu filial sizning do'koningizga tegishli emas."
                 })
-            if warehouse and warehouse.store != store:
-                raise serializers.ValidationError({
-                    'warehouse': "Bu ombor sizning do'koningizga tegishli emas."
-                })
-
-        # Takroriy yozuv tekshiruvi
-        if branch and Stock.objects.filter(product=data['product'], branch=branch).exists():
+        if Stock.objects.filter(
+            product=data['product'], branch=data['branch']
+        ).exists():
             raise serializers.ValidationError(
                 "Bu mahsulot uchun ushbu filialda qoldiq yozuvi allaqachon mavjud."
-            )
-        if warehouse and Stock.objects.filter(product=data['product'], warehouse=warehouse).exists():
-            raise serializers.ValidationError(
-                "Bu mahsulot uchun ushbu omborда qoldiq yozuvi allaqachon mavjud."
             )
         return data
 
 
 class StockUpdateSerializer(serializers.ModelSerializer):
     """
-    Qoldiqni yangilash (faqat miqdor).
+    Ombor qoldig'ini yangilash (faqat miqdor).
     PATCH /api/v1/warehouse/stocks/{id}/ da ishlatiladi.
     """
 
@@ -460,7 +624,7 @@ class StockUpdateSerializer(serializers.ModelSerializer):
 
 
 # ============================================================
-# HARAKAT (KIRIM/CHIQIM/KO'CHIRISH) SERIALIZERLARI
+# HARAKAT (KIRIM/CHIQIM) SERIALIZERLARI
 # ============================================================
 
 class MovementListSerializer(serializers.ModelSerializer):
@@ -472,32 +636,24 @@ class MovementListSerializer(serializers.ModelSerializer):
     product_unit          = serializers.CharField(
         source='product.get_unit_display', read_only=True
     )
+    branch_name           = serializers.CharField(source='branch.name', read_only=True)
     movement_type_display = serializers.CharField(
         source='get_movement_type_display', read_only=True
     )
-    from_name             = serializers.SerializerMethodField()
-    to_name               = serializers.SerializerMethodField()
     worker_name           = serializers.SerializerMethodField()
 
     class Meta:
         model  = StockMovement
         fields = (
-            'id', 'product_name', 'product_unit',
+            'id', 'product_name', 'product_unit', 'branch_name',
             'movement_type', 'movement_type_display',
-            'from_name', 'to_name',
             'quantity', 'worker_name', 'created_on',
         )
 
-    def get_from_name(self, obj: StockMovement) -> str | None:
-        loc = obj.from_branch or obj.from_warehouse
-        return loc.name if loc else None
-
-    def get_to_name(self, obj: StockMovement) -> str | None:
-        loc = obj.to_branch or obj.to_warehouse
-        return loc.name if loc else None
-
     def get_worker_name(self, obj: StockMovement) -> str | None:
-        return str(obj.worker.user) if obj.worker else None
+        if obj.worker:
+            return str(obj.worker.user)
+        return None
 
 
 class MovementDetailSerializer(serializers.ModelSerializer):
@@ -510,32 +666,10 @@ class MovementDetailSerializer(serializers.ModelSerializer):
     product_unit          = serializers.CharField(
         source='product.get_unit_display', read_only=True
     )
+    branch_id             = serializers.IntegerField(source='branch.id', read_only=True)
+    branch_name           = serializers.CharField(source='branch.name', read_only=True)
     movement_type_display = serializers.CharField(
         source='get_movement_type_display', read_only=True
-    )
-    from_branch_id        = serializers.IntegerField(
-        source='from_branch.id', read_only=True, default=None
-    )
-    from_branch_name      = serializers.CharField(
-        source='from_branch.name', read_only=True, default=None
-    )
-    from_warehouse_id     = serializers.IntegerField(
-        source='from_warehouse.id', read_only=True, default=None
-    )
-    from_warehouse_name   = serializers.CharField(
-        source='from_warehouse.name', read_only=True, default=None
-    )
-    to_branch_id          = serializers.IntegerField(
-        source='to_branch.id', read_only=True, default=None
-    )
-    to_branch_name        = serializers.CharField(
-        source='to_branch.name', read_only=True, default=None
-    )
-    to_warehouse_id       = serializers.IntegerField(
-        source='to_warehouse.id', read_only=True, default=None
-    )
-    to_warehouse_name     = serializers.CharField(
-        source='to_warehouse.name', read_only=True, default=None
     )
     worker_name           = serializers.SerializerMethodField()
 
@@ -544,46 +678,31 @@ class MovementDetailSerializer(serializers.ModelSerializer):
         fields = (
             'id',
             'product_id', 'product_name', 'product_unit',
+            'branch_id', 'branch_name',
             'movement_type', 'movement_type_display',
-            'from_branch_id', 'from_branch_name',
-            'from_warehouse_id', 'from_warehouse_name',
-            'to_branch_id', 'to_branch_name',
-            'to_warehouse_id', 'to_warehouse_name',
             'quantity', 'note',
             'worker_name', 'created_on',
         )
 
     def get_worker_name(self, obj: StockMovement) -> str | None:
-        return str(obj.worker.user) if obj.worker else None
+        if obj.worker:
+            return str(obj.worker.user)
+        return None
 
 
 class MovementCreateSerializer(serializers.ModelSerializer):
     """
-    Yangi harakat yaratish (kirim, chiqim, ko'chirish).
+    Yangi kirim/chiqim harakati yaratish.
     POST /api/v1/warehouse/movements/ da ishlatiladi.
-
-    Qoidalar:
-      IN       — to_branch yoki to_warehouse berilishi kerak
-      OUT      — from_branch yoki from_warehouse berilishi kerak
-      TRANSFER — from_* va to_* ikkalasi ham berilishi kerak
 
     Yaratilganda:
       - Stock qoldig'i avtomatik yangilanadi (ViewSet.perform_create)
-      - OUT/TRANSFER uchun yetarli qoldiq tekshiriladi
+      - Chiqim uchun yetarli qoldiq tekshiriladi
     """
 
     class Meta:
         model  = StockMovement
-        fields = (
-            'product',
-            'movement_type',
-            'quantity',
-            'from_branch',
-            'from_warehouse',
-            'to_branch',
-            'to_warehouse',
-            'note',
-        )
+        fields = ('product', 'branch', 'movement_type', 'quantity', 'note')
 
     def validate_quantity(self, value):
         if value <= 0:
@@ -591,94 +710,34 @@ class MovementCreateSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, data: dict) -> dict:
-        store         = self.context.get('store')
-        movement_type = data.get('movement_type')
-        from_branch   = data.get('from_branch')
-        from_wh       = data.get('from_warehouse')
-        to_branch     = data.get('to_branch')
-        to_wh         = data.get('to_warehouse')
-        product       = data.get('product')
-
-        # Multi-tenant: barcha FK lar bir do'konga tegishli bo'lishi kerak
+        store = self.context.get('store')
         if store:
-            if product and product.store != store:
+            if data['product'].store != store:
                 raise serializers.ValidationError({
                     'product': "Bu mahsulot sizning do'koningizga tegishli emas."
                 })
-            for loc, field in [(from_branch, 'from_branch'), (to_branch, 'to_branch')]:
-                if loc and loc.store != store:
-                    raise serializers.ValidationError({
-                        field: "Bu filial sizning do'koningizga tegishli emas."
-                    })
-            for loc, field in [(from_wh, 'from_warehouse'), (to_wh, 'to_warehouse')]:
-                if loc and loc.store != store:
-                    raise serializers.ValidationError({
-                        field: "Bu ombor sizning do'koningizga tegishli emas."
-                    })
+            if data['branch'].store != store:
+                raise serializers.ValidationError({
+                    'branch': "Bu filial sizning do'koningizga tegishli emas."
+                })
 
-        # Harakat turiga qarab from/to tekshiruvi
-        if movement_type == MovementType.IN:
-            if not to_branch and not to_wh:
-                raise serializers.ValidationError(
-                    "Kirim uchun qayerga (to_branch yoki to_warehouse) ko'rsatilishi kerak."
-                )
-            if from_branch or from_wh:
-                raise serializers.ValidationError(
-                    "Kirimda 'from' joyi ko'rsatilmaydi."
-                )
-
-        elif movement_type == MovementType.OUT:
-            if not from_branch and not from_wh:
-                raise serializers.ValidationError(
-                    "Chiqim uchun qayerdan (from_branch yoki from_warehouse) ko'rsatilishi kerak."
-                )
-            if to_branch or to_wh:
-                raise serializers.ValidationError(
-                    "Chiqimda 'to' joyi ko'rsatilmaydi."
-                )
-
-        elif movement_type == MovementType.TRANSFER:
-            if not (from_branch or from_wh):
-                raise serializers.ValidationError(
-                    "Ko'chirishda qayerdan (from_branch yoki from_warehouse) ko'rsatilishi kerak."
-                )
-            if not (to_branch or to_wh):
-                raise serializers.ValidationError(
-                    "Ko'chirishda qayerga (to_branch yoki to_warehouse) ko'rsatilishi kerak."
-                )
-            # Bir joydan bir joyga bo'lmasligi kerak
-            if from_branch and from_branch == to_branch:
-                raise serializers.ValidationError(
-                    "Ko'chirish bir filialdan o'sha filialga bo'lmaydi."
-                )
-            if from_wh and from_wh == to_wh:
-                raise serializers.ValidationError(
-                    "Ko'chirish bir ombordan o'sha omborga bo'lmaydi."
-                )
-
-        # Chiqim va ko'chirish uchun qoldiq tekshiruvi
-        if movement_type in (MovementType.OUT, MovementType.TRANSFER):
-            from_location_filter = {}
-            if from_branch:
-                from_location_filter['branch'] = from_branch
-            elif from_wh:
-                from_location_filter['warehouse'] = from_wh
-
+        # Chiqim uchun yetarli qoldiq borligini tekshirish
+        if data.get('movement_type') == MovementType.OUT:
             try:
-                stock = Stock.objects.get(product=product, **from_location_filter)
+                stock = Stock.objects.get(
+                    product=data['product'],
+                    branch=data['branch'],
+                )
                 if stock.quantity < data['quantity']:
-                    from_name = getattr(from_branch or from_wh, 'name', '?')
                     raise serializers.ValidationError({
                         'quantity': (
-                            f"'{from_name}' da yetarli mahsulot yo'q. "
+                            f"Omborda yetarli mahsulot yo'q. "
                             f"Mavjud: {stock.quantity} "
-                            f"{product.get_unit_display()}"
+                            f"{data['product'].get_unit_display()}"
                         )
                     })
             except Stock.DoesNotExist:
-                from_name = getattr(from_branch or from_wh, 'name', '?')
                 raise serializers.ValidationError({
-                    'quantity': f"Bu mahsulot '{from_name}' da mavjud emas."
+                    'quantity': "Bu mahsulot ushbu filial omborida mavjud emas."
                 })
-
         return data

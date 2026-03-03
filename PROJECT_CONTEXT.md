@@ -55,7 +55,7 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 |-------------|-------------------|--------------------------------------------------------|
 | `accaunt`   | ✅ Tugallangan    | CustomUser, Worker, AuditLog, JWT auth — password reset, WorkerList/Detail da store+branch |
 | `store`     | ✅ Tugallangan    | Store, Branch CRUD (soft delete, multi-tenant, workers in detail, Uzbek errors) |
-| `warehouse` | ✅ Tugallangan    | Category, Product(+image), Warehouse, Stock, StockMovement (IN/OUT/TRANSFER, from/to branch/warehouse, race condition tuzatildi) |
+| `warehouse` | ✅ Tugallangan    | Category, **SubCategory**, Product(+image, +barcode EAN-13, +subcategory, +price_currency), **Currency**, **ExchangeRate**, Stock, StockMovement (race condition tuzatildi) — BOSQICH 1 ✅ |
 | `trade`     | ❌ Boshlanmagan  | BOSQICH 4 — Customer, Sale, SaleItem                   |
 | `expense`   | ❌ Boshlanmagan  | BOSQICH 6 — ExpenseCategory, Expense                   |
 | `StoreSettings` | ❌ Boshlanmagan | BOSQICH 2 — store app da, 3 qoida bilan            |
@@ -462,15 +462,23 @@ PORT=8000
 
 ---
 
-### BOSQICH 1 — warehouse ni to'ldirish
+### BOSQICH 1 — warehouse ni to'ldirish ✅ BAJARILDI (03.03.2026)
 | # | Vazifa | Holat |
 |---|--------|-------|
-| 1.1 | SubCategory (Category → SubCategory → Product, ixtiyoriy) | ❌ Qilinmagan |
-| 1.2 | Barcode auto-generate (EAN-13, prefix 2XXXX GS1 in-store, python-barcode) | ❌ Qilinmagan |
-| 1.3 | Multi-valyuta: Currency model + ExchangeRate + price_currency on Product | ❌ Qilinmagan |
-| 1.4 | Celery task: kurs kunlik avtomatik yangilanishi (O'zbekiston CBU API) | ❌ Qilinmagan |
+| 1.1 | SubCategory (Category → SubCategory → Product, ixtiyoriy) | ✅ Bajarildi |
+| 1.2 | Barcode auto-generate (EAN-13, prefix 2XXXX GS1 in-store, python-barcode) | ✅ Bajarildi |
+| 1.3 | Multi-valyuta: Currency model + ExchangeRate + price_currency on Product | ✅ Bajarildi |
+| 1.4 | Celery task: kurs kunlik avtomatik yangilanishi (O'zbekiston CBU API) | ✅ Bajarildi |
 
-**Barcode format:** `2XXXX` prefix (200000-299999) — hech qachon real GS1 mahsulotlari bilan to'qnashmaydi.
+**Barcode format:** `20{store_id:05d}{seq:05d}{check}` — 13 raqam EAN-13 (GS1 in-store prefix 20, hech qachon real GS1 bilan to'qnashmaydi).
+**Currency seed (migration 0005):** UZS (asosiy), USD, EUR, RUB, CNY.
+**Celery schedule:** `CELERY_BEAT_SCHEDULE` — `update_exchange_rates` har kuni soat 09:00 da (`crontab(hour=9, minute=0)`).
+
+**Yangi fayllar:**
+- `warehouse/utils.py` — `generate_unique_barcode()`, `get_barcode_image()`, `get_barcode_svg()`, `get_today_rate()`
+- `warehouse/tasks.py` — `update_exchange_rates` Celery task (CBU API, retry 3×5min)
+- `warehouse/migrations/0004_subcategory.py` — SubCategory + Product.subcategory
+- `warehouse/migrations/0005_currency_exchangerate.py` — Currency + ExchangeRate + Product.price_currency + seed
 
 ---
 
@@ -1000,7 +1008,8 @@ myenv/Scripts/python.exe manage.py migrate appname --settings=config.settings.lo
 
 ### Git log (so'nggi commitlar, 03.03.2026)
 ```
-(joriy)  feat: BOSQICH 0 bajarildi — CORS x-idempotency-key, 20-bosqichli to'liq reja
+(joriy)  feat(warehouse): BOSQICH 1 — SubCategory, barcode EAN-13, Currency, ExchangeRate, Celery task
+bc70380  feat: BOSQICH 0 bajarildi — CORS x-idempotency-key, 20-bosqichli to'liq reja
 e69d660  docs: loyiha rejasi 9 bosqichdan 19 bosqichga yangilandi (worktree)
 b55551b  docs: loyiha rejasi 9 bosqichdan 19 bosqichga yangilandi (main, cherry-pick)
 9ce1d81  docs: 3 qoida + to'liq loyiha rejasi PROJECT_CONTEXT ga qo'shildi (main)
@@ -1011,11 +1020,15 @@ d1fc1b8  feat(warehouse): Product.image + WarehouseListSerializer.address (main)
 ### Qo'shilgan xususiyatlar (03.03.2026)
 | Xususiyat | Joyi | Izoh |
 |-----------|------|------|
-| `Product.image` | `warehouse/models.py` | Ixtiyoriy `ImageField(upload_to='products/')` — migration 0004 |
+| `Product.image` | `warehouse/models.py` | Ixtiyoriy `ImageField(upload_to='products/')` — migration 0003 |
 | `WarehouseListSerializer.address` | `warehouse/serializers.py` | Ombor ro'yxatida manzil ham ko'rsatiladi |
 | `CORS_ALLOW_HEADERS += 'x-idempotency-key'` | `config/settings/base.py` | Offline rejim uchun (BOSQICH 18) |
 | BOSQICH 0 tayyorlov | `base.py`, `urls.py` | MEDIA fayllar allaqachon to'g'ri sozlangan — tasdiqlandi |
-| 20-bosqichli loyiha rejasi | `PROJECT_CONTEXT.md` | Barcha ixtiyoriy flaglar (subcategory, sale_return, wastage, stock_audit, kpi, price_list) qo'shildi |
+| 20-bosqichli loyiha rejasi | `PROJECT_CONTEXT.md` | Barcha ixtiyoriy flaglar qo'shildi |
+| **BOSQICH 1** — `SubCategory` modeli | `warehouse/models.py` + migration 0004 | `Category → SubCategory → Product` ierarxiya, `StoreSettings.subcategory_enabled` |
+| **BOSQICH 1** — Barcode EAN-13 auto-generate | `warehouse/utils.py`, `views.py` | `generate_unique_barcode(store_id)`, prefix `20XXXXXYYYYY` + check digit, `GET /products/{id}/barcode/?format=png\|svg` |
+| **BOSQICH 1** — `Currency` + `ExchangeRate` modellari | `warehouse/models.py` + migration 0005 | UZS/USD/EUR/RUB/CNY seed, `Product.price_currency FK` |
+| **BOSQICH 1** — Celery task: valyuta kursi | `warehouse/tasks.py`, `config/settings/base.py` | CBU API, `crontab(hour=9, minute=0)`, retry 3×5min |
 
 ### Tuzatilgan xatolar (03.03.2026)
 | Xato | Joyi | Tuzatish |

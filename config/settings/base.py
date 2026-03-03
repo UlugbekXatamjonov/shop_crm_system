@@ -13,6 +13,8 @@ from pathlib import Path
 from datetime import timedelta
 import os
 
+from celery.schedules import crontab
+
 # ============================================================
 # ASOSIY YO'LLAR
 # ============================================================
@@ -316,3 +318,15 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_ACCEPT_CONTENT = ['json']
+
+# Rejalashtirilgan vazifalar (Celery Beat)
+CELERY_BEAT_SCHEDULE = {
+    # BOSQICH 1.4 — CBU API dan valyuta kurslarini har kuni 09:00 da yangilash
+    'update-exchange-rates-daily': {
+        'task':     'warehouse.tasks.update_exchange_rates',
+        'schedule': crontab(hour=9, minute=0),  # Har kuni soat 09:00 da
+        'options': {
+            'expires': 3600,  # 1 soat ichida bajarilmasa — bekor qilinadi
+        },
+    },
+}

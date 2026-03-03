@@ -12,17 +12,26 @@ Router avtomatik quyidagi URL'larni yaratadi:
   PATCH  /api/v1/warehouse/categories/{id}/      — kategoriya yangilash
   DELETE /api/v1/warehouse/categories/{id}/      — kategoriyani nofaol qilish
 
-  GET    /api/v1/warehouse/products/             — mahsulotlar ro'yxati
-  POST   /api/v1/warehouse/products/             — mahsulot yaratish
+  GET    /api/v1/warehouse/subcategories/        — subkategoriyalar ro'yxati (?category=<id>)
+  POST   /api/v1/warehouse/subcategories/        — subkategoriya yaratish
+  GET    /api/v1/warehouse/subcategories/{id}/   — subkategoriya tafsilotlari
+  PATCH  /api/v1/warehouse/subcategories/{id}/   — subkategoriya yangilash
+  DELETE /api/v1/warehouse/subcategories/{id}/   — subkategoriyani nofaol qilish
+
+  GET    /api/v1/warehouse/currencies/           — valyutalar ro'yxati
+  POST   /api/v1/warehouse/currencies/           — valyuta qo'shish (manager+)
+  GET    /api/v1/warehouse/currencies/{id}/      — valyuta tafsilotlari (latest_rate bilan)
+
+  GET    /api/v1/warehouse/exchange-rates/       — kurslar ro'yxati (?currency=USD&date=2026-03-03)
+  POST   /api/v1/warehouse/exchange-rates/       — kurs qo'lda kiritish (manager+)
+  GET    /api/v1/warehouse/exchange-rates/{id}/  — kurs tafsilotlari
+
+  GET    /api/v1/warehouse/products/             — mahsulotlar ro'yxati (?category=&subcategory=&status=)
+  POST   /api/v1/warehouse/products/             — mahsulot yaratish (barcode auto-generate)
   GET    /api/v1/warehouse/products/{id}/        — mahsulot tafsilotlari
   PATCH  /api/v1/warehouse/products/{id}/        — mahsulot yangilash
   DELETE /api/v1/warehouse/products/{id}/        — mahsulotni nofaol qilish
-
-  GET    /api/v1/warehouse/warehouses/           — omborlar ro'yxati
-  POST   /api/v1/warehouse/warehouses/           — ombor yaratish (owner)
-  GET    /api/v1/warehouse/warehouses/{id}/      — ombor tafsilotlari
-  PATCH  /api/v1/warehouse/warehouses/{id}/      — omborni yangilash
-  DELETE /api/v1/warehouse/warehouses/{id}/      — omborni nofaol qilish (owner)
+  GET    /api/v1/warehouse/products/{id}/barcode/— barcode PNG/SVG rasm (?format=svg)
 
   GET    /api/v1/warehouse/stocks/               — qoldiqlar ro'yxati
   POST   /api/v1/warehouse/stocks/               — qoldiq qo'shish
@@ -31,7 +40,7 @@ Router avtomatik quyidagi URL'larni yaratadi:
   DELETE /api/v1/warehouse/stocks/{id}/          — qoldiqni o'chirish
 
   GET    /api/v1/warehouse/movements/            — harakatlar ro'yxati
-  POST   /api/v1/warehouse/movements/            — harakat yaratish (kirim/chiqim/ko'chirish)
+  POST   /api/v1/warehouse/movements/            — harakat yaratish (kirim/chiqim)
   GET    /api/v1/warehouse/movements/{id}/       — harakat tafsilotlari
 """
 
@@ -39,17 +48,21 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     CategoryViewSet,
+    CurrencyViewSet,
+    ExchangeRateViewSet,
     ProductViewSet,
     StockMovementViewSet,
     StockViewSet,
-    WarehouseViewSet,
+    SubCategoryViewSet,
 )
 
 router = DefaultRouter()
-router.register(r'categories', CategoryViewSet,      basename='category')
-router.register(r'products',   ProductViewSet,       basename='product')
-router.register(r'warehouses', WarehouseViewSet,     basename='warehouse')
-router.register(r'stocks',     StockViewSet,         basename='stock')
-router.register(r'movements',  StockMovementViewSet, basename='movement')
+router.register(r'categories',     CategoryViewSet,     basename='category')
+router.register(r'subcategories',  SubCategoryViewSet,  basename='subcategory')
+router.register(r'currencies',     CurrencyViewSet,     basename='currency')
+router.register(r'exchange-rates', ExchangeRateViewSet, basename='exchange-rate')
+router.register(r'products',       ProductViewSet,      basename='product')
+router.register(r'stocks',         StockViewSet,        basename='stock')
+router.register(r'movements',      StockMovementViewSet, basename='movement')
 
 urlpatterns = router.urls
