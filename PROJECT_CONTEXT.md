@@ -56,7 +56,7 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 | `accaunt`   | ✅ Tugallangan    | CustomUser, Worker, AuditLog, JWT auth — password reset, WorkerList/Detail da store+branch |
 | `store`     | ✅ Tugallangan    | Store, Branch CRUD (soft delete, multi-tenant, workers in detail, Uzbek errors) |
 | `warehouse` | ✅ Tugallangan    | Category, **SubCategory**, Product(+image, +barcode EAN-13, +subcategory, +price_currency), **Currency**, **ExchangeRate**, Stock, StockMovement (race condition tuzatildi) — BOSQICH 1 ✅ |
-| `trade`     | ❌ Boshlanmagan  | BOSQICH 4 — Customer, Sale, SaleItem                   |
+| `trade`     | ✅ Tugallangan   | BOSQICH 4 ✅ — CustomerGroup, Customer (soft delete), Sale (@transaction.atomic, 13-qadam), SaleItem, cancel action, _build_report() to'ldirildi |
 | `expense`   | ❌ Boshlanmagan  | BOSQICH 6 — ExpenseCategory, Expense                   |
 | `StoreSettings` | ✅ Tugallangan  | BOSQICH 2 ✅ — 10 guruh, 30+ maydon, signal+Redis kesh |
 | `Smena`     | ✅ Tugallangan   | BOSQICH 3 ✅ — SmenaStatus+Smena model, SmenaViewSet (open/close/x-report), migration 0005 |

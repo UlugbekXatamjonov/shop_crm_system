@@ -591,12 +591,44 @@ class SmenaViewSet(viewsets.ModelViewSet):
     def _build_report(self, smena: Smena) -> dict:
         """
         X/Z report ma'lumotlarini quriladi.
+        Lazy import ishlatiladi — trade.models dan circular import oldini olish uchun.
 
-        ⚠️ BOSQICH 4 da: Sale modeli qo'shilgandan keyin
-              sales_count, sales_total, by_payment to'ldiriladi.
         ⚠️ BOSQICH 6 da: Expense modeli qo'shilgandan keyin
               expenses_total to'ldiriladi.
         """
+        # Lazy import — trade → store circular import ni oldini oladi
+        from django.db.models import Sum, Count
+        from trade.models import Sale, SaleStatus, PaymentType
+
+        completed_sales = Sale.objects.filter(
+            smena=smena,
+            status=SaleStatus.COMPLETED,
+        )
+
+        # Umumiy ko'rsatkichlar
+        agg = completed_sales.aggregate(
+            total=Sum('total_price'),
+            count=Count('id'),
+        )
+        sales_total = agg['total'] or 0
+        sales_count = agg['count'] or 0
+
+        # To'lov turi bo'yicha
+        def _sum_by_payment(ptype):
+            result = completed_sales.filter(payment_type=ptype).aggregate(
+                s=Sum('paid_amount')
+            )['s']
+            return str(result or '0.00')
+
+        # MIXED savdolarda naqd va karta qismi alohida saqlanmaydi —
+        # paid_amount umumiy to'langan summa sifatida ko'rsatiladi.
+        by_payment = {
+            'cash':  _sum_by_payment(PaymentType.CASH),
+            'card':  _sum_by_payment(PaymentType.CARD),
+            'mixed': _sum_by_payment(PaymentType.MIXED),
+            'debt':  _sum_by_payment(PaymentType.DEBT),
+        }
+
         return {
             'period': {
                 'start': smena.start_time.strftime('%Y-%m-%d | %H:%M'),
@@ -605,15 +637,10 @@ class SmenaViewSet(viewsets.ModelViewSet):
                     if smena.end_time else None
                 ),
             },
-            # --- BOSQICH 4 da qo'shiladi ---
-            'sales_count':  0,
-            'sales_total':  '0.00',
-            'by_payment': {
-                'cash': '0.00',
-                'card': '0.00',
-                'debt': '0.00',
-            },
-            # --- BOSQICH 6 da qo'shiladi ---
+            'sales_count':    sales_count,
+            'sales_total':    str(sales_total),
+            'by_payment':     by_payment,
+            # --- BOSQICH 6 da to'ldiriladi ---
             'expenses_total': '0.00',
             # --- Naqd hisobi ---
             'cash_start': str(smena.cash_start),
