@@ -395,6 +395,13 @@ CORS_ORIGIN_WHITELIST = (
     'http://localhost:3000',
     'https://shop-crm-front.vercel.app',   # ← Production frontend
 )
+
+CORS_ALLOW_HEADERS = [
+    'accept', 'accept-encoding', 'authorization',
+    'content-type', 'dnt', 'origin', 'user-agent',
+    'x-csrftoken', 'x-requested-with',
+    'x-idempotency-key',  # ← Offline rejim uchun (BOSQICH 18) — 03.03.2026 qo'shildi
+]
 ```
 
 ### `production.py` (Railway)
@@ -439,7 +446,19 @@ PORT=8000
 
 ---
 
-## TO'LIQ LOYIHA REJASI — 19 BOSQICH (ASLO UNUTMA)
+## TO'LIQ LOYIHA REJASI — 20 BOSQICH (ASLO UNUTMA)
+
+---
+
+### BOSQICH 0 — Tayyorlov (Infratuzilma) ✅ BAJARILDI
+| # | Vazifa | Holat |
+|---|--------|-------|
+| 0.1 | `MEDIA_URL = '/media/'` va `MEDIA_ROOT = BASE_DIR / 'media'` — `base.py` da | ✅ Allaqachon bor |
+| 0.2 | `urls.py` da `if settings.DEBUG: urlpatterns += static(MEDIA_URL, ...)` | ✅ Allaqachon bor |
+| 0.3 | `CORS_ALLOW_HEADERS` ga `'x-idempotency-key'` qo'shildi (offline rejim uchun) | ✅ 03.03.2026 qo'shildi |
+| 0.4 | `CORS_ALLOW_HEADERS` da barcha kerakli headerlar to'liq | ✅ Allaqachon to'g'ri |
+
+**Natija:** Mahsulot rasmlari, xarajat cheklari, barcha media fayllar ishlaydi. Offline sync header'i qabul qilinadi.
 
 ---
 
@@ -457,18 +476,90 @@ PORT=8000
 
 ### BOSQICH 2 — StoreSettings (Sozlamalar)
 **⚠️ QOIDA 1, 2, 3 SHU YERDA QO'LLANILADI!**
+
+```python
+# StoreSettings modeli (OneToOneField → Store, store app da yashaydi)
+# ============================================================
+# GURUH 1 — Modul on/off flaglari (IXTIYORIY, default=False/True)
+# ============================================================
+subcategory_enabled   = BooleanField(default=False)  # SubCategory (1.1) — kichik do'konlarda off
+sale_return_enabled   = BooleanField(default=True)   # SaleReturn (B5)   — aksariyat do'konlarda on
+wastage_enabled       = BooleanField(default=True)   # WastageRecord (B7) — on, lekin ishlatmaslik mumkin
+stock_audit_enabled   = BooleanField(default=True)   # StockAudit (B8)   — on
+kpi_enabled           = BooleanField(default=False)  # WorkerKPI (B9)    — faqat xohlagan owner yoqadi
+price_list_enabled    = BooleanField(default=False)  # PriceList (B12)   — faqat ulgurji/retail farq uchun
+
+# ============================================================
+# GURUH 2 — Valyuta sozlamalari
+# ============================================================
+default_currency      = CharField(max_length=3, default='UZS')  # UZS | USD | RUB
+show_usd_price        = BooleanField(default=False)  # USD narxini ko'rsatish
+show_rub_price        = BooleanField(default=False)  # RUB narxini ko'rsatish
+
+# ============================================================
+# GURUH 3 — To'lov sozlamalari
+# ============================================================
+allow_cash            = BooleanField(default=True)   # Naqd to'lov
+allow_card            = BooleanField(default=True)   # Karta to'lov
+allow_debt            = BooleanField(default=False)  # Nasiya (qarz)
+
+# ============================================================
+# GURUH 4 — Chegirma sozlamalari
+# ============================================================
+allow_discount        = BooleanField(default=True)   # Chegirma berish ruxsati
+max_discount_percent  = DecimalField(default=0)      # Maksimal chegirma foizi (0 = cheksiz)
+
+# ============================================================
+# GURUH 5 — Chek sozlamalari
+# ============================================================
+receipt_header        = TextField(blank=True)        # Chek yuqori matni
+receipt_footer        = TextField(blank=True)        # Chek pastki matni
+show_store_logo       = BooleanField(default=False)  # Chekda do'kon logosi
+show_worker_name      = BooleanField(default=True)   # Chekda kassir ismi
+
+# ============================================================
+# GURUH 6 — Ombor sozlamalari
+# ============================================================
+low_stock_enabled     = BooleanField(default=True)   # Kam qoldiq ogohlantirish
+low_stock_threshold   = IntegerField(default=5)      # Ogohlantirish chegarasi (dona)
+
+# ============================================================
+# GURUH 7 — Smena sozlamalari
+# ============================================================
+shift_enabled         = BooleanField(default=False)  # Smena tizimi
+shifts_per_day        = IntegerField(default=1)      # Kunlik smena soni (1/2/3)
+require_cash_count    = BooleanField(default=False)  # Smena ochish/yopishda naqd hisoblash majburiy
+
+# ============================================================
+# GURUH 8 — Telegram sozlamalari
+# ============================================================
+telegram_enabled      = BooleanField(default=False)  # Telegram bildirishnomalar
+telegram_chat_id      = CharField(max_length=50, null=True, blank=True)
+
+# ============================================================
+# GURUH 9 — Soliq sozlamalari (OFD v2 uchun)
+# ============================================================
+tax_enabled           = BooleanField(default=False)  # QQS (OFD v2 da majburiy)
+tax_percent           = DecimalField(default=12)     # QQS foizi (O'zbekistonda 12%)
+ofd_enabled           = BooleanField(default=False)  # OFD integratsiya (v2)
+ofd_token             = CharField(max_length=255, null=True, blank=True)
+ofd_device_id         = CharField(max_length=100, null=True, blank=True)
+
+# ============================================================
+# GURUH 10 — Yetkazib beruvchi sozlamalari (v2)
+# ============================================================
+supplier_credit_enabled = BooleanField(default=False)  # Yetkazib beruvchi qarz hisobi
 ```
-StoreSettings (OneToOneField → Store, store app da yashaydi):
-  Valyuta:           default_currency(UZS/USD/RUB), show_usd_price, show_rub_price
-  To'lov:            allow_cash, allow_card, allow_debt (nasiya ruxsati)
-  Chegirma:          allow_discount, max_discount_percent
-  Chek:              receipt_header, receipt_footer, show_store_logo, show_worker_name
-  Ombor:             low_stock_enabled, low_stock_threshold (ogohlantirish chegarasi)
-  Smena:             shift_enabled, shifts_per_day(1/2/3), require_cash_count
-  Telegram:          telegram_enabled, telegram_chat_id
-  Yetkazib beruvchi: supplier_credit_enabled
-  Soliq:             tax_enabled, tax_percent
+
+**Barcha flaglar uchun ViewSet tekshirish pattern:**
+```python
+def perform_create(self, serializer):
+    settings = get_store_settings(self.request.user.worker.store_id)  # QOIDA 3 (Redis kesh)
+    if not settings.sale_return_enabled:
+        raise PermissionDenied("Qaytarish bu do'konda o'chirilgan.")
+    serializer.save(worker=self.request.user.worker)
 ```
+
 **Signal:** Store yaratilganda `StoreSettings` AVTOMATIK yaratiladi (QOIDA 1).
 
 ---
@@ -847,8 +938,9 @@ AuditLog read API (accaunt app da):
 
 ### REJANING UMUMIY KETMA-KETLIGI (QAYTA ESLATMA)
 ```
-1  ✅→❌  warehouse (SubCategory, Barcode, Currency, Celery kurs)
-2  ❌     StoreSettings (3 QOIDA!)
+0  ✅     Tayyorlov: MEDIA fayllar, CORS headers (x-idempotency-key) ← BAJARILDI
+1  ❌     warehouse (SubCategory, Barcode, Currency, Celery kurs)
+2  ❌     StoreSettings (3 QOIDA! + barcha ixtiyoriy flaglar)
 3  ❌     Smena (shift)
 4  ❌     trade (Customer, Sale, SaleItem)
 5  ❌     SaleReturn (qaytarish)           ← YANGI
@@ -866,6 +958,19 @@ AuditLog read API (accaunt app da):
 17 ❌     Dashboard
 18 ❌     Offline rejim                    ← YANGI
 19 ❌     QR kod + AuditLog API
+
+IXTIYORIY FLAGLAR (StoreSettings da, har do'kon uchun alohida):
+  subcategory_enabled  → default=False (B1)
+  sale_return_enabled  → default=True  (B5)
+  wastage_enabled      → default=True  (B7)
+  stock_audit_enabled  → default=True  (B8)
+  kpi_enabled          → default=False (B9)
+  price_list_enabled   → default=False (B12)
+  shift_enabled        → default=False (B3) — allaqachon bor
+  telegram_enabled     → default=False (B11) — allaqachon bor
+  allow_debt           → default=False (B4) — allaqachon bor
+  show_usd/rub_price   → default=False (B1.3) — allaqachon bor
+  ofd_enabled          → default=False (B14) — v2
 ```
 
 ---
@@ -895,11 +1000,12 @@ myenv/Scripts/python.exe manage.py migrate appname --settings=config.settings.lo
 
 ### Git log (so'nggi commitlar, 03.03.2026)
 ```
-d5cfc0e  docs: 3 qoida + to'liq loyiha rejasi PROJECT_CONTEXT ga qo'shildi (worktree)
-e60b59b  feat(warehouse): Product.image qo'shildi (worktree)
-9ce1d81  docs: 3 qoida + to'liq loyiha rejasi PROJECT_CONTEXT ga qo'shildi (main, cherry-pick)
+(joriy)  feat: BOSQICH 0 bajarildi — CORS x-idempotency-key, 20-bosqichli to'liq reja
+e69d660  docs: loyiha rejasi 9 bosqichdan 19 bosqichga yangilandi (worktree)
+b55551b  docs: loyiha rejasi 9 bosqichdan 19 bosqichga yangilandi (main, cherry-pick)
+9ce1d81  docs: 3 qoida + to'liq loyiha rejasi PROJECT_CONTEXT ga qo'shildi (main)
 d1fc1b8  feat(warehouse): Product.image + WarehouseListSerializer.address (main)
-9466a72  fix: 3 ta muhim xato tuzatildi — race condition, hardcoded URL, string comparison (main)
+9466a72  fix: 3 ta muhim xato tuzatildi — race condition, hardcoded URL, string comparison
 ```
 
 ### Qo'shilgan xususiyatlar (03.03.2026)
@@ -907,6 +1013,9 @@ d1fc1b8  feat(warehouse): Product.image + WarehouseListSerializer.address (main)
 |-----------|------|------|
 | `Product.image` | `warehouse/models.py` | Ixtiyoriy `ImageField(upload_to='products/')` — migration 0004 |
 | `WarehouseListSerializer.address` | `warehouse/serializers.py` | Ombor ro'yxatida manzil ham ko'rsatiladi |
+| `CORS_ALLOW_HEADERS += 'x-idempotency-key'` | `config/settings/base.py` | Offline rejim uchun (BOSQICH 18) |
+| BOSQICH 0 tayyorlov | `base.py`, `urls.py` | MEDIA fayllar allaqachon to'g'ri sozlangan — tasdiqlandi |
+| 20-bosqichli loyiha rejasi | `PROJECT_CONTEXT.md` | Barcha ixtiyoriy flaglar (subcategory, sale_return, wastage, stock_audit, kpi, price_list) qo'shildi |
 
 ### Tuzatilgan xatolar (03.03.2026)
 | Xato | Joyi | Tuzatish |
