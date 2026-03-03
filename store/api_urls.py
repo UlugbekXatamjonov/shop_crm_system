@@ -1,6 +1,6 @@
 """
 ============================================================
-STORE APP — Do'kon, Filial va Sozlamalar API URL'lari
+STORE APP — Do'kon, Filial, Sozlamalar va Smena API URL'lari
 ============================================================
 Prefix: /api/v1/
 
@@ -21,15 +21,23 @@ Router avtomatik quyidagi URL'larni yaratadi:
   GET    /api/v1/settings/         — do'kon sozlamalari (CanAccess('sozlamalar'))
   PATCH  /api/v1/settings/{id}/    — sozlamalarni yangilash (faqat owner)
   [create va delete YO'Q — signal avtomatik yaratadi]
+
+  GET    /api/v1/shifts/               — smenalar ro'yxati (?status=open|closed, ?branch=id)
+  POST   /api/v1/shifts/               — smena ochish
+  GET    /api/v1/shifts/{id}/          — smena tafsilotlari
+  PATCH  /api/v1/shifts/{id}/close/    — smena yopish (Z-report)
+  GET    /api/v1/shifts/{id}/x-report/ — X-report (smena yopilmaydi)
+  [delete YO'Q — smenalar o'chirilmaydi]
 """
 
 from rest_framework.routers import DefaultRouter
 
-from .views import BranchViewSet, StoreSettingsViewSet, StoreViewSet
+from .views import BranchViewSet, SmenaViewSet, StoreSettingsViewSet, StoreViewSet
 
 router = DefaultRouter()
 router.register(r'stores',   StoreViewSet,         basename='store')
 router.register(r'branches', BranchViewSet,        basename='branch')
 router.register(r'settings', StoreSettingsViewSet, basename='store-settings')
+router.register(r'shifts',   SmenaViewSet,         basename='smena')
 
 urlpatterns = router.urls

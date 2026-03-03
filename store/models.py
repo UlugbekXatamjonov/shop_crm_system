@@ -10,6 +10,10 @@ Modellar:
                    BOSQICH 2: 10 guruh, 30+ maydon
                    Signal orqali Store yaratilganda avtomatik yaratiladi (QOIDA 1)
                    Redis keshi orqali tez yuklash (QOIDA 3)
+  SmenaStatus    — Smena holatlari: open | closed (BOSQICH 3)
+  Smena          — Kassir smenasi (BOSQICH 3)
+                   Har bir filial uchun bir vaqtda faqat bitta OPEN smena
+                   shift_enabled=True bo'lsa sotuv smena mavjud bo'lganda mumkin
 """
 
 from django.db import models
@@ -342,3 +346,98 @@ class StoreSettings(models.Model):
 
     def __str__(self) -> str:
         return f"{self.store.name} — sozlamalari"
+
+
+# ============================================================
+# SMENA — BOSQICH 3
+# ============================================================
+
+class SmenaStatus(models.TextChoices):
+    OPEN   = 'open',   'Ochiq'
+    CLOSED = 'closed', 'Yopiq'
+
+
+class Smena(models.Model):
+    """
+    Kassir smenasi.
+
+    ⚠️ QOIDA: Bir filialda bir vaqtda faqat bitta OPEN smena bo'lishi shart.
+               Bu views.py da perform_create da tekshiriladi.
+
+    ⚠️ Multi-tenant: store FK — worker.store_id bilan to'g'ridan-to'g'ri
+               filtrlash uchun (branch__store JOIN qilmasdan).
+
+    ⚠️ shift_enabled=True bo'lsa sotuv faqat OPEN smena mavjud bo'lganda
+               bajarilishi mumkin (BOSQICH 4 da tekshiriladi).
+
+    Hisobotlar:
+      X-report — smena davomidagi hisobot (smena yopilmaydi)
+      Z-report — smenani yopadi + yakuniy hisobot
+                 (BOSQICH 4/6 da Sale/Expense qo'shilgandan keyin to'ldiriladi)
+    """
+    branch = models.ForeignKey(
+        'Branch',
+        on_delete=models.PROTECT,
+        related_name='smenas',
+        verbose_name='Filial',
+    )
+    store = models.ForeignKey(
+        'Store',
+        on_delete=models.PROTECT,
+        related_name='smenas',
+        verbose_name="Do'kon",
+    )
+    worker_open = models.ForeignKey(
+        'accaunt.Worker',
+        on_delete=models.PROTECT,
+        related_name='opened_smenas',
+        verbose_name='Smena ochgan xodim',
+    )
+    worker_close = models.ForeignKey(
+        'accaunt.Worker',
+        on_delete=models.PROTECT,
+        related_name='closed_smenas',
+        null=True,
+        blank=True,
+        verbose_name='Smena yopgan xodim',
+    )
+    start_time = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Boshlanish vaqti',
+    )
+    end_time = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Tugash vaqti',
+    )
+    status = models.CharField(
+        max_length=10,
+        choices=SmenaStatus.choices,
+        default=SmenaStatus.OPEN,
+        verbose_name='Holat',
+    )
+    cash_start = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+        verbose_name="Boshlang'ich naqd (so'm)",
+    )
+    cash_end = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Yakuniy naqd (so'm)",
+    )
+    note = models.TextField(
+        blank=True,
+        verbose_name='Izoh',
+    )
+
+    class Meta:
+        verbose_name        = 'Smena'
+        verbose_name_plural = 'Smenalar'
+        ordering            = ['-start_time']
+
+    def __str__(self) -> str:
+        return f"Smena #{self.pk} — {self.branch.name} ({self.get_status_display()})"

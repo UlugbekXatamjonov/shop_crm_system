@@ -18,7 +18,7 @@ StoreSettings serializerlari (BOSQICH 2):
 
 from rest_framework import serializers
 
-from .models import Branch, Store, StoreSettings, StoreStatus
+from .models import Branch, Smena, SmenaStatus, Store, StoreSettings, StoreStatus
 
 
 def _worker_short(worker) -> dict:
@@ -354,3 +354,106 @@ class StoreSettingsUpdateSerializer(serializers.ModelSerializer):
             })
 
         return attrs
+
+
+# ============================================================
+# SMENA SERIALIZERLARI — BOSQICH 3
+# ============================================================
+
+class SmenaListSerializer(serializers.ModelSerializer):
+    """
+    Smenalar ro'yxati uchun qisqa serializer.
+    GET /api/v1/shifts/ da ishlatiladi.
+    """
+    branch_name      = serializers.CharField(source='branch.name', read_only=True)
+    status_display   = serializers.CharField(source='get_status_display', read_only=True)
+    worker_open_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = Smena
+        fields = (
+            'id', 'branch', 'branch_name',
+            'status', 'status_display',
+            'start_time', 'end_time',
+            'worker_open_name',
+        )
+
+    def get_worker_open_name(self, obj: Smena) -> str:
+        return str(obj.worker_open.user) if obj.worker_open else None
+
+
+class SmenaDetailSerializer(serializers.ModelSerializer):
+    """
+    Smenaning to'liq ma'lumoti.
+    GET /api/v1/shifts/{id}/ va close/x-report action da ishlatiladi.
+    """
+    branch_name       = serializers.CharField(source='branch.name', read_only=True)
+    store_name        = serializers.CharField(source='store.name',  read_only=True)
+    status_display    = serializers.CharField(source='get_status_display', read_only=True)
+    worker_open_name  = serializers.SerializerMethodField()
+    worker_close_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = Smena
+        fields = (
+            'id',
+            'branch', 'branch_name',
+            'store',  'store_name',
+            'status', 'status_display',
+            'worker_open',  'worker_open_name',
+            'worker_close', 'worker_close_name',
+            'start_time', 'end_time',
+            'cash_start', 'cash_end',
+            'note',
+        )
+
+    def get_worker_open_name(self, obj: Smena) -> str | None:
+        return str(obj.worker_open.user) if obj.worker_open else None
+
+    def get_worker_close_name(self, obj: Smena) -> str | None:
+        return str(obj.worker_close.user) if obj.worker_close else None
+
+
+class SmenaOpenSerializer(serializers.ModelSerializer):
+    """
+    Smena ochish uchun serializer.
+    POST /api/v1/shifts/ da ishlatiladi.
+
+    Maydonlar:
+      branch     — Qaysi filialda smena ochilmoqda (majburiy)
+      cash_start — Boshlang'ich naqd miqdori (ixtiyoriy, default=0)
+                   require_cash_count=True bo'lsa views.py da majburiy tekshiriladi
+      note       — Izoh (ixtiyoriy)
+
+    store, worker_open, status — views.py perform_create da avtomatik to'ldiriladi.
+    """
+
+    class Meta:
+        model  = Smena
+        fields = ('branch', 'cash_start', 'note')
+        extra_kwargs = {
+            'cash_start': {'required': False},
+            'note':       {'required': False},
+        }
+
+
+class SmenaCloseSerializer(serializers.ModelSerializer):
+    """
+    Smena yopish uchun serializer.
+    PATCH /api/v1/shifts/{id}/close/ da ishlatiladi.
+
+    Maydonlar:
+      cash_end — Yakuniy naqd miqdori (ixtiyoriy)
+                 require_cash_count=True bo'lsa views.py da majburiy tekshiriladi
+      note     — Izoh (ixtiyoriy, yangilanadi)
+
+    worker_close, end_time, status — views.py close action da avtomatik to'ldiriladi.
+    """
+
+    class Meta:
+        model  = Smena
+        fields = ('cash_end', 'note')
+        extra_kwargs = {
+            'cash_end': {'required': False},
+            'note':     {'required': False},
+        }

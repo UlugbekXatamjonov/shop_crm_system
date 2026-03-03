@@ -59,7 +59,7 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 | `trade`     | ❌ Boshlanmagan  | BOSQICH 4 — Customer, Sale, SaleItem                   |
 | `expense`   | ❌ Boshlanmagan  | BOSQICH 6 — ExpenseCategory, Expense                   |
 | `StoreSettings` | ✅ Tugallangan  | BOSQICH 2 ✅ — 10 guruh, 30+ maydon, signal+Redis kesh |
-| `Smena`     | ❌ Boshlanmagan  | BOSQICH 3 — store yoki trade app da                    |
+| `Smena`     | ✅ Tugallangan   | BOSQICH 3 ✅ — SmenaStatus+Smena model, SmenaViewSet (open/close/x-report), migration 0005 |
 | `SaleReturn` | ❌ Boshlanmagan | BOSQICH 5 — trade app da                               |
 | `WastageRecord` | ❌ Boshlanmagan | BOSQICH 7 — warehouse app da                        |
 | `StockAudit` | ❌ Boshlanmagan | BOSQICH 8 — warehouse app da                           |
@@ -582,22 +582,43 @@ def perform_create(self, serializer):
 
 ---
 
-### BOSQICH 3 — Smena (Shift)
+### BOSQICH 3 — Smena (Shift) ✅ BAJARILDI (03.03.2026)
 ```
 Smena model (store app da yashaydi):
   branch(FK), store(FK)
   worker_open(FK→Worker), worker_close(FK→Worker, null)
-  start_time, end_time(null)
-  status: open | closed
-  cash_start, cash_end(null)
+  start_time(auto_now_add), end_time(null)
+  status: open | closed   (SmenaStatus TextChoices)
+  cash_start(DecimalField, default=0), cash_end(null)
   note(blank)
-
-→ Sale, SaleReturn, Expense ga smena(FK, null) qo'shiladi
-→ StoreSettings.shift_enabled=True bo'lsa smena ochilmasa sotuv bloklanadi
-→ X-report: smena davomidagi hisobot (smena YOPILMAYDI)
-→ Z-report: smenani yopadi + yakuniy hisobot generatsiya qiladi
-→ Endpoint: POST /api/v1/shifts/ (ochish), PATCH /api/v1/shifts/{id}/close/ (yopish)
+  ordering: ['-start_time']
 ```
+
+**Endpointlar:**
+- `GET  /api/v1/shifts/`                 — ro'yxat (?status=open|closed, ?branch=id)
+- `POST /api/v1/shifts/`                 — smena ochish
+- `GET  /api/v1/shifts/{id}/`            — to'liq ma'lumot
+- `PATCH /api/v1/shifts/{id}/close/`     — Z-report + yopish
+- `GET  /api/v1/shifts/{id}/x-report/`  — X-report (yopilmaydi)
+
+**Biznes qoidalari:**
+- shift_enabled=False → smena ochib bo'lmaydi (403)
+- Bir filialda bir vaqtda faqat bitta OPEN smena (400)
+- require_cash_count=True → cash_start/cash_end majburiy
+- Yopilgan smenani qayta yopib bo'lmaydi (400)
+
+**Keyingi bosqichlarda to'ldiriladi:**
+- BOSQICH 4 (Sale): Sale.smena(FK,null) + X/Z report da savdolar
+- BOSQICH 6 (Expense): Expense.smena(FK,null) + X/Z report da xarajatlar
+
+**Yangi fayllar:**
+- `store/migrations/0005_smena.py` — Smena jadval migratsiyasi
+
+**Yangilangan fayllar:**
+- `store/models.py` — SmenaStatus + Smena model qo'shildi
+- `store/serializers.py` — SmenaListSerializer, SmenaDetailSerializer, SmenaOpenSerializer, SmenaCloseSerializer
+- `store/views.py` — SmenaViewSet (create, close action, x_report action, _build_report)
+- `store/api_urls.py` — /shifts/ router qo'shildi
 
 ---
 
