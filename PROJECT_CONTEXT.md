@@ -249,7 +249,7 @@ permissions  # ["sotuv", "ombor", ...]  — to'liq ro'yxat almashadi
 | Model           | Maydonlar                                                                 | Constraint |
 |-----------------|---------------------------------------------------------------------------|------------|
 | `Category`      | name, description, store(FK), status, created_on                          | `unique_together = [('store','name')]` |
-| `Product`       | name, category(FK), unit, purchase_price, sale_price, barcode, store(FK), status, created_on | `unique_together = [('store','name'), ('store','barcode')]` |
+| `Product`       | name, category(FK), unit, purchase_price, sale_price, barcode, image(nullable), store(FK), status, created_on | `unique_together = [('store','name'), ('store','barcode')]` |
 | `Stock`         | product(FK), branch(FK), quantity, updated_on                             | `unique_together = [('product','branch')]` |
 | `StockMovement` | product(FK), branch(FK), movement_type(in/out), quantity, note, worker(FK), created_on | — |
 
@@ -259,17 +259,20 @@ permissions  # ["sotuv", "ombor", ...]  — to'liq ro'yxat almashadi
 - `MovementType`: in (Kirim), out (Chiqim)
 
 ### Migratsiyalar
-| Migration | Izoh                                                         |
-|-----------|--------------------------------------------------------------|
-| 0001      | Dastlabki modellar                                           |
-| 0002      | Product unique_together [('store','name'), ('store','barcode')] qo'shildi |
+| Migration | Izoh                                                              |
+|-----------|-------------------------------------------------------------------|
+| 0001      | Dastlabki modellar                                                |
+| 0002      | Product unique_together [('store','name'), ('store','barcode')]   |
+| 0003      | Warehouse, TRANSFER, from/to branch/warehouse (main da)          |
+| 0004      | Product.image ImageField qo'shildi (main da 0004, worktree da 0003) |
 
 ### Endpointlar
 ```
-GET/POST   /api/v1/warehouse/categories/   + PATCH/DELETE /{id}/
-GET/POST   /api/v1/warehouse/products/     + PATCH/DELETE /{id}/
-GET/POST   /api/v1/warehouse/stocks/       + PATCH/DELETE /{id}/
-GET/POST   /api/v1/warehouse/movements/    + GET          /{id}/   (immutable)
+GET/POST   /api/v1/warehouse/categories/    + PATCH/DELETE /{id}/
+GET/POST   /api/v1/warehouse/products/      + PATCH/DELETE /{id}/
+GET/POST   /api/v1/warehouse/warehouses/    + PATCH/DELETE /{id}/   (faqat main da)
+GET/POST   /api/v1/warehouse/stocks/        + PATCH/DELETE /{id}/
+GET/POST   /api/v1/warehouse/movements/     + GET          /{id}/   (immutable)
 ```
 
 ### Ruxsatlar
@@ -419,6 +422,12 @@ myenv/Scripts/python.exe manage.py migrate appname --settings=config.settings.lo
 2652da4  feat(auth): parolni tiklash endpointlari qo'shildi va change-password tuzatildi
 73ba2de  feat(accaunt): WorkerList/Detail da branch_id, branch_name, store_id, store_name qo'shildi
 ```
+
+### Qo'shilgan xususiyatlar (03.03.2026)
+| Xususiyat | Joyi | Izoh |
+|-----------|------|------|
+| `Product.image` | `warehouse/models.py` | Ixtiyoriy `ImageField(upload_to='products/')` — migration 0004 |
+| `WarehouseListSerializer.address` | `warehouse/serializers.py` | Ombor ro'yxatida manzil ham ko'rsatiladi |
 
 ### Tuzatilgan xatolar (03.03.2026)
 | Xato | Joyi | Tuzatish |
