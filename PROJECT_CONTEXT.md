@@ -1,5 +1,41 @@
 # CLAUDE UCHUN ESLATMA — Yangi chatda bu faylni o'qi va davom et
 
+## ⚠️ MUHIM: 3 TA QOIDA (HECH QACHON UNUTMA)
+
+### QOIDA 1 — StoreSettings SIGNAL
+Store yaratilganda AVTOMATIK default StoreSettings yaratilishi SHART:
+```python
+@receiver(post_save, sender=Store)
+def create_store_settings(sender, instance, created, **kwargs):
+    if created:
+        StoreSettings.objects.create(store=instance)
+```
+**Sabab:** Hech qachon "sozlamalar topilmadi" xatosi bo'lmasligi kerak.
+
+### QOIDA 2 — select_related BILAN TORTISH
+Settings ga murojaat qilganda DOIM select_related:
+```python
+worker.store  # allaqachon worker bilan keladigan
+store.settings  # + 1 JOIN, undan ko'p emas
+# Yoki ViewSet da: queryset.select_related('store__settings')
+```
+**Sabab:** N+1 query muammosi bo'lmasin.
+
+### QOIDA 3 — Redis KESH (5 daqiqa)
+```python
+def get_store_settings(store_id):
+    key = f'store_settings_{store_id}'
+    settings = cache.get(key)
+    if not settings:
+        settings = StoreSettings.objects.get(store_id=store_id)
+        cache.set(key, settings, timeout=300)
+    return settings
+# Sozlamalar o'zgarganda: cache.delete(f'store_settings_{store_id}')
+```
+**Sabab:** 200 do'kon × tez-tez bir xil so'rov → DB ga har gal bormasin.
+
+---
+
 ## Sen kim bilan ishlayapsan
 Foydalanuvchi: Ulugbek (Django dasturchisi)
 Loyiha: `D:\projects\shop_crm_system` (GitHub: `UlugbekXatamjonov/shop_crm_system`, `main` branch)
@@ -380,15 +416,85 @@ PORT=8000
 
 ---
 
-## KEYINGI ISHLAR (navbat)
+## TO'LIQ LOYIHA REJASI (ASLO UNUTMA)
 
-### `trade` app — to'liq qurish kerak
-- `Sale` — sotuv (Branch, Worker, vaqt, jami summa)
-- `SaleItem` — sotuv tarkibi (Sale, Product, miqdor, narx)
+### BOSQICH 1 — warehouse ni to'ldirish
+| # | Vazifa | Holat |
+|---|--------|-------|
+| 1.1 | SubCategory (Category → SubCategory → Product) | ❌ Qilinmagan |
+| 1.2 | Barcode auto-generate (EAN-13, prefix 2XXXX, python-barcode) | ❌ Qilinmagan |
+| 1.3 | Multi-valyuta: Currency + ExchangeRate + price_currency on Product | ❌ Qilinmagan |
+| 1.4 | Celery task: kurs kunlik avtomatik yangilanishi (CBU API) | ❌ Qilinmagan |
 
-### `expense` app — to'liq qurish kerak
-- `ExpenseCategory` — xarajat kategoriyasi
-- `Expense` — xarajat (Branch, Worker, miqdor, izoh, sana)
+### BOSQICH 2 — StoreSettings (Sozlamalar)
+**Qoida 1, 2, 3 shu yerda qo'llaniladi!**
+```
+StoreSettings (OneToOneField → Store):
+  Valyuta:        default_currency, show_usd_price, show_rub_price
+  To'lov:         allow_cash, allow_card, allow_debt (nasiya)
+  Chegirma:       allow_discount, max_discount_percent
+  Chek:           receipt_header, receipt_footer, show_store_logo, show_worker_name
+  Ombor:          low_stock_enabled, low_stock_threshold
+  Smena:          shift_enabled, shifts_per_day (1/2/3), require_cash_count
+  Yetkazib beruvchi: supplier_credit_enabled
+  Soliq:          tax_enabled, tax_percent
+```
+
+### BOSQICH 3 — Smena (Shift)
+```
+Smena:
+  branch(FK), store(FK), worker_open(FK), worker_close(FK, null)
+  start_time, end_time(null), status(open/closed)
+  cash_start, cash_end(null)
+→ Sale va Expense ga smena(FK, null) qo'shiladi
+→ StoreSettings.shift_enabled=True bo'lsa MAJBURIY
+```
+
+### BOSQICH 4 — trade app
+```
+Customer:    name, phone, address, debt_balance, store(FK), created_on
+Sale:        branch(FK), worker(FK), customer(FK,null), smena(FK,null),
+             total_price, discount_amount, payment_type, created_on
+SaleItem:    sale(FK), product(FK), quantity, unit_price, total_price
+→ Sale yaratilganda: StockMovement(OUT) AVTOMATIK
+→ store.settings.allow_debt tekshiriladi
+→ store.settings.max_discount_percent tekshiriladi
+```
+
+### BOSQICH 5 — expense app
+```
+ExpenseCategory: name, store(FK), status
+Expense:         category(FK), branch(FK), worker(FK), smena(FK,null),
+                 amount, description, date, receipt_image(null)
+```
+
+### BOSQICH 6 — Yetkazib beruvchi (Supplier)
+```
+Supplier:       name, phone, company, store(FK), debt_balance, status
+PurchaseOrder:  supplier(FK), branch/warehouse(FK), worker(FK), total, created_on
+PurchaseItem:   order(FK), product(FK), quantity, unit_price
+→ PurchaseOrder tasdiqlanganda: StockMovement(IN) AVTOMATIK
+```
+
+### BOSQICH 7 — Celery tasks (barcha tasklar)
+```
+- ExchangeRate kunlik yangilanishi (CBU API)
+- Low stock ogohlantirish (settings.low_stock_threshold)
+- Kunlik smena hisoboti (email/Telegram)
+- Yetkazib beruvchi qarz eslatmasi
+```
+
+### BOSQICH 8 — Export + Dashboard
+```
+Export (Excel/PDF):  mahsulotlar, harakatlar, savdolar, xarajatlar, smena hisoboti
+Dashboard:           bugungi sotuv, top mahsulotlar, ombor holati, xarajatlar, foyda
+```
+
+### BOSQICH 9 — QR kod + AuditLog API
+```
+QR kod: mahsulot uchun, savdo cheki uchun
+AuditLog read API: /api/v1/audit-logs/ (faqat GET)
+```
 
 ---
 
