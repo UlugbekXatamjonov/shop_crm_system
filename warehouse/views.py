@@ -19,7 +19,9 @@ StockMovement:
   Yaratishda Stock qoldig'i avtomatik yangilanadi.
 """
 
-from django.db.models import Case, IntegerField, Value, When
+from django.db import transaction
+from django.db.models import Case, F, IntegerField, Value, When
+from django.utils import timezone
 
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
@@ -665,6 +667,7 @@ class StockMovementViewSet(viewsets.ModelViewSet):
         """
         Berilgan joydagi qoldiqni delta ga o'zgartiradi.
         delta > 0 — qo'shish, delta < 0 — ayirish.
+        F() expression + select_for_update() — parallel so'rovlarda race condition yo'q.
         """
         filter_kwargs = {'product': product}
         if branch:
@@ -672,12 +675,14 @@ class StockMovementViewSet(viewsets.ModelViewSet):
         else:
             filter_kwargs['warehouse'] = warehouse
 
-        stock, _ = Stock.objects.get_or_create(
+        stock, _ = Stock.objects.select_for_update().get_or_create(
             **filter_kwargs,
             defaults={'quantity': 0},
         )
-        stock.quantity += delta
-        stock.save(update_fields=['quantity', 'updated_on'])
+        Stock.objects.filter(pk=stock.pk).update(
+            quantity=F('quantity') + delta,
+            updated_on=timezone.now(),
+        )
 
     def perform_create(self, serializer):
         worker   = getattr(self.request.user, 'worker', None)

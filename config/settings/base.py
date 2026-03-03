@@ -202,6 +202,13 @@ REST_FRAMEWORK = {
 
 
 # ============================================================
+# FRONTEND URL (parol tiklash havolasi uchun)
+# ============================================================
+
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://shop-crm-front.vercel.app')
+
+
+# ============================================================
 # CORS SOZLAMALARI (Frontend bilan ishlash)
 # ============================================================
 

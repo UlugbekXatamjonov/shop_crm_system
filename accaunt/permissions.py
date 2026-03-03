@@ -17,7 +17,7 @@ Ierarxiya:
 from rest_framework.permissions import BasePermission
 from rest_framework.request import Request
 
-from .models import WorkerRole
+from .models import WorkerRole, WorkerStatus
 
 
 # ============================================================
@@ -85,7 +85,7 @@ class IsSotuvchiOrAbove(BasePermission):
 
     def has_permission(self, request: Request, view) -> bool:
         worker = _get_worker(request)
-        return bool(worker and worker.status == 'active')
+        return bool(worker and worker.status == WorkerStatus.ACTIVE)
 
 
 class CanAccess(BasePermission):

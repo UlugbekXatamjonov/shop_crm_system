@@ -20,6 +20,7 @@ Serializer'lar ikki guruhga bo'lingan:
    - WorkerUpdateSerializer     — hodimni yangilash (user+worker+permissions bitta PATCH da)
 """
 
+from django.conf import settings
 from django.contrib.auth import authenticate
 from django.utils.encoding import smart_str, force_bytes, DjangoUnicodeDecodeError
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
@@ -226,7 +227,7 @@ class SendPasswordResetEmailSerializer(serializers.Serializer):
 
         uid   = urlsafe_base64_encode(force_bytes(user.id))
         token = PasswordResetTokenGenerator().make_token(user)
-        link  = f'http://localhost:3000/reset-password/{uid}/{token}'
+        link  = f'{settings.FRONTEND_URL}/reset-password/{uid}/{token}'
 
         Util.send_email({
             'subject': 'Parolni tiklash',
