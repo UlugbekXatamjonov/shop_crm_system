@@ -13,7 +13,7 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 
 ---
 
-## LOYIHA HOLATI (27.02.2026)
+## LOYIHA HOLATI (03.03.2026)
 
 | App         | Holat             | Izoh                                                   |
 |-------------|-------------------|--------------------------------------------------------|
@@ -115,11 +115,12 @@ permissions  # ["sotuv", "ombor", ...]  — to'liq ro'yxat almashadi
 ```
 
 ### Permission klasslari (`accaunt/permissions.py`)
-| Klass            | Shart                                          |
-|------------------|------------------------------------------------|
-| `IsOwner`        | `worker.role == 'owner'`                       |
-| `IsManagerOrAbove` | `worker.role in ('owner', 'manager')`        |
-| `CanAccess(code)`| `worker.has_permission(code)`                  |
+| Klass              | Shart                                          |
+|--------------------|------------------------------------------------|
+| `IsOwner`          | `worker.role == WorkerRole.OWNER`              |
+| `IsManagerOrAbove` | `worker.role in {WorkerRole.OWNER, WorkerRole.MANAGER}` |
+| `IsSotuvchiOrAbove`| `worker.status == WorkerStatus.ACTIVE`         |
+| `CanAccess(code)`  | `worker.has_permission(code)`                  |
 
 ### Endpointlar
 
@@ -277,7 +278,7 @@ GET/POST   /api/v1/warehouse/movements/    + GET          /{id}/   (immutable)
 - `StockMovement` → faqat `GET` va `POST` (http_method_names = ['get', 'post'])
 
 ### Muhim logika
-- **StockMovement POST** → `Stock.quantity` avtomatik yangilanadi (`get_or_create`)
+- **StockMovement POST** → `Stock.quantity` avtomatik yangilanadi (`@transaction.atomic` + `select_for_update()` + `F()` expression — race condition yo'q)
 - **Chiqim (`out`)** uchun qoldiq serializer'da tekshiriladi (yetarli bo'lmasa → 400)
 - **Soft delete**: Category, Product (`status='inactive'`)
 - **Stock** → hard delete (o'chirish mumkin)
@@ -286,7 +287,15 @@ GET/POST   /api/v1/warehouse/movements/    + GET          /{id}/   (immutable)
 
 ---
 
-## CONFIG — MUHIM SOZLAMALAR (27.02.2026)
+## CONFIG — MUHIM SOZLAMALAR (03.03.2026)
+
+### `config/settings/base.py` — FRONTEND_URL
+```python
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://shop-crm-front.vercel.app')
+# Parol tiklash havolasi uchun ishlatiladi
+# SendPasswordResetEmailSerializer: f'{settings.FRONTEND_URL}/reset-password/{uid}/{token}'
+```
+**Railway Variables ga qo'shish kerak:** `FRONTEND_URL=https://shop-crm-front.vercel.app`
 
 ### `config/settings/base.py` — REST_FRAMEWORK
 ```python
@@ -402,14 +411,21 @@ myenv/Scripts/python.exe manage.py makemigrations appname --settings=config.sett
 myenv/Scripts/python.exe manage.py migrate appname --settings=config.settings.local
 ```
 
-### Git log (so'nggi commitlar, 27.02.2026)
+### Git log (so'nggi commitlar, 03.03.2026)
 ```
-213f878  feat(auth): parolni tiklash endpointlari qo'shildi va change-password tuzatildi
+9466a72  fix: 3 ta muhim xato tuzatildi (main branch)
+0ccbf63  fix: 3 ta muammo tuzatildi — race condition, hardcoded URL, string comparison (worktree)
+0dd85b0  docs: PROJECT_CONTEXT.md yangilandi (27.02.2026)
+2652da4  feat(auth): parolni tiklash endpointlari qo'shildi va change-password tuzatildi
 73ba2de  feat(accaunt): WorkerList/Detail da branch_id, branch_name, store_id, store_name qo'shildi
-85beff6  fix(store): StoreListSerializer dan workers olib tashlandi, faqat detail da qoldi
-c5e1bc6  feat: O'zbek tilidagi xato xabarlari va Store/Branch da workers ro'yxati
-a23903a  fix(store): StoreUpdateSerializer va BranchUpdateSerializer ga status maydoni qo'shildi
 ```
+
+### Tuzatilgan xatolar (03.03.2026)
+| Xato | Joyi | Tuzatish |
+|------|------|---------|
+| `IsSotuvchiOrAbove`: `'active'` string taqqoslash | `accaunt/permissions.py` | `WorkerStatus.ACTIVE` TextChoices constant |
+| `SendPasswordResetEmailSerializer`: hardcoded `localhost:3000` URL | `accaunt/serializers.py` | `settings.FRONTEND_URL` env variable |
+| `StockMovement.perform_create`: race condition | `warehouse/views.py` | `@transaction.atomic` + `select_for_update()` + `F()` expression |
 
 ---
 
