@@ -291,45 +291,47 @@ permissions  # ["sotuv", "ombor", ...]  — to'liq ro'yxat almashadi
 
 ---
 
-## WAREHOUSE APP — TUZILMA (to'liq)
+## WAREHOUSE APP — TUZILMA (to'liq, 03.03.2026 yangilandi)
 
-### Modellar
+### Modellar (haqiqiy)
 | Model           | Maydonlar                                                                 | Constraint |
 |-----------------|---------------------------------------------------------------------------|------------|
 | `Category`      | name, description, store(FK), status, created_on                          | `unique_together = [('store','name')]` |
-| `Product`       | name, category(FK), unit, purchase_price, sale_price, barcode, **image(nullable)**, store(FK), status, created_on | `unique_together = [('store','name'), ('store','barcode')]` |
-| `Warehouse`     | name, store(FK), address, status, created_on                              | `unique_together = [('store','name')]` |
-| `Stock`         | product(FK), branch(FK,null), **warehouse(FK,null)**, quantity, updated_on | `unique_together = [('product','branch'), ('product','warehouse')]` + `CheckConstraint(exactly_one_location)` |
-| `StockMovement` | product(FK), movement_type(in/out/**transfer**), quantity, **from_branch(null), from_warehouse(null), to_branch(null), to_warehouse(null)**, note, worker(FK), created_on | — |
+| `SubCategory`   | name, category(FK), store(FK), status, created_on                         | `unique_together = [('store','name')]` |
+| `Currency`      | code, name, symbol, is_base — **store YO'Q, global**                      | `unique: code` |
+| `ExchangeRate`  | currency(FK), rate, date, source, created_on — **store YO'Q, global**     | `unique_together = [('currency','date')]` |
+| `Product`       | name, category(FK), subcategory(FK,null), unit, purchase_price, sale_price, price_currency(FK,null), barcode(null), image(null), store(FK), status, created_on | `unique_together = [('store','name')]` |
+| `Stock`         | product(FK), branch(FK), quantity, updated_on                             | `unique_together = [('product','branch')]` |
+| `StockMovement` | product(FK), branch(FK), movement_type, quantity, note, worker(FK,null), created_on | — (immutable log) |
+
+⚠️ **Muhim:** `Warehouse` modeli **mavjud emas**. `Stock` faqat `branch` ga bog'liq.
+⚠️ `Currency` va `ExchangeRate` da `store` maydoni **yo'q** — ular global (barcha do'konlar uchun umumiy).
 
 ### Choices
 - `ProductUnit`: dona, kg, g, litr, metr, m2, yashik, qop, quti
 - `ProductStatus`: active, inactive
-- `MovementType`: in (Kirim), out (Chiqim), **transfer (Ko'chirish)**
+- `MovementType`: in (Kirim), out (Chiqim)
 
-### Stock constraint (muhim!)
-```python
-# branch YOKI warehouse — faqat bittasi bo'lishi shart
-CheckConstraint(
-    check=(Q(branch__isnull=False, warehouse__isnull=True) |
-           Q(branch__isnull=True,  warehouse__isnull=False)),
-    name='stock_exactly_one_location',
-)
-```
+### Migratsiyalar (to'g'ri zanjir!)
+| Migration | Fayl nomi                          | Izoh                                                    |
+|-----------|------------------------------------|---------------------------------------------------------|
+| 0001      | 0001_initial.py                    | Dastlabki modellar                                      |
+| 0002      | 0002_alter_product_unique_together | Product unique_together                                 |
+| 0003      | 0003_expand_warehouse_models.py    | Kengaytirilgan modellar                                 |
+| 0004 (a)  | 0004_product_image.py              | Product.image ImageField (0003 ga bog'liq)              |
+| 0004 (b)  | 0004_subcategory.py                | SubCategory + Product.subcategory (**0004_product_image** ga bog'liq ✅) |
+| 0005      | 0005_currency_exchangerate.py      | Currency + ExchangeRate + seed data (0004_subcategory ga bog'liq) |
 
-### Migratsiyalar
-| Migration | Izoh                                                              |
-|-----------|-------------------------------------------------------------------|
-| 0001      | Dastlabki modellar                                                |
-| 0002      | Product unique_together [('store','name'), ('store','barcode')]   |
-| 0003      | Warehouse, TRANSFER, from/to branch/warehouse (main da)          |
-| 0004      | Product.image ImageField qo'shildi (main da 0004, worktree da 0003) |
+⚠️ **Muhim:** `0004_subcategory` → `('warehouse', '0004_product_image')` ga bog'liq (0003_product_image emas!)
+`trade.0001_initial` → `('warehouse', '0005_currency_exchangerate')` ga bog'liq ✅
 
 ### Endpointlar
 ```
 GET/POST   /api/v1/warehouse/categories/    + PATCH/DELETE /{id}/
+GET/POST   /api/v1/warehouse/subcategories/ + PATCH/DELETE /{id}/
+GET/POST   /api/v1/warehouse/currencies/    + PATCH        /{id}/   (faqat list/retrieve/update)
+GET/POST   /api/v1/warehouse/exchange-rates/+ GET          /{id}/   (faqat list/retrieve/create)
 GET/POST   /api/v1/warehouse/products/      + PATCH/DELETE /{id}/
-GET/POST   /api/v1/warehouse/warehouses/    + PATCH/DELETE /{id}/   (faqat main da)
 GET/POST   /api/v1/warehouse/stocks/        + PATCH/DELETE /{id}/
 GET/POST   /api/v1/warehouse/movements/     + GET          /{id}/   (immutable)
 ```
@@ -342,7 +344,7 @@ GET/POST   /api/v1/warehouse/movements/     + GET          /{id}/   (immutable)
 ### Muhim logika
 - **StockMovement POST** → `Stock.quantity` avtomatik yangilanadi (`@transaction.atomic` + `select_for_update()` + `F()` expression — race condition yo'q)
 - **Chiqim (`out`)** uchun qoldiq serializer'da tekshiriladi (yetarli bo'lmasa → 400)
-- **Soft delete**: Category, Product (`status='inactive'`)
+- **Soft delete**: Category, SubCategory, Product (`status='inactive'`)
 - **Stock** → hard delete (o'chirish mumkin)
 - **Multi-tenant**: `get_queryset()` — `worker.store` bo'yicha filtrlash
 - **AuditLog**: barcha write operatsiyalarda yoziladi
@@ -410,6 +412,56 @@ CORS_ORIGIN_WHITELIST = tuple([
     'https://shop-crm-front.vercel.app',   # hardcode
     *_extra_origins,                        # + CORS_ALLOWED_ORIGINS env (ixtiyoriy)
 ])
+```
+
+---
+
+## LOCAL DEV ENVIRONMENT (03.03.2026 sozlandi)
+
+```
+Virtual env:  D:\projects\my_projects\shop_crm_system\myenv\
+Python:       myenv\Scripts\python.exe  (Django 5.2.11, Celery 5.6.2)
+Settings:     config.settings.local  (SQLite, DEBUG=True)
+```
+
+**`.claude/launch.json` — 3 ta server:**
+```json
+{
+  "name": "Django Dev Server",
+  "runtimeExecutable": "D:\\...\\myenv\\Scripts\\python.exe",
+  "runtimeArgs": ["manage.py", "runserver", "8000", "--settings=config.settings.local"],
+  "port": 8000
+}
+```
+Server: `http://127.0.0.1:8000/`
+Swagger: `http://127.0.0.1:8000/swagger/`
+
+**Foydali buyruqlar:**
+```bash
+# Migrate (local)
+myenv\Scripts\python.exe manage.py migrate --settings=config.settings.local
+
+# Check (xatolarni oldindan tekshirish)
+myenv\Scripts\python.exe manage.py check --settings=config.settings.local
+
+# showmigrations
+myenv\Scripts\python.exe manage.py showmigrations --settings=config.settings.local
+```
+
+---
+
+## RAILWAY DEPLOY — TUZATILGAN MUAMMOLAR (03.03.2026)
+
+| # | Xato | Sabab | Tuzatish |
+|---|------|-------|----------|
+| 1 | `ImportError: cannot import name 'Warehouse'` | `warehouse/admin.py` da mavjud bo'lmagan `Warehouse` modeli import qilingan | `Warehouse` o'chirildi, to'g'ri modellar yozildi |
+| 2 | `admin.E108/E116` — `store`, `created_on` topilmadi | `Currency` va `ExchangeRate` da `store` maydoni yo'q | Admin `list_display/list_filter` haqiqiy maydonlar bilan to'g'rilanaldi |
+| 3 | `NodeNotFoundError: '0003_product_image'` | `0004_subcategory.py` da noto'g'ri dependency (`0003_product_image` degan fayl yo'q) | `('warehouse', '0003_product_image')` → `('warehouse', '0004_product_image')` |
+
+**⚠️ Deploy oldi nazorat (har safar):**
+```bash
+python manage.py check --settings=config.settings.local
+# "System check identified no issues" bo'lishi SHART
 ```
 
 ---
@@ -622,24 +674,81 @@ Smena model (store app da yashaydi):
 
 ---
 
-### BOSQICH 4 — trade app (Savdolar + Mijozlar)
+### BOSQICH 4 — trade app (Savdolar + Mijozlar) ✅ BAJARILDI (03.03.2026)
+
+**Modellar:**
 ```
-Customer:  name, phone, address, debt_balance, customer_group(FK,null),
-           store(FK), status, created_on
+CustomerGroup: name, store(FK), discount(%), created_on
+               unique_together = [('store', 'name')]
 
-Sale:      branch(FK), worker(FK), customer(FK,null), smena(FK,null),
-           payment_type(cash|card|mixed|debt), total_price, discount_amount,
-           paid_amount, debt_amount, status(completed|cancelled), created_on
+Customer:      name, phone, address, debt_balance, group(FK,null),
+               store(FK), status(active|inactive), created_on
+               → Soft delete: status='inactive'
 
-SaleItem:  sale(FK), product(FK), quantity, unit_price, total_price
+Sale:          branch(FK), store(FK), worker(FK), customer(FK,null),
+               smena(FK,null), payment_type(cash|card|mixed|debt),
+               total_price, discount_amount, paid_amount, debt_amount,
+               status(completed|cancelled), note, created_on
 
-→ Sale yaratilganda: StockMovement(OUT) AVTOMATIK (har bir SaleItem uchun)
-→ store.settings.allow_debt tekshiriladi (nasiya bloklanishi mumkin)
-→ store.settings.max_discount_percent tekshiriladi (chegirma chegarasi)
-→ PriceList mavjud bo'lsa → unit_price PriceList dan avtomatik olinadi (BOSQICH 12)
-→ Customer.debt_balance nasiyada yangilanadi
-→ Ruxsatlar: IsAuthenticated + CanAccess('savdolar')
+SaleItem:      sale(FK), product(FK), quantity, unit_price, total_price
+               → immutable (o'zgartirilmaydi)
 ```
+
+**Serializer'lar (9 ta):**
+```
+CustomerGroupListSerializer, CustomerGroupCreateSerializer
+CustomerListSerializer, CustomerDetailSerializer
+CustomerCreateSerializer, CustomerUpdateSerializer
+SaleItemListSerializer, SaleItemInputSerializer
+SaleCreateSerializer   ← Serializer (ModelSerializer emas — items write-only)
+SaleDetailSerializer
+```
+
+**Endpointlar:**
+```
+GET/POST   /api/v1/customer-groups/  + GET/PATCH/DELETE /{id}/  (IsManagerOrAbove)
+GET/POST   /api/v1/customers/        + GET/PATCH/DELETE /{id}/  (CanAccess('sotuv'))
+GET/POST   /api/v1/sales/            + GET              /{id}/  (CanAccess('sotuv'))
+PATCH      /api/v1/sales/{id}/cancel/                           (@transaction.atomic)
+```
+
+**Sale yaratish — 13 qadam (@transaction.atomic):**
+1. Serializer validatsiya
+2. Branch → store tekshirish
+3. Customer → store tekshirish
+4. Settings: `allow_cash/card/debt` tekshirish
+5. Smena: `shift_enabled` bo'lsa ochiq smena bor-yo'qligi
+6. `total_price` hisoblash (`unit_price` yoki `product.sale_price`)
+7. Chegirma: `allow_discount` + `max_discount_percent`
+8. To'lov summasi validatsiya
+9. Mahsulot → store tekshirish
+10. Stock: `select_for_update()` + mavjudlik tekshirish
+11. `Sale.objects.create()`
+12. `SaleItem` + `StockMovement(OUT)` + `Stock` → `F('quantity') - qty`
+13. `Customer.debt_balance` yangilash (nasiya bo'lsa)
+    + AuditLog
+
+**Sale bekor qilish (cancel):**
+- Faqat `completed` savdo bekor qilinadi
+- Har SaleItem uchun `StockMovement(IN)` + `Stock` qaytariladi
+- `Customer.debt_balance` kamaytiriladi (nasiya bo'lsa)
+- `sale.status = 'cancelled'`
+
+**store/views.py — `_build_report()` yangilandi:**
+- Lazy import: `from trade.models import Sale, SaleStatus, PaymentType`
+- `Sale.objects.filter(smena=smena, status='completed').aggregate(Sum, Count)`
+- `by_payment`: cash / card / mixed / debt to'lov turlari bo'yicha
+
+**Yangi fayllar:**
+- `trade/models.py` — barcha modellar
+- `trade/serializers.py` — 9 ta serializer
+- `trade/views.py` — 3 ta ViewSet
+- `trade/api_urls.py` — router
+- `trade/migrations/0001_initial.py` — CustomerGroup, Customer, Sale, SaleItem
+
+**Yangilangan fayllar:**
+- `store/views.py` — `_build_report()` haqiqiy aggregatsiya
+- `config/urls.py` — `path('api/v1/', include('trade.api_urls'))`
 
 ---
 
