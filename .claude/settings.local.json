@@ -17,7 +17,14 @@
       "Bash(git push:*)",
       "Bash(test:*)",
       "Bash(python manage.py migrate:*)",
-      "Bash(C:/Users/U17/my_projects/shop_crm_system/myenv/Scripts/python.exe -c \"import django; import os; os.environ.setdefault\\(''DJANGO_SETTINGS_MODULE'', ''config.settings.local''\\); django.setup\\(\\); from accaunt.serializers import WorkerListSerializer, WorkerDetailSerializer; print\\(''OK — import muvaffaqiyatli''\\)\")"
+      "Bash(C:/Users/U17/my_projects/shop_crm_system/myenv/Scripts/python.exe -c \"import django; import os; os.environ.setdefault\\(''DJANGO_SETTINGS_MODULE'', ''config.settings.local''\\); django.setup\\(\\); from accaunt.serializers import WorkerListSerializer, WorkerDetailSerializer; print\\(''OK — import muvaffaqiyatli''\\)\")",
+      "Bash(git -C /d/projects/shop_crm_system log --oneline --since=\"2026-03-03\" --until=\"2026-03-04\")",
+      "Bash(myenv/Scripts/python.exe manage.py makemigrations accaunt --settings=config.settings.local)",
+      "Bash(myenv/Scripts/python.exe manage.py makemigrations accaunt --name phone1_unique --settings=config.settings.local --no-input)",
+      "Bash(myenv/Scripts/python.exe manage.py showmigrations --settings=config.settings.local)",
+      "Bash(git -C /d/projects/shop_crm_system log --oneline bb65ba9..HEAD -- warehouse/)",
+      "Bash(git -C /d/projects/shop_crm_system show faadf3b --stat)",
+      "Bash(git -C /d/projects/shop_crm_system log --oneline --all -- warehouse/migrations/)"
     ]
   }
 }

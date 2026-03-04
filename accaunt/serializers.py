@@ -112,6 +112,20 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             },
         }
 
+    def validate_phone1(self, value: str) -> str:
+        if CustomUser.objects.filter(phone1=value).exists():
+            raise serializers.ValidationError(
+                "Bu telefon raqami allaqachon boshqa foydalanuvchida band."
+            )
+        return value
+
+    def validate_email(self, value: str) -> str:
+        if value and CustomUser.objects.filter(email=value).exists():
+            raise serializers.ValidationError(
+                "Bu email allaqachon boshqa foydalanuvchida band."
+            )
+        return value
+
     def validate(self, attrs: dict) -> dict:
         if attrs['password'] != attrs.pop('password2'):
             raise serializers.ValidationError("Kiritilgan parollar bir xil emas!")

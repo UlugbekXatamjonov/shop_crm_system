@@ -2,6 +2,10 @@
 
 
 ------ Qilish kerak ---------
+workerda email edit bo'lmayapdi
+Obuna va Try except ni tushuntirish
+
+
 
 
 ------ Tugadi ---------
