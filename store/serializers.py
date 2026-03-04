@@ -39,14 +39,23 @@ class BranchListSerializer(serializers.ModelSerializer):
         source='get_status_display',
         read_only=True
     )
-    store_name = serializers.CharField(
+    store_name    = serializers.CharField(
         source='store.name',
         read_only=True
     )
+    workers_count = serializers.SerializerMethodField()
 
     class Meta:
         model  = Branch
-        fields = ('id', 'name', 'store_name', 'phone', 'status', 'status_display')
+        fields = (
+            'id', 'name', 'address', 'store_name',
+            'phone', 'status', 'status_display',
+            'workers_count',
+        )
+
+    def get_workers_count(self, obj: Branch) -> int:
+        """Shu filialdagi faol xodimlar soni."""
+        return obj.workers.count()
 
 
 class BranchDetailSerializer(serializers.ModelSerializer):
@@ -95,6 +104,15 @@ class BranchCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Branch
         fields = ('name', 'address', 'phone')
+        extra_kwargs = {
+            'name': {
+                'error_messages': {
+                    'required':   "Filial nomi kiritilishi shart.",
+                    'blank':      "Filial nomi bo'sh bo'lishi mumkin emas.",
+                    'max_length': "Filial nomi 200 belgidan oshmasligi kerak.",
+                }
+            },
+        }
 
     def validate_name(self, value: str) -> str:
         """Bir do'kon ichida filial nomi takrorlanmasligi kerak."""
@@ -115,6 +133,19 @@ class BranchUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Branch
         fields = ('name', 'address', 'phone', 'status')
+        extra_kwargs = {
+            'name': {
+                'error_messages': {
+                    'blank':      "Filial nomi bo'sh bo'lishi mumkin emas.",
+                    'max_length': "Filial nomi 200 belgidan oshmasligi kerak.",
+                }
+            },
+            'status': {
+                'error_messages': {
+                    'invalid_choice': "'{input}' noto'g'ri holat. Mavjud: active, inactive.",
+                }
+            },
+        }
 
     def validate_name(self, value: str) -> str:
         """Bir do'kon ichida filial nomi takrorlanmasligi kerak."""
@@ -194,6 +225,15 @@ class StoreCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Store
         fields = ('name', 'address', 'phone')
+        extra_kwargs = {
+            'name': {
+                'error_messages': {
+                    'required':   "Do'kon nomi kiritilishi shart.",
+                    'blank':      "Do'kon nomi bo'sh bo'lishi mumkin emas.",
+                    'max_length': "Do'kon nomi 200 belgidan oshmasligi kerak.",
+                }
+            },
+        }
 
 
 class StoreUpdateSerializer(serializers.ModelSerializer):
@@ -205,6 +245,19 @@ class StoreUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Store
         fields = ('name', 'address', 'phone', 'status')
+        extra_kwargs = {
+            'name': {
+                'error_messages': {
+                    'blank':      "Do'kon nomi bo'sh bo'lishi mumkin emas.",
+                    'max_length': "Do'kon nomi 200 belgidan oshmasligi kerak.",
+                }
+            },
+            'status': {
+                'error_messages': {
+                    'invalid_choice': "'{input}' noto'g'ri holat. Mavjud: active, inactive.",
+                }
+            },
+        }
 
 
 # ============================================================
@@ -432,8 +485,20 @@ class SmenaOpenSerializer(serializers.ModelSerializer):
         model  = Smena
         fields = ('branch', 'cash_start', 'note')
         extra_kwargs = {
-            'cash_start': {'required': False},
-            'note':       {'required': False},
+            'branch': {
+                'error_messages': {
+                    'required':        "Filial tanlanishi shart.",
+                    'does_not_exist':  "Bunday filial topilmadi.",
+                    'incorrect_type':  "Filial ID butun son bo'lishi kerak.",
+                }
+            },
+            'cash_start': {
+                'required': False,
+                'error_messages': {
+                    'invalid': "To'g'ri pul miqdori kiritilishi shart.",
+                }
+            },
+            'note': {'required': False},
         }
 
 

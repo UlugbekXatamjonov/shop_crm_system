@@ -205,6 +205,7 @@ class BranchViewSet(viewsets.ModelViewSet):
             Branch.objects
             .filter(store=worker.store)
             .select_related('store')
+            .prefetch_related('workers')  # BranchListSerializer.workers_count uchun
         )
 
     def get_serializer_context(self):

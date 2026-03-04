@@ -177,7 +177,13 @@ class LogoutSerializer(serializers.Serializer):
     """
     Tizimdan chiqish — refresh tokenni blacklist ga qo'shadi.
     """
-    refresh = serializers.CharField(label="Refresh token")
+    refresh = serializers.CharField(
+        label="Refresh token",
+        error_messages={
+            'required': "Refresh token kiritilishi shart.",
+            'blank':    "Refresh token bo'sh bo'lishi mumkin emas.",
+        }
+    )
 
     def validate(self, attrs: dict) -> dict:
         self.token = attrs['refresh']
@@ -200,17 +206,29 @@ class UserChangePasswordSerializer(serializers.Serializer):
     current_password = serializers.CharField(
         write_only=True,
         style={'input_type': 'password'},
-        label="Joriy parol"
+        label="Joriy parol",
+        error_messages={
+            'required': "Joriy parol kiritilishi shart.",
+            'blank':    "Joriy parol bo'sh bo'lishi mumkin emas.",
+        }
     )
     password = serializers.CharField(
         write_only=True,
         style={'input_type': 'password'},
-        label="Yangi parol"
+        label="Yangi parol",
+        error_messages={
+            'required': "Yangi parol kiritilishi shart.",
+            'blank':    "Yangi parol bo'sh bo'lishi mumkin emas.",
+        }
     )
     password2 = serializers.CharField(
         write_only=True,
         style={'input_type': 'password'},
-        label="Yangi parolni tasdiqlash"
+        label="Yangi parolni tasdiqlash",
+        error_messages={
+            'required': "Parolni tasdiqlash kiritilishi shart.",
+            'blank':    "Parolni tasdiqlash bo'sh bo'lishi mumkin emas.",
+        }
     )
 
     def validate_current_password(self, value: str) -> str:
@@ -230,7 +248,14 @@ class UserChangePasswordSerializer(serializers.Serializer):
 
 class SendPasswordResetEmailSerializer(serializers.Serializer):
     """Parolni tiklash uchun email yuborish."""
-    email = serializers.EmailField(label="Email manzil")
+    email = serializers.EmailField(
+        label="Email manzil",
+        error_messages={
+            'required': "Email manzil kiritilishi shart.",
+            'blank':    "Email manzil bo'sh bo'lishi mumkin emas.",
+            'invalid':  "To'g'ri email manzil kiriting (masalan: ism@example.com).",
+        }
+    )
 
     def validate(self, attrs: dict) -> dict:
         email = attrs['email']
@@ -253,8 +278,22 @@ class SendPasswordResetEmailSerializer(serializers.Serializer):
 
 class UserPasswordResetSerializer(serializers.Serializer):
     """Email orqali yuborilgan token yordamida yangi parol o'rnatish."""
-    password  = serializers.CharField(write_only=True, style={'input_type': 'password'})
-    password2 = serializers.CharField(write_only=True, style={'input_type': 'password'})
+    password  = serializers.CharField(
+        write_only=True,
+        style={'input_type': 'password'},
+        error_messages={
+            'required': "Yangi parol kiritilishi shart.",
+            'blank':    "Yangi parol bo'sh bo'lishi mumkin emas.",
+        }
+    )
+    password2 = serializers.CharField(
+        write_only=True,
+        style={'input_type': 'password'},
+        error_messages={
+            'required': "Parolni tasdiqlash kiritilishi shart.",
+            'blank':    "Parolni tasdiqlash bo'sh bo'lishi mumkin emas.",
+        }
+    )
 
     def validate(self, attrs: dict) -> dict:
         if attrs['password'] != attrs['password2']:
@@ -568,6 +607,22 @@ class WorkerCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError("Bu telefon raqami allaqachon ro'yxatdan o'tgan.")
         return value
 
+    def validate_branch(self, value: int | None):
+        """
+        Filial ID ni tekshirib Branch obyektiga aylantiradi.
+        Filial faqat joriy do'konga tegishli bo'lishi kerak.
+        """
+        if value is None:
+            return None
+        from store.models import Branch
+        store = self.context.get('store')
+        try:
+            return Branch.objects.get(id=value, store=store)
+        except Branch.DoesNotExist:
+            raise serializers.ValidationError(
+                "Bu filial sizning do'koningizga tegishli emas yoki topilmadi."
+            )
+
     def validate_role(self, value: str) -> str:
         """Owner rolini faqat do'kon egasi yoki superadmin tayinlay oladi."""
         if value == WorkerRole.OWNER:
@@ -594,24 +649,15 @@ class WorkerCreateSerializer(serializers.Serializer):
         """
         CustomUser va Worker birgalikda yaratiladi.
         Xato yuz bersa — ikkalasi ham bekor qilinadi (atomic transaction).
-        """
-        from store.models import Branch
 
-        store            = validated_data.pop('store')          # view da beriladi
-        branch_id        = validated_data.pop('branch', None)
+        branch — validate_branch() da allaqachon Branch obyektiga aylantirilgan.
+        store  — perform_create() da serializer.save(store=...) orqali beriladi.
+        """
+        store            = validated_data.pop('store')         # view da avtomatik
+        branch           = validated_data.pop('branch', None)  # Branch obj yoki None
         role             = validated_data.pop('role')
         salary           = validated_data.pop('salary', 0)
         permissions_data = validated_data.pop('permissions', None)
-
-        # Branch — faqat shu do'konning filiallari qabul qilinadi
-        branch = None
-        if branch_id:
-            try:
-                branch = Branch.objects.get(id=branch_id, store=store)
-            except Branch.DoesNotExist:
-                raise serializers.ValidationError(
-                    {'branch': "Bu filial sizning do'koningizga tegishli emas yoki topilmadi."}
-                )
 
         # 1. CustomUser yaratish
         user = CustomUser.objects.create_user(

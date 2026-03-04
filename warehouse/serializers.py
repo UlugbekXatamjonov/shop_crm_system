@@ -92,6 +92,15 @@ class CategoryCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Category
         fields = ('name', 'description')
+        extra_kwargs = {
+            'name': {
+                'error_messages': {
+                    'required':   "Kategoriya nomi kiritilishi shart.",
+                    'blank':      "Kategoriya nomi bo'sh bo'lishi mumkin emas.",
+                    'max_length': "Kategoriya nomi 200 belgidan oshmasligi kerak.",
+                }
+            },
+        }
 
     def validate_name(self, value: str) -> str:
         """Bir do'kon ichida kategoriya nomi takrorlanmasligi kerak."""
@@ -112,6 +121,14 @@ class CategoryUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Category
         fields = ('name', 'description')
+        extra_kwargs = {
+            'name': {
+                'error_messages': {
+                    'blank':      "Kategoriya nomi bo'sh bo'lishi mumkin emas.",
+                    'max_length': "Kategoriya nomi 200 belgidan oshmasligi kerak.",
+                }
+            },
+        }
 
     def validate_name(self, value: str) -> str:
         qs = Category.objects.filter(
@@ -182,6 +199,22 @@ class SubCategoryCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = SubCategory
         fields = ('name', 'description', 'category')
+        extra_kwargs = {
+            'name': {
+                'error_messages': {
+                    'required':   "Subkategoriya nomi kiritilishi shart.",
+                    'blank':      "Subkategoriya nomi bo'sh bo'lishi mumkin emas.",
+                    'max_length': "Subkategoriya nomi 200 belgidan oshmasligi kerak.",
+                }
+            },
+            'category': {
+                'error_messages': {
+                    'required':       "Kategoriya tanlanishi shart.",
+                    'does_not_exist': "Bunday kategoriya topilmadi.",
+                    'incorrect_type': "Kategoriya ID butun son bo'lishi kerak.",
+                }
+            },
+        }
 
     def validate_category(self, value: Category) -> Category:
         """Kategoriya xuddi shu do'konga tegishli bo'lishi kerak."""
@@ -216,6 +249,20 @@ class SubCategoryUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = SubCategory
         fields = ('name', 'description', 'category')
+        extra_kwargs = {
+            'name': {
+                'error_messages': {
+                    'blank':      "Subkategoriya nomi bo'sh bo'lishi mumkin emas.",
+                    'max_length': "Subkategoriya nomi 200 belgidan oshmasligi kerak.",
+                }
+            },
+            'category': {
+                'error_messages': {
+                    'does_not_exist': "Bunday kategoriya topilmadi.",
+                    'incorrect_type': "Kategoriya ID butun son bo'lishi kerak.",
+                }
+            },
+        }
 
     def validate_category(self, value: Category) -> Category:
         if value and value.store != self.instance.store:
@@ -285,6 +332,28 @@ class CurrencyCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Currency
         fields = ('code', 'name', 'symbol', 'is_base')
+        extra_kwargs = {
+            'code': {
+                'error_messages': {
+                    'required':   "Valyuta kodi kiritilishi shart.",
+                    'blank':      "Valyuta kodi bo'sh bo'lishi mumkin emas.",
+                    'max_length': "Valyuta kodi 3 belgidan oshmasligi kerak.",
+                    'unique':     "Bu valyuta kodi allaqachon mavjud.",
+                }
+            },
+            'name': {
+                'error_messages': {
+                    'required':   "Valyuta nomi kiritilishi shart.",
+                    'blank':      "Valyuta nomi bo'sh bo'lishi mumkin emas.",
+                }
+            },
+            'symbol': {
+                'error_messages': {
+                    'required':   "Valyuta belgisi kiritilishi shart.",
+                    'blank':      "Valyuta belgisi bo'sh bo'lishi mumkin emas.",
+                }
+            },
+        }
 
     def validate_code(self, value: str) -> str:
         return value.upper().strip()
@@ -341,6 +410,28 @@ class ExchangeRateCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = ExchangeRate
         fields = ('currency', 'rate', 'date', 'source')
+        extra_kwargs = {
+            'currency': {
+                'error_messages': {
+                    'required':       "Valyuta tanlanishi shart.",
+                    'does_not_exist': "Bunday valyuta topilmadi.",
+                    'incorrect_type': "Valyuta ID butun son bo'lishi kerak.",
+                }
+            },
+            'rate': {
+                'error_messages': {
+                    'required': "Kurs kiritilishi shart.",
+                    'invalid':  "To'g'ri raqam kiritilishi shart.",
+                    'max_digits': "Raqam juda katta.",
+                }
+            },
+            'date': {
+                'error_messages': {
+                    'required': "Sana kiritilishi shart.",
+                    'invalid':  "Sana formati noto'g'ri. To'g'ri format: YYYY-MM-DD.",
+                }
+            },
+        }
 
     def validate(self, data: dict) -> dict:
         currency = data.get('currency')
@@ -444,6 +535,50 @@ class ProductCreateSerializer(serializers.ModelSerializer):
             'unit', 'purchase_price', 'sale_price', 'price_currency',
             'barcode', 'image',
         )
+        extra_kwargs = {
+            'name': {
+                'error_messages': {
+                    'required':   "Mahsulot nomi kiritilishi shart.",
+                    'blank':      "Mahsulot nomi bo'sh bo'lishi mumkin emas.",
+                    'max_length': "Mahsulot nomi 300 belgidan oshmasligi kerak.",
+                }
+            },
+            'category': {
+                'error_messages': {
+                    'does_not_exist': "Bunday kategoriya topilmadi.",
+                    'incorrect_type': "Kategoriya ID butun son bo'lishi kerak.",
+                }
+            },
+            'subcategory': {
+                'error_messages': {
+                    'does_not_exist': "Bunday subkategoriya topilmadi.",
+                    'incorrect_type': "Subkategoriya ID butun son bo'lishi kerak.",
+                }
+            },
+            'unit': {
+                'error_messages': {
+                    'invalid_choice': "'{input}' noto'g'ri o'lchov birligi.",
+                }
+            },
+            'purchase_price': {
+                'error_messages': {
+                    'invalid':  "To'g'ri xarid narxi kiritilishi shart.",
+                    'max_digits': "Xarid narxi juda katta.",
+                }
+            },
+            'sale_price': {
+                'error_messages': {
+                    'invalid':    "To'g'ri sotuv narxi kiritilishi shart.",
+                    'max_digits': "Sotuv narxi juda katta.",
+                }
+            },
+            'price_currency': {
+                'error_messages': {
+                    'does_not_exist': "Bunday valyuta topilmadi.",
+                    'incorrect_type': "Valyuta ID butun son bo'lishi kerak.",
+                }
+            },
+        }
 
     def validate_name(self, value: str) -> str:
         """Bir do'kon ichida mahsulot nomi takrorlanmasligi kerak."""
@@ -499,6 +634,34 @@ class ProductUpdateSerializer(serializers.ModelSerializer):
             'unit', 'purchase_price', 'sale_price', 'price_currency',
             'barcode', 'image', 'status',
         )
+        extra_kwargs = {
+            'name': {
+                'error_messages': {
+                    'blank':      "Mahsulot nomi bo'sh bo'lishi mumkin emas.",
+                    'max_length': "Mahsulot nomi 300 belgidan oshmasligi kerak.",
+                }
+            },
+            'unit': {
+                'error_messages': {
+                    'invalid_choice': "'{input}' noto'g'ri o'lchov birligi.",
+                }
+            },
+            'status': {
+                'error_messages': {
+                    'invalid_choice': "'{input}' noto'g'ri holat. Mavjud: active, inactive.",
+                }
+            },
+            'purchase_price': {
+                'error_messages': {
+                    'invalid': "To'g'ri xarid narxi kiritilishi shart.",
+                }
+            },
+            'sale_price': {
+                'error_messages': {
+                    'invalid': "To'g'ri sotuv narxi kiritilishi shart.",
+                }
+            },
+        }
 
     def validate_name(self, value: str) -> str:
         qs = Product.objects.filter(
@@ -591,6 +754,28 @@ class StockCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Stock
         fields = ('product', 'branch', 'quantity')
+        extra_kwargs = {
+            'product': {
+                'error_messages': {
+                    'required':       "Mahsulot tanlanishi shart.",
+                    'does_not_exist': "Bunday mahsulot topilmadi.",
+                    'incorrect_type': "Mahsulot ID butun son bo'lishi kerak.",
+                }
+            },
+            'branch': {
+                'error_messages': {
+                    'required':       "Filial tanlanishi shart.",
+                    'does_not_exist': "Bunday filial topilmadi.",
+                    'incorrect_type': "Filial ID butun son bo'lishi kerak.",
+                }
+            },
+            'quantity': {
+                'error_messages': {
+                    'required': "Miqdor kiritilishi shart.",
+                    'invalid':  "To'g'ri miqdor kiritilishi shart.",
+                }
+            },
+        }
 
     def validate(self, data: dict) -> dict:
         store = self.context.get('store')
@@ -621,6 +806,14 @@ class StockUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Stock
         fields = ('quantity',)
+        extra_kwargs = {
+            'quantity': {
+                'error_messages': {
+                    'required': "Miqdor kiritilishi shart.",
+                    'invalid':  "To'g'ri miqdor kiritilishi shart.",
+                }
+            },
+        }
 
 
 # ============================================================
@@ -703,6 +896,39 @@ class MovementCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = StockMovement
         fields = ('product', 'branch', 'movement_type', 'quantity', 'note')
+        extra_kwargs = {
+            'product': {
+                'error_messages': {
+                    'required':       "Mahsulot tanlanishi shart.",
+                    'does_not_exist': "Bunday mahsulot topilmadi.",
+                    'incorrect_type': "Mahsulot ID butun son bo'lishi kerak.",
+                }
+            },
+            'branch': {
+                'error_messages': {
+                    'required':       "Filial tanlanishi shart.",
+                    'does_not_exist': "Bunday filial topilmadi.",
+                    'incorrect_type': "Filial ID butun son bo'lishi kerak.",
+                }
+            },
+            'movement_type': {
+                'error_messages': {
+                    'required':       "Harakat turi tanlanishi shart.",
+                    'invalid_choice': "'{input}' noto'g'ri harakat turi. Mavjud: IN (kirim), OUT (chiqim).",
+                }
+            },
+            'quantity': {
+                'error_messages': {
+                    'required': "Miqdor kiritilishi shart.",
+                    'invalid':  "To'g'ri miqdor kiritilishi shart.",
+                }
+            },
+            'note': {
+                'error_messages': {
+                    'max_length': "Izoh 500 belgidan oshmasligi kerak.",
+                }
+            },
+        }
 
     def validate_quantity(self, value):
         if value <= 0:

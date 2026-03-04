@@ -2,13 +2,13 @@
 
 
 ------ Qilish kerak ---------
-workerda email edit bo'lmayapdi
 Obuna va Try except ni tushuntirish
 
 
-
-
 ------ Tugadi ---------
+workerda email edit bo'lmayapdi
+xodim qo'shganda do'kon avtomatik olinishi kk
+filial listga adress va ishchilar soni qo'shildi
 
 
 --------- Qoldi ----------

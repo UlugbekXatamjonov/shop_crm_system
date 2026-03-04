@@ -21,6 +21,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status, viewsets, mixins
+from rest_framework.exceptions import ValidationError
 from rest_framework.filters import SearchFilter
 from rest_framework_simplejwt.tokens import RefreshToken
 from django_filters.rest_framework import DjangoFilterBackend
@@ -343,10 +344,15 @@ class WorkerViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """
-        Hodim qo'shish — do'kon avtomatik belgilanadi.
+        Hodim qo'shish — do'kon avtomatik belgilanadi (JWT tokendan).
         Faqat o'z do'koniga hodim qo'sha oladi.
+        Do'kon yo'q bo'lsa — avval do'kon yaratish kerak.
         """
         worker = self.request.user.worker
+        if not worker.store:
+            raise ValidationError(
+                "Avval do'kon yarating, so'ngra xodim qo'shish mumkin bo'ladi."
+            )
         return serializer.save(store=worker.store)
 
     def create(self, request, *args, **kwargs):

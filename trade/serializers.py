@@ -59,7 +59,21 @@ class CustomerGroupCreateSerializer(serializers.ModelSerializer):
         model  = CustomerGroup
         fields = ('name', 'discount')
         extra_kwargs = {
-            'discount': {'required': False, 'default': Decimal('0')},
+            'name': {
+                'error_messages': {
+                    'required':   "Guruh nomi kiritilishi shart.",
+                    'blank':      "Guruh nomi bo'sh bo'lishi mumkin emas.",
+                    'max_length': "Guruh nomi 100 belgidan oshmasligi kerak.",
+                }
+            },
+            'discount': {
+                'required': False,
+                'default': Decimal('0'),
+                'error_messages': {
+                    'invalid':    "To'g'ri chegirma foizi kiritilishi shart.",
+                    'max_digits': "Chegirma foizi juda katta.",
+                }
+            },
         }
 
     def validate_discount(self, value: Decimal) -> Decimal:
@@ -118,9 +132,23 @@ class CustomerCreateSerializer(serializers.ModelSerializer):
         model  = Customer
         fields = ('name', 'phone', 'address', 'group')
         extra_kwargs = {
+            'name': {
+                'error_messages': {
+                    'required':   "Mijoz nomi kiritilishi shart.",
+                    'blank':      "Mijoz nomi bo'sh bo'lishi mumkin emas.",
+                    'max_length': "Mijoz nomi 200 belgidan oshmasligi kerak.",
+                }
+            },
             'phone':   {'required': False, 'allow_blank': True},
             'address': {'required': False, 'allow_blank': True},
-            'group':   {'required': False, 'allow_null': True},
+            'group': {
+                'required':   False,
+                'allow_null': True,
+                'error_messages': {
+                    'does_not_exist': "Bunday mijoz guruhi topilmadi.",
+                    'incorrect_type': "Guruh ID butun son bo'lishi kerak.",
+                }
+            },
         }
 
 
@@ -134,11 +162,29 @@ class CustomerUpdateSerializer(serializers.ModelSerializer):
         model  = Customer
         fields = ('name', 'phone', 'address', 'group', 'status')
         extra_kwargs = {
-            'name':    {'required': False},
+            'name': {
+                'required': False,
+                'error_messages': {
+                    'blank':      "Mijoz nomi bo'sh bo'lishi mumkin emas.",
+                    'max_length': "Mijoz nomi 200 belgidan oshmasligi kerak.",
+                }
+            },
             'phone':   {'required': False, 'allow_blank': True},
             'address': {'required': False, 'allow_blank': True},
-            'group':   {'required': False, 'allow_null': True},
-            'status':  {'required': False},
+            'group': {
+                'required':   False,
+                'allow_null': True,
+                'error_messages': {
+                    'does_not_exist': "Bunday mijoz guruhi topilmadi.",
+                    'incorrect_type': "Guruh ID butun son bo'lishi kerak.",
+                }
+            },
+            'status': {
+                'required': False,
+                'error_messages': {
+                    'invalid_choice': "'{input}' noto'g'ri holat. Mavjud: active, inactive.",
+                }
+            },
         }
 
 
@@ -171,11 +217,22 @@ class SaleItemInputSerializer(serializers.Serializer):
     """
     product    = serializers.PrimaryKeyRelatedField(
         queryset=Product.objects.filter(status='active'),
+        error_messages={
+            'required':       "Mahsulot tanlanishi shart.",
+            'does_not_exist': "Bunday mahsulot topilmadi yoki u faol emas.",
+            'incorrect_type': "Mahsulot ID butun son bo'lishi kerak.",
+        }
     )
     quantity   = serializers.DecimalField(
         max_digits=10,
         decimal_places=3,
         min_value=Decimal('0.001'),
+        error_messages={
+            'required':   "Miqdor kiritilishi shart.",
+            'invalid':    "To'g'ri miqdor kiritilishi shart.",
+            'min_value':  "Miqdor 0 dan katta bo'lishi kerak.",
+            'max_digits': "Miqdor juda katta.",
+        }
     )
     unit_price = serializers.DecimalField(
         max_digits=15,
@@ -184,6 +241,10 @@ class SaleItemInputSerializer(serializers.Serializer):
         required=False,
         allow_null=True,
         default=None,
+        error_messages={
+            'invalid':   "To'g'ri narx kiritilishi shart.",
+            'min_value': "Narx manfiy bo'lishi mumkin emas.",
+        }
     )
 
 
@@ -283,32 +344,66 @@ class SaleCreateSerializer(serializers.Serializer):
     """
     branch          = serializers.PrimaryKeyRelatedField(
         queryset=Branch.objects.all(),
+        error_messages={
+            'required':       "Filial tanlanishi shart.",
+            'does_not_exist': "Bunday filial topilmadi.",
+            'incorrect_type': "Filial ID butun son bo'lishi kerak.",
+        }
     )
     customer        = serializers.PrimaryKeyRelatedField(
         queryset=Customer.objects.filter(status=CustomerStatus.ACTIVE),
         required=False,
         allow_null=True,
         default=None,
+        error_messages={
+            'does_not_exist': "Bunday mijoz topilmadi yoki u faol emas.",
+            'incorrect_type': "Mijoz ID butun son bo'lishi kerak.",
+        }
     )
-    payment_type    = serializers.ChoiceField(choices=PaymentType.choices)
+    payment_type    = serializers.ChoiceField(
+        choices=PaymentType.choices,
+        error_messages={
+            'required':       "To'lov turi tanlanishi shart.",
+            'invalid_choice': "'{input}' noto'g'ri to'lov turi.",
+        }
+    )
     discount_amount = serializers.DecimalField(
         max_digits=15,
         decimal_places=2,
         min_value=Decimal('0'),
         required=False,
         default=Decimal('0'),
+        error_messages={
+            'invalid':   "To'g'ri chegirma miqdori kiritilishi shart.",
+            'min_value': "Chegirma manfiy bo'lishi mumkin emas.",
+        }
     )
     paid_amount     = serializers.DecimalField(
         max_digits=15,
         decimal_places=2,
         min_value=Decimal('0'),
+        error_messages={
+            'required':  "To'lov miqdori kiritilishi shart.",
+            'invalid':   "To'g'ri to'lov miqdori kiritilishi shart.",
+            'min_value': "To'lov miqdori manfiy bo'lishi mumkin emas.",
+        }
     )
     note            = serializers.CharField(
         required=False,
         allow_blank=True,
         default='',
+        error_messages={
+            'max_length': "Izoh 500 belgidan oshmasligi kerak.",
+        }
     )
-    items           = SaleItemInputSerializer(many=True)
+    items           = SaleItemInputSerializer(
+        many=True,
+        error_messages={
+            'required':   "Kamida bitta mahsulot bo'lishi shart.",
+            'not_a_list': "Mahsulotlar ro'yxat ko'rinishida bo'lishi kerak.",
+            'empty':      "Kamida bitta mahsulot bo'lishi shart.",
+        }
+    )
 
     def validate_items(self, value: list) -> list:
         if not value:
