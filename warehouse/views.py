@@ -8,8 +8,11 @@ ViewSet'lar:
   CurrencyViewSet      — Valyutalarni boshqarish (BOSQICH 1.3)
   ExchangeRateViewSet  — Valyuta kurslarini boshqarish (BOSQICH 1.3)
   ProductViewSet       — Mahsulotlarni boshqarish + barcode_image action (BOSQICH 1.2)
-  StockViewSet         — Ombor qoldiqlarini boshqarish
-  StockMovementViewSet — Kirim/chiqim harakatlarini boshqarish
+  WarehouseViewSet     — Omborlarni boshqarish (BOSQICH 6)
+  StockViewSet         — Ombor qoldiqlarini boshqarish (branch|warehouse)
+  StockMovementViewSet — Kirim/chiqim harakatlarini boshqarish (branch|warehouse, FIFO)
+  TransferViewSet      — Guruhlab ko'chirish (BOSQICH 1.6, FIFO propagatsiya)
+  StockBatchViewSet    — FIFO partiyalar (read-only, BOSQICH 1.7)
 
 Ruxsatlar:
   list/retrieve → CanAccess('mahsulotlar') yoki CanAccess('ombor')
@@ -19,7 +22,11 @@ StockMovement:
   Harakatlar faqat POST (create) bilan yaratiladi.
   UPDATE va DELETE yo'q — harakatlar immutable.
   Yaratishda Stock qoldig'i avtomatik yangilanadi.
+  IN harakatda unit_cost bo'lsa → StockBatch yaratiladi (FIFO).
+  OUT harakatda FIFO dan narx hisoblanadi → unit_cost saqlashadi.
 """
+
+from decimal import Decimal
 
 from django.db import transaction
 from django.db.models import F
@@ -28,6 +35,7 @@ from django.utils import timezone
 
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -42,8 +50,12 @@ from .models import (
     Product,
     ProductStatus,
     Stock,
+    StockBatch,
     StockMovement,
     SubCategory,
+    Transfer,
+    TransferStatus,
+    Warehouse,
 )
 from .serializers import (
     CategoryCreateSerializer,
@@ -63,6 +75,7 @@ from .serializers import (
     ProductDetailSerializer,
     ProductListSerializer,
     ProductUpdateSerializer,
+    StockBatchSerializer,
     StockCreateSerializer,
     StockDetailSerializer,
     StockListSerializer,
@@ -71,7 +84,15 @@ from .serializers import (
     SubCategoryDetailSerializer,
     SubCategoryListSerializer,
     SubCategoryUpdateSerializer,
+    TransferCreateSerializer,
+    TransferDetailSerializer,
+    TransferListSerializer,
+    WarehouseCreateSerializer,
+    WarehouseDetailSerializer,
+    WarehouseListSerializer,
+    WarehouseUpdateSerializer,
 )
+from .utils import fifo_deduct, generate_batch_code
 
 
 # ============================================================
@@ -697,8 +718,128 @@ class ProductViewSet(viewsets.ModelViewSet):
         except ValueError as e:
             return Response(
                 {'error': str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                status=status.HTTP_400_BAD_REQUEST,
             )
+
+
+# ============================================================
+# OMBOR (WAREHOUSE) VIEWSET
+# ============================================================
+
+class WarehouseViewSet(viewsets.ModelViewSet):
+    """
+    Omborlarni boshqarish.
+
+    Endpointlar:
+      GET    /api/v1/warehouse/warehouses/       — ro'yxat
+      POST   /api/v1/warehouse/warehouses/       — yangi ombor qo'shish (manager+)
+      GET    /api/v1/warehouse/warehouses/{id}/  — tafsilotlar
+      PATCH  /api/v1/warehouse/warehouses/{id}/  — yangilash (manager+)
+      DELETE /api/v1/warehouse/warehouses/{id}/  — nofaol qilish (manager+, soft delete)
+
+    Multi-tenant: har bir ombor bitta do'konga tegishli.
+    Soft delete: is_active=False bilan o'chiriladi (haqiqiy o'chirish yo'q).
+    """
+    http_method_names = ['get', 'post', 'patch', 'delete']
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated(), CanAccess('ombor')]
+        return [IsAuthenticated(), IsManagerOrAbove()]
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return WarehouseListSerializer
+        if self.action == 'create':
+            return WarehouseCreateSerializer
+        if self.action in ('update', 'partial_update'):
+            return WarehouseUpdateSerializer
+        return WarehouseDetailSerializer
+
+    def get_queryset(self):
+        worker = getattr(self.request.user, 'worker', None)
+        if not worker or not worker.store:
+            return Warehouse.objects.none()
+        return Warehouse.objects.filter(store=worker.store)
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        worker = getattr(self.request.user, 'worker', None)
+        if worker:
+            context['store'] = worker.store
+        return context
+
+    def perform_create(self, serializer):
+        worker = getattr(self.request.user, 'worker', None)
+        instance = serializer.save(store=worker.store)
+        AuditLog.objects.create(
+            actor=self.request.user,
+            action=AuditLog.Action.CREATE,
+            target_model='Warehouse',
+            target_id=instance.id,
+            description=f"Yangi ombor qo'shildi: '{instance.name}'",
+        )
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        AuditLog.objects.create(
+            actor=self.request.user,
+            action=AuditLog.Action.UPDATE,
+            target_model='Warehouse',
+            target_id=instance.id,
+            description=f"Ombor yangilandi: '{instance.name}'",
+        )
+
+    def perform_destroy(self, instance: Warehouse):
+        """Soft delete — is_active=False."""
+        instance.is_active = False
+        instance.save(update_fields=['is_active'])
+        AuditLog.objects.create(
+            actor=self.request.user,
+            action=AuditLog.Action.DELETE,
+            target_model='Warehouse',
+            target_id=instance.id,
+            description=f"Ombor nofaol qilindi: '{instance.name}'",
+        )
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(
+            {
+                'message': "Ombor muvaffaqiyatli qo'shildi.",
+                'data': WarehouseDetailSerializer(
+                    serializer.instance,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(
+            {
+                'message': "Ombor muvaffaqiyatli yangilandi.",
+                'data': WarehouseDetailSerializer(
+                    serializer.instance,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response(
+            {'message': "Ombor nofaol qilindi."},
+            status=status.HTTP_200_OK,
+        )
 
 
 # ============================================================
@@ -742,7 +883,7 @@ class StockViewSet(viewsets.ModelViewSet):
         return (
             Stock.objects
             .filter(product__store=worker.store)
-            .select_related('product', 'branch')
+            .select_related('product', 'branch', 'warehouse')
         )
 
     def get_serializer_context(self):
@@ -751,6 +892,11 @@ class StockViewSet(viewsets.ModelViewSet):
         if worker:
             context['store'] = worker.store
         return context
+
+    def _location_name(self, instance: Stock) -> str:
+        if instance.branch_id:
+            return instance.branch.name
+        return instance.warehouse.name if instance.warehouse_id else '—'
 
     def perform_create(self, serializer):
         instance = serializer.save()
@@ -761,7 +907,7 @@ class StockViewSet(viewsets.ModelViewSet):
             target_id=instance.id,
             description=(
                 f"Ombor qoldig'i qo'shildi: '{instance.product.name}' "
-                f"({instance.branch.name}) = {instance.quantity}"
+                f"({self._location_name(instance)}) = {instance.quantity}"
             ),
         )
 
@@ -774,13 +920,13 @@ class StockViewSet(viewsets.ModelViewSet):
             target_id=instance.id,
             description=(
                 f"Ombor qoldig'i yangilandi: '{instance.product.name}' "
-                f"({instance.branch.name}) = {instance.quantity}"
+                f"({self._location_name(instance)}) = {instance.quantity}"
             ),
         )
 
     def perform_destroy(self, instance: Stock):
         pk   = instance.id
-        name = f"{instance.product.name} ({instance.branch.name})"
+        name = f"{instance.product.name} ({self._location_name(instance)})"
         instance.delete()
         AuditLog.objects.create(
             actor=self.request.user,
@@ -797,7 +943,10 @@ class StockViewSet(viewsets.ModelViewSet):
         return Response(
             {
                 'message': "Ombor qoldig'i muvaffaqiyatli qo'shildi.",
-                'data': StockDetailSerializer(serializer.instance).data,
+                'data': StockDetailSerializer(
+                    serializer.instance,
+                    context=self.get_serializer_context(),
+                ).data,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -810,7 +959,10 @@ class StockViewSet(viewsets.ModelViewSet):
         return Response(
             {
                 'message': "Ombor qoldig'i muvaffaqiyatli yangilandi.",
-                'data': StockDetailSerializer(serializer.instance).data,
+                'data': StockDetailSerializer(
+                    serializer.instance,
+                    context=self.get_serializer_context(),
+                ).data,
             },
             status=status.HTTP_200_OK,
         )
@@ -865,7 +1017,7 @@ class StockMovementViewSet(viewsets.ModelViewSet):
         return (
             StockMovement.objects
             .filter(product__store=worker.store)
-            .select_related('product', 'branch', 'worker__user')
+            .select_related('product', 'branch', 'warehouse', 'worker__user')
         )
 
     def get_serializer_context(self):
@@ -875,28 +1027,73 @@ class StockMovementViewSet(viewsets.ModelViewSet):
             context['store'] = worker.store
         return context
 
+    def _location_name(self, instance: StockMovement) -> str:
+        if instance.branch_id:
+            return instance.branch.name
+        return instance.warehouse.name if instance.warehouse_id else '—'
+
     @transaction.atomic
     def perform_create(self, serializer):
-        worker   = getattr(self.request.user, 'worker', None)
-        instance = serializer.save(worker=worker)
+        worker    = getattr(self.request.user, 'worker', None)
+        store     = getattr(worker, 'store', None)
+        unit_cost = serializer.validated_data.get('unit_cost')
+        instance  = serializer.save(worker=worker)
 
-        # Stock qoldig'ini yangilash
+        # Stock qoldig'ini yangilash (branch YOKI warehouse)
         # get_or_create + F() expression — parallel so'rovlarda race condition yo'q
-        stock, _ = Stock.objects.select_for_update().get_or_create(
-            product=instance.product,
-            branch=instance.branch,
-            defaults={'quantity': 0},
-        )
+        if instance.branch_id:
+            stock, _ = Stock.objects.select_for_update().get_or_create(
+                product=instance.product,
+                branch=instance.branch,
+                warehouse=None,
+                defaults={'quantity': 0},
+            )
+        else:
+            stock, _ = Stock.objects.select_for_update().get_or_create(
+                product=instance.product,
+                branch=None,
+                warehouse=instance.warehouse,
+                defaults={'quantity': 0},
+            )
+
         if instance.movement_type == MovementType.IN:
             Stock.objects.filter(pk=stock.pk).update(
                 quantity=F('quantity') + instance.quantity,
                 updated_on=timezone.now(),
             )
+            # ── FIFO: IN harakat uchun yangi partiya yaratish ──
+            if unit_cost and store:
+                batch_code = generate_batch_code(store)
+                StockBatch.objects.create(
+                    batch_code   = batch_code,
+                    product      = instance.product,
+                    branch       = instance.branch,
+                    warehouse    = instance.warehouse,
+                    unit_cost    = unit_cost,
+                    qty_received = instance.quantity,
+                    qty_left     = instance.quantity,
+                    movement     = instance,
+                    store        = store,
+                )
         else:
             Stock.objects.filter(pk=stock.pk).update(
                 quantity=F('quantity') - instance.quantity,
                 updated_on=timezone.now(),
             )
+            # ── FIFO: OUT harakat uchun partiyalardan yechib olish ──
+            if store:
+                loc_kwargs = {
+                    'branch':    instance.branch,
+                    'warehouse': instance.warehouse,
+                }
+                deductions, total_cost = fifo_deduct(
+                    instance.product, loc_kwargs, instance.quantity
+                )
+                if instance.quantity > 0:
+                    avg_cost = total_cost / instance.quantity
+                    StockMovement.objects.filter(pk=instance.pk).update(
+                        unit_cost=avg_cost
+                    )
 
         AuditLog.objects.create(
             actor=self.request.user,
@@ -906,7 +1103,7 @@ class StockMovementViewSet(viewsets.ModelViewSet):
             description=(
                 f"{instance.get_movement_type_display()}: "
                 f"'{instance.product.name}' × {instance.quantity} "
-                f"({instance.branch.name})"
+                f"({self._location_name(instance)})"
             ),
         )
 
@@ -924,3 +1121,359 @@ class StockMovementViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+# ============================================================
+# TRANSFER VIEWSET
+# ============================================================
+
+class TransferViewSet(viewsets.ModelViewSet):
+    """
+    Tovar ko'chirish (Transfer) — bir nechta mahsulotni guruhlab jo'natish.
+
+    Endpointlar:
+      GET    /api/v1/warehouse/transfers/              — ro'yxat
+      POST   /api/v1/warehouse/transfers/              — yangi transfer (pending)
+      GET    /api/v1/warehouse/transfers/{id}/         — tafsilotlar
+      POST   /api/v1/warehouse/transfers/{id}/confirm/ — tasdiqlash (stock yangilanadi)
+      POST   /api/v1/warehouse/transfers/{id}/cancel/  — bekor qilish (faqat pending)
+
+    Muhim:
+      Yaratishda status=pending — stock o'zgarmaydi.
+      confirm() da BARCHA mahsulotlar atomik yangilanadi (transaction.atomic).
+      Agar bitta mahsulotda qoldiq yetishmasa → HECH BIRI o'zgarmaydi.
+      confirmed va cancelled — immutable (o'zgartirib bo'lmaydi).
+    """
+    http_method_names = ['get', 'post']
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated(), CanAccess('ombor')]
+        return [IsAuthenticated(), IsManagerOrAbove()]
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return TransferListSerializer
+        if self.action == 'create':
+            return TransferCreateSerializer
+        return TransferDetailSerializer
+
+    def get_queryset(self):
+        worker = getattr(self.request.user, 'worker', None)
+        if not worker or not worker.store:
+            return Transfer.objects.none()
+        return (
+            Transfer.objects
+            .filter(store=worker.store)
+            .select_related(
+                'from_branch', 'from_warehouse',
+                'to_branch',   'to_warehouse',
+                'worker__user',
+            )
+            .prefetch_related('items__product')
+        )
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        worker = getattr(self.request.user, 'worker', None)
+        if worker:
+            context['store']  = worker.store
+            context['worker'] = worker
+        return context
+
+    def _from_name(self, transfer: Transfer) -> str:
+        if transfer.from_branch_id:
+            return transfer.from_branch.name
+        return transfer.from_warehouse.name if transfer.from_warehouse_id else '—'
+
+    def _to_name(self, transfer: Transfer) -> str:
+        if transfer.to_branch_id:
+            return transfer.to_branch.name
+        return transfer.to_warehouse.name if transfer.to_warehouse_id else '—'
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        transfer = serializer.save()
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditLog.Action.CREATE,
+            target_model='Transfer',
+            target_id=transfer.id,
+            description=(
+                f"Transfer yaratildi (pending): "
+                f"{self._from_name(transfer)} → {self._to_name(transfer)}, "
+                f"{transfer.items.count()} ta mahsulot"
+            ),
+        )
+        return Response(
+            {
+                'message': "Transfer muvaffaqiyatli yaratildi. Tasdiqlash uchun /confirm/ ga murojaat qiling.",
+                'data': TransferDetailSerializer(
+                    transfer,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=['post'], url_path='confirm')
+    @transaction.atomic
+    def confirm(self, request, pk=None):
+        """
+        Transferni tasdiqlash — barcha mahsulotlar atomik yangilanadi.
+
+        Jarayon:
+          1. Status pending ekanligini tekshirish
+          2. Barcha itemlar uchun manbaa stockni LOCK (select_for_update)
+          3. Qoldiq yetarliligini tekshirish (HAMMASI tekshiriladi, keyin yangilash)
+          4. Har bir item uchun:
+             a. StockMovement(OUT) — manbaa
+             b. Manbaa Stock kamayadi (F())
+             c. StockMovement(IN)  — manzil
+             d. Manzil Stock ko'payadi (get_or_create + F())
+          5. Transfer.status = confirmed, confirmed_at = now()
+          6. AuditLog
+        """
+        transfer = self.get_object()
+
+        if transfer.status != TransferStatus.PENDING:
+            return Response(
+                {'error': f"Faqat 'pending' transferni tasdiqlash mumkin. Hozirgi holat: '{transfer.get_status_display()}'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        items = list(transfer.items.select_related('product').all())
+        if not items:
+            return Response(
+                {'error': "Transfer bo'sh — hech qanday mahsulot yo'q."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Manbaa joyi
+        from_branch    = transfer.from_branch
+        from_warehouse = transfer.from_warehouse
+
+        # Manzil joyi
+        to_branch    = transfer.to_branch
+        to_warehouse = transfer.to_warehouse
+
+        # ── QADAM 1: Barcha manbaa stocklarni LOCK va tekshirish ──────
+        errors = []
+        locked_stocks = {}
+
+        for item in items:
+            if from_branch:
+                stock, _ = Stock.objects.select_for_update().get_or_create(
+                    product=item.product,
+                    branch=from_branch,
+                    warehouse=None,
+                    defaults={'quantity': 0},
+                )
+            else:
+                stock, _ = Stock.objects.select_for_update().get_or_create(
+                    product=item.product,
+                    branch=None,
+                    warehouse=from_warehouse,
+                    defaults={'quantity': 0},
+                )
+            locked_stocks[item.product_id] = stock
+
+            if stock.quantity < item.quantity:
+                errors.append(
+                    f"'{item.product.name}': mavjud {stock.quantity}, "
+                    f"kerakli {item.quantity}."
+                )
+
+        if errors:
+            # Hech narsa o'zgarmaydi — transaction rollback
+            raise ValidationError({
+                'detail': "Qoldiq yetarli emas — transfer bekor qilindi.",
+                'errors': errors,
+            })
+
+        # ── QADAM 2: Har bir item uchun OUT + IN ──────────────────────
+        worker = getattr(request.user, 'worker', None)
+        store  = transfer.store
+
+        for item in items:
+            from_stock = locked_stocks[item.product_id]
+
+            # ── FIFO: manbaa partiyalardan yechib olish ──────────────
+            loc_from = {
+                'branch':    from_branch,
+                'warehouse': from_warehouse,
+            }
+            deductions, total_cost = fifo_deduct(
+                item.product, loc_from, item.quantity
+            )
+            avg_cost = (
+                total_cost / item.quantity
+                if item.quantity > 0
+                else Decimal('0')
+            )
+
+            # OUT — manbaa
+            out_movement = StockMovement.objects.create(
+                product       = item.product,
+                branch        = from_branch,
+                warehouse     = from_warehouse,
+                movement_type = MovementType.OUT,
+                quantity      = item.quantity,
+                unit_cost     = avg_cost,
+                worker        = worker,
+                note          = f"Transfer #{transfer.id} chiqim",
+            )
+            Stock.objects.filter(pk=from_stock.pk).update(
+                quantity   = F('quantity') - item.quantity,
+                updated_on = timezone.now(),
+            )
+
+            # IN — manzil
+            in_movement = StockMovement.objects.create(
+                product       = item.product,
+                branch        = to_branch,
+                warehouse     = to_warehouse,
+                movement_type = MovementType.IN,
+                quantity      = item.quantity,
+                unit_cost     = avg_cost,
+                worker        = worker,
+                note          = f"Transfer #{transfer.id} kirim",
+            )
+            if to_branch:
+                to_stock, _ = Stock.objects.select_for_update().get_or_create(
+                    product=item.product,
+                    branch=to_branch,
+                    warehouse=None,
+                    defaults={'quantity': 0},
+                )
+            else:
+                to_stock, _ = Stock.objects.select_for_update().get_or_create(
+                    product=item.product,
+                    branch=None,
+                    warehouse=to_warehouse,
+                    defaults={'quantity': 0},
+                )
+            Stock.objects.filter(pk=to_stock.pk).update(
+                quantity   = F('quantity') + item.quantity,
+                updated_on = timezone.now(),
+            )
+
+            # ── FIFO: manzilda yangi batch yaratish ─────────────────
+            batch_code = generate_batch_code(store)
+            StockBatch.objects.create(
+                batch_code   = batch_code,
+                product      = item.product,
+                branch       = to_branch,
+                warehouse    = to_warehouse,
+                unit_cost    = avg_cost,
+                qty_received = item.quantity,
+                qty_left     = item.quantity,
+                movement     = in_movement,
+                store        = store,
+            )
+
+        # ── QADAM 3: Transfer tasdiqlash ──────────────────────────────
+        transfer.status       = TransferStatus.CONFIRMED
+        transfer.confirmed_at = timezone.now()
+        transfer.save(update_fields=['status', 'confirmed_at'])
+
+        total_qty = sum(item.quantity for item in items)
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditLog.Action.UPDATE,
+            target_model='Transfer',
+            target_id=transfer.id,
+            description=(
+                f"Transfer tasdiqlandi: "
+                f"{self._from_name(transfer)} → {self._to_name(transfer)}, "
+                f"{len(items)} ta mahsulot, jami {total_qty} birlik"
+            ),
+        )
+
+        return Response(
+            {
+                'message': "Transfer muvaffaqiyatli tasdiqlandi. Qoldiqlar yangilandi.",
+                'data': TransferDetailSerializer(
+                    transfer,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=['post'], url_path='cancel')
+    def cancel(self, request, pk=None):
+        """
+        Transferni bekor qilish — faqat pending holatda.
+        Stock o'zgarmaydi.
+        """
+        transfer = self.get_object()
+
+        if transfer.status != TransferStatus.PENDING:
+            return Response(
+                {'error': f"Faqat 'pending' transferni bekor qilish mumkin. Hozirgi holat: '{transfer.get_status_display()}'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        transfer.status = TransferStatus.CANCELLED
+        transfer.save(update_fields=['status'])
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditLog.Action.DELETE,
+            target_model='Transfer',
+            target_id=transfer.id,
+            description=(
+                f"Transfer bekor qilindi: "
+                f"{self._from_name(transfer)} → {self._to_name(transfer)}"
+            ),
+        )
+
+        return Response(
+            {
+                'message': "Transfer bekor qilindi.",
+                'data': TransferDetailSerializer(
+                    transfer,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+# ============================================================
+# STOCKBATCH VIEWSET (FIFO PARTIYALAR)
+# ============================================================
+
+class StockBatchViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    FIFO partiyalarini ko'rish (faqat o'qish).
+
+    Endpointlar:
+      GET /api/v1/warehouse/batches/           — ro'yxat (?product=<id>)
+      GET /api/v1/warehouse/batches/{id}/      — tafsilotlar
+
+    Filtrlash:
+      ?product=<id>  — ma'lum mahsulotning barcha partiyadlari
+
+    Foydalanish:
+      Mahsulotning FIFO tannarxini kuzatish, moliyaviy hisobot uchun.
+      qty_left=0 bo'lgan partiyalar tamom (eski arxiv).
+    """
+    serializer_class   = StockBatchSerializer
+    permission_classes = [IsAuthenticated, CanAccess('ombor')]
+
+    def get_queryset(self):
+        worker = getattr(self.request.user, 'worker', None)
+        if not worker or not worker.store:
+            return StockBatch.objects.none()
+        qs = (
+            StockBatch.objects
+            .filter(store=worker.store)
+            .select_related('product', 'branch', 'warehouse', 'movement')
+        )
+        product_id = self.request.query_params.get('product')
+        if product_id:
+            qs = qs.filter(product_id=product_id)
+        return qs

@@ -7,8 +7,11 @@ Funksiyalar:
   get_barcode_image(barcode_value)   — PNG rasm qaytaradi
   get_barcode_svg(barcode_value)     — SVG qaytaradi
   get_today_rate(currency_code)      — Bugungi valyuta kursini olish
+  generate_batch_code(store)         — FIFO partiya kodi generatsiya
+  fifo_deduct(product, loc_kwargs, qty_needed) — FIFO bo'yicha partiyadan yechib olish
 """
 
+from decimal import Decimal
 from io import BytesIO
 
 
@@ -187,3 +190,110 @@ def get_today_rate(currency_code: str) -> float | None:
         return float(last_rate.rate)
 
     return None
+
+
+# ============================================================
+# FIFO PARTIYA KODI GENERATSIYA
+# ============================================================
+
+def generate_batch_code(store) -> str:
+    """
+    Do'kon uchun FIFO partiya kodi generatsiya qilish.
+
+    Format: {DO'KON[:5].upper()}-{YY}-{MM}-{DD}-{seq:04d}
+    Misol:  BESTM-26-03-10-0001
+      BESTM  — "Best Market" do'kon nomi (maks 5 ta harf, katta)
+      26-03-10 — 2026-yil 10-mart (qisqa sana formati)
+      0001   — shu kun uchun birinchi partiya
+
+    Thread-safe: select_for_update() + transaction.atomic() ichida ishlaydi.
+    Kod benzersizligi: unique=True bilan DB darajasida kafolatlanadi.
+
+    Maksimal kuniga: 9999 ta partiya (bir do'kon uchun).
+    """
+    from django.db import transaction
+    from django.db.models import Q
+    from django.utils import timezone
+    from .models import StockBatch
+
+    today  = timezone.localdate()
+    prefix = f"{store.name[:5].upper()}-{today.strftime('%y-%m-%d')}-"
+
+    with transaction.atomic():
+        # Bugungi kundagi so'nggi partiyani toping (select_for_update — thread-safe)
+        last = (
+            StockBatch.objects
+            .filter(batch_code__startswith=prefix)
+            .select_for_update()
+            .order_by('-batch_code')
+            .first()
+        )
+        if last:
+            # Oxirgi ketma-ketlik raqamini ajratib oling va 1 ga oshiring
+            try:
+                seq = int(last.batch_code.rsplit('-', 1)[1]) + 1
+            except (ValueError, IndexError):
+                seq = 1
+        else:
+            seq = 1
+
+        return f"{prefix}{seq:04d}"
+
+
+# ============================================================
+# FIFO YECHIB OLISH (chiqim/sotuv/transfer uchun)
+# ============================================================
+
+def fifo_deduct(product, location_kwargs: dict, qty_needed: Decimal):
+    """
+    FIFO bo'yicha partiyalardan yechib olish.
+
+    Argumentlar:
+      product        — warehouse.Product obyekti
+      location_kwargs — {'branch': branch, 'warehouse': None} yoki
+                        {'branch': None,   'warehouse': warehouse}
+      qty_needed     — yechib olinishi kerak bo'lgan umumiy miqdor (Decimal)
+
+    Qaytaradi: (deductions, total_cost)
+      deductions  — [(StockBatch, qty_used), ...] ro'yxati (FIFO tartibi)
+      total_cost  — Decimal, jami tannarx = sum(qty_used * unit_cost)
+
+    MUHIM:
+      - Bu funksiya select_for_update() ishlatadi.
+      - transaction.atomic() ichida chaqirilishi shart!
+      - Agar qoldiq yetishmasa, qolgan miqdor o'chirilmaydi.
+        (Chaqiruvchi kod oldin Stock.quantity tekshirishi kerak.)
+
+    Misol:
+      >>> deductions, total_cost = fifo_deduct(
+      ...     product, {'branch': branch, 'warehouse': None}, Decimal('8')
+      ... )
+      >>> avg_cost = total_cost / Decimal('8')
+    """
+    from django.db.models import F
+    from .models import StockBatch
+
+    batches = (
+        StockBatch.objects
+        .select_for_update()
+        .filter(product=product, qty_left__gt=0, **location_kwargs)
+        .order_by('received_at', 'id')  # FIFO: eng eski birinchi
+    )
+
+    remaining  = qty_needed
+    deductions = []           # [(batch, qty_used), ...]
+    total_cost = Decimal('0')
+
+    for batch in batches:
+        if remaining <= 0:
+            break
+        use = min(batch.qty_left, remaining)
+        deductions.append((batch, use))
+        total_cost += use * batch.unit_cost
+        # F() expression bilan atomik yangilash (race condition yo'q)
+        StockBatch.objects.filter(pk=batch.pk).update(
+            qty_left=F('qty_left') - use
+        )
+        remaining -= use
+
+    return deductions, total_cost
