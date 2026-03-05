@@ -70,6 +70,7 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 | `Supplier`  | ❌ Boshlanmagan  | BOSQICH 13 — v2, keyingi versiyada                     |
 | `OFD`       | ❌ Boshlanmagan  | BOSQICH 14 — v2, keyingi versiyada (Uzbekistonda MAJBURIY 2026) |
 | `Offline sync` | ❌ Boshlanmagan | BOSQICH 18 — idempotency + sync queue                |
+| `subscription` | ❌ Boshlanmagan  | BOSQICH 20 — SubscriptionPlan, Subscription (trial/active/expired), Coupon, CouponUsage, SubscriptionPayment, Middleware, Celery eslatma |
 
 ---
 
@@ -1084,6 +1085,290 @@ AuditLog read API (accaunt app da):
 
 ---
 
+### BOSQICH 20 — Subscription (Obuna tizimi) ← YANGI
+
+**Yangi app:** `subscription`
+
+#### SubscriptionStatus (TextChoices)
+```python
+TRIAL     = 'trial'      # 30 kunlik bepul sinov — yangi akkaunt ochilganda
+ACTIVE    = 'active'     # To'langan yoki kupon orqali faol
+EXPIRED   = 'expired'    # Muddati tugagan → tizimga kirish bloklanadi
+CANCELLED = 'cancelled'  # Bekor qilingan
+```
+
+#### BillingCycle (TextChoices)
+```python
+MONTHLY = 'monthly'  # Oylik to'lov
+YEARLY  = 'yearly'   # Yillik to'lov
+```
+
+#### Model 1 — SubscriptionPlan (admin boshqaradi)
+```
+name           CharField(unique)     'basic' | 'normal' | 'pro'
+display_name   CharField             'Basic' | 'Normal' | 'Pro'
+max_branches   IntegerField(null)    null = cheksiz
+max_warehouses IntegerField(null)    null = cheksiz
+max_workers    IntegerField(null)    null = cheksiz
+monthly_price  DecimalField          Oylik narx (UZS)
+yearly_price   DecimalField          Yillik narx (UZS)
+is_active      BooleanField          Plan sotuvda bormi
+order          IntegerField          Ko'rsatish tartibi (1=Basic, 2=Normal, 3=Pro)
+
+Seed data (migration da):
+  Basic:  max_branches=1, max_warehouses=1, max_workers=4
+  Normal: max_branches=3, max_warehouses=3, max_workers=10
+  Pro:    max_branches=null, max_warehouses=null, max_workers=null
+```
+
+#### Model 2 — Subscription (har do'kon uchun bitta, OneToOne → Store)
+```
+store           OneToOneField(Store)          related_name='subscription'
+plan            FK(SubscriptionPlan, null)    null = trial davri
+status          CharField                     SubscriptionStatus
+billing_cycle   CharField(null)               BillingCycle
+start_date      DateField
+end_date        DateField                     Qachon tugaydi
+is_trial        BooleanField(default=True)
+notified_3_days BooleanField(default=False)   3 kunlik eslatma yuborilganmi
+notified_1_day  BooleanField(default=False)   1 kunlik eslatma yuborilganmi
+created_on      DateTimeField(auto_now_add)
+```
+
+#### Model 3 — Coupon (admin yaratadi)
+```
+code          CharField(unique)         'PROMO2026', 'SUMMER50'
+plan          FK(SubscriptionPlan,null) null = barcha planlarga; aks holda SHART O'SHA PLAN
+duration_days IntegerField              Necha kunlik bepul kirish beradi
+max_uses      IntegerField(null)        null = cheksiz; masalan 100 ta do'kon
+used_count    IntegerField(default=0)   Necha kishi ishlatgan (avtomatik ++)
+valid_from    DateField                 Kupon qachondan amal qiladi
+valid_to      DateField(null)           null = muddatsiz
+is_active     BooleanField(default=True)
+created_on    DateTimeField(auto_now_add)
+
+Kupon ishlash logikasi:
+  - plan belgilangan bo'lsa → do'kon O'SHA PLAN ga duration_days kunlik bepul kirish oladi
+  - plan=null bo'lsa → joriy plan uzaytiriladi (duration_days kun)
+  - Bir do'kon bir kuponi faqat bir marta ishlatadi (CouponUsage unique_together)
+  - max_uses to'lsa → kupon ishlamaydi (400 xato)
+  - valid_to o'tgan bo'lsa → ishlamaydi (400 xato)
+  - is_active=False bo'lsa → ishlamaydi (400 xato)
+```
+
+#### Model 4 — CouponUsage (kim ishlatganini kuzatadi)
+```
+coupon          FK(Coupon)
+store           FK(Store)
+used_at         DateTimeField(auto_now_add)
+extended_until  DateField              Obuna qachongacha uzaygani
+
+unique_together = [('coupon', 'store')]  ← bir do'kon bir kuponi 1 marta
+```
+
+#### Model 5 — SubscriptionPayment (to'lovlar tarixi)
+```
+subscription   FK(Subscription)           related_name='payments'
+plan           FK(SubscriptionPlan)        Qaysi plan uchun to'langan
+billing_cycle  CharField                  monthly | yearly
+amount         DecimalField               To'langan summa (UZS)
+coupon         FK(Coupon, null)            Kupon ishlatilganmi
+status         CharField                  completed | pending | failed
+paid_at        DateTimeField              To'lov vaqti
+note           TextField(blank)           Admin izohi (masalan: "Payme orqali")
+created_by     FK(CustomUser, null)       Admin tomonidan yozilsa
+
+→ Do'kon egasi faqat o'z to'lovlarini ko'ra oladi
+→ Admin barcha to'lovlarni ko'radi va qo'sha oladi
+→ V2 da: Payme/Click gateway orqali avtomatik to'ldiriladi
+```
+
+#### Signal
+```python
+# Store yaratilganda AVTOMATIK trial Subscription yaratiladi
+@receiver(post_save, sender=Store)
+def create_trial_subscription(sender, instance, created, **kwargs):
+    if created:
+        Subscription.objects.create(
+            store=instance,
+            plan=None,
+            status='trial',
+            is_trial=True,
+            start_date=today,
+            end_date=today + timedelta(days=30),
+        )
+# Sabab: hech qachon "subscription topilmadi" xatosi bo'lmasin
+```
+
+#### Middleware — Har so'rovda obuna tekshiruvi
+```python
+class SubscriptionMiddleware:
+    # Bu yo'llarga tekshiruv qo'llanilmaydi:
+    EXEMPT_PREFIXES = [
+        '/api/v1/auth/',
+        '/api/v1/subscription/',
+        '/health/',
+        '/admin/',
+        '/swagger/',
+    ]
+
+    def __call__(self, request):
+        # Faqat authenticated request lar tekshiriladi
+        # Superuser/admin bypass qiladi
+        # Subscription.status == 'expired' bo'lsa → 403
+        # {"detail": "Obuna muddati tugagan. Yangilash uchun /api/v1/subscription/"}
+```
+
+#### Cheklovlar (Enforcement) — Branch va Worker yaratishda
+```python
+# Branch yaratishda (store/views.py BranchViewSet.perform_create):
+sub = worker.store.subscription
+if sub.status == 'expired':
+    raise PermissionDenied("Obuna muddati tugagan.")
+plan = sub.plan
+if plan and plan.max_branches is not None:
+    active_count = Branch.objects.filter(store=worker.store, status='active').count()
+    if active_count >= plan.max_branches:
+        raise PermissionDenied(f"'{plan.display_name}' tarifi faqat {plan.max_branches} ta filialga ruxsat beradi.")
+
+# Worker yaratishda (accaunt/views.py WorkerViewSet.perform_create):
+if plan and plan.max_workers is not None:
+    active_count = Worker.objects.filter(store=worker.store).exclude(status='ishdan_ketgan').count()
+    if active_count >= plan.max_workers:
+        raise PermissionDenied(f"'{plan.display_name}' tarifi faqat {plan.max_workers} ta xodimga ruxsat beradi.")
+
+# Pro plan (null limit) → tekshiruv o'tkazilmaydi
+```
+
+#### Celery Task — Kunlik eslatma va muddatni tekshirish (har kuni 08:00)
+```python
+@shared_task
+def check_subscription_expirations():
+    today = timezone.now().date()
+
+    # 3 kun qolganda (va eslatma yuborilmagan)
+    subs_3days = Subscription.objects.filter(
+        status='active', end_date=today + timedelta(days=3), notified_3_days=False
+    )
+    for sub in subs_3days:
+        # → Telegram xabar (agar telegram_enabled)
+        # → Email xabar (ixtiyoriy)
+        sub.notified_3_days = True
+        sub.save(update_fields=['notified_3_days'])
+
+    # 1 kun qolganda
+    subs_1day = Subscription.objects.filter(
+        status='active', end_date=today + timedelta(days=1), notified_1_day=False
+    )
+    for sub in subs_1day:
+        sub.notified_1_day = True
+        sub.save(update_fields=['notified_1_day'])
+
+    # Muddati o'tganlar → expired ga o'tkazish
+    expired = Subscription.objects.filter(
+        status__in=['trial', 'active'], end_date__lt=today
+    )
+    expired.update(status='expired')
+```
+
+#### API Endpointlar
+
+**Do'kon egasi uchun (IsOwner):**
+```
+GET  /api/v1/subscription/               → O'z obunasi, qancha vaqt qolgan, joriy plan
+GET  /api/v1/subscription/plans/         → Barcha faol planlar va narxlari (ro'yxat)
+POST /api/v1/subscription/activate-coupon/ → {"code": "PROMO2026"} → obunani faollashtiradi
+GET  /api/v1/subscription/payments/      → O'z to'lovlari tarixi (faqat o'zini ko'radi)
+```
+
+**Admin uchun (IsAdminUser — Django superuser):**
+```
+# Tarif planlari (CRUD)
+GET/POST      /api/v1/admin/plans/          → Plan yaratish, ro'yxat
+PATCH/DELETE  /api/v1/admin/plans/{id}/     → Plan tahrirlash, o'chirish
+
+# Kuponlar (CRUD)
+GET/POST      /api/v1/admin/coupons/        → Kupon yaratish, ro'yxat
+PATCH/DELETE  /api/v1/admin/coupons/{id}/   → Kupon tahrirlash, o'chirish
+GET           /api/v1/admin/coupons/{id}/usages/ → Kim ishlatganini ko'rish
+
+# Barcha obunalar (monitoring)
+GET           /api/v1/admin/subscriptions/              → Barcha do'konlar obunasi
+              ?status=trial|active|expired|cancelled
+              ?plan=basic|normal|pro
+GET           /api/v1/admin/subscriptions/{id}/         → Bitta obuna detayli
+POST          /api/v1/admin/subscriptions/{id}/extend/  → Qo'lda uzaytirish
+              {"days": 30, "note": "Bonus"}
+
+# To'lovlar (CRUD + monitoring)
+GET/POST      /api/v1/admin/payments/        → Barcha to'lovlar, yangi to'lov qo'shish
+PATCH         /api/v1/admin/payments/{id}/   → To'lov tahrirlash
+
+# Moliyaviy dashboard (admin uchun)
+GET           /api/v1/admin/financial/
+  Javob:
+  {
+    "total_revenue": {"monthly": 0, "yearly": 0, "total": 0},
+    "subscriptions_by_status": {"trial": 0, "active": 0, "expired": 0},
+    "subscriptions_by_plan":   {"basic": 0, "normal": 0, "pro": 0},
+    "revenue_by_month": [{"month": "2026-03", "amount": 0}, ...],  # oxirgi 12 oy
+    "coupon_stats": {"total_coupons": 0, "total_uses": 0, "active_coupons": 0},
+    "expiring_soon": 0   # keyingi 7 kun ichida tugaydigan obunalar soni
+  }
+```
+
+#### Ruxsatlar jadvali
+```
+                              Do'kon egasi    Admin (superuser)
+GET /subscription/            ✅ O'zini        ✅ Barcha
+GET /subscription/plans/      ✅              ✅
+POST /activate-coupon/        ✅              ✅
+GET /subscription/payments/   ✅ Faqat o'zi   ✅ Barcha
+/admin/plans/*                ❌              ✅
+/admin/coupons/*              ❌              ✅
+/admin/subscriptions/*        ❌              ✅
+/admin/payments/*             ❌              ✅
+/admin/financial/             ❌              ✅
+```
+
+#### Yangi fayllar
+```
+subscription/
+├── __init__.py
+├── apps.py
+├── models.py        ← SubscriptionPlan, Subscription, Coupon, CouponUsage, SubscriptionPayment
+├── serializers.py   ← barcha serializerlar
+├── views.py         ← do'kon egasi + admin ViewSet lar
+├── admin.py         ← Django admin panel
+├── permissions.py   ← IsAdminUser permission
+├── middleware.py    ← SubscriptionMiddleware
+├── signals.py       ← Store → auto trial Subscription
+├── tasks.py         ← check_subscription_expirations (Celery)
+└── migrations/
+    └── 0001_initial.py  ← barcha modellar + seed data (Basic/Normal/Pro planlar)
+```
+
+#### Yangilangan fayllar
+```
+store/signals.py      ← create_trial_subscription signal qo'shiladi
+config/celery.py      ← check_subscription_expirations Celery beat task qo'shiladi (har kuni 08:00)
+config/settings/base.py ← INSTALLED_APPS ga 'subscription' qo'shiladi
+config/middleware.py yoki config/settings/base.py ← MIDDLEWARE ga SubscriptionMiddleware qo'shiladi
+config/urls.py        ← /api/v1/ va /api/v1/admin/ urllar qo'shiladi
+```
+
+#### Muhim eslatmalar
+```
+⚠️ Trial davri: yangi Store ochilganda AVTOMATIK 30 kunlik trial yaratiladi (signal orqali)
+⚠️ Pro plan: max_* = null → barcha cheklovlar bypass qilinadi (tekshiruv o'tkazilmaydi)
+⚠️ Kupon + plan: kupon plan belgilagan bo'lsa, do'kon O'SHA PLAN ga o'tadi (yuqoriga ham, pastga ham)
+⚠️ To'lov integratsiyasi (Payme/Click) → V2 da, hozir admin qo'lda SubscriptionPayment yozadi
+⚠️ Eslatma kanali: Telegram (StoreSettings.telegram_enabled=True bo'lsa), aks holda faqat log
+⚠️ Admin bypass: Django superuser (is_superuser=True) SubscriptionMiddleware ni chetlab o'tadi
+```
+
+---
+
 ### REJANING UMUMIY KETMA-KETLIGI (QAYTA ESLATMA)
 ```
 0  ✅     Tayyorlov: MEDIA fayllar, CORS headers (x-idempotency-key) ← BAJARILDI
@@ -1106,6 +1391,7 @@ AuditLog read API (accaunt app da):
 17 ❌     Dashboard
 18 ❌     Offline rejim                    ← YANGI
 19 ❌     QR kod + AuditLog API
+20 ❌     Subscription (Obuna tizimi)      ← YANGI
 
 IXTIYORIY FLAGLAR (StoreSettings da, har do'kon uchun alohida):
   subcategory_enabled  → default=False (B1)

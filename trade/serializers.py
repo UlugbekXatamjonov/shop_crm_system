@@ -272,7 +272,7 @@ class SaleListSerializer(serializers.ModelSerializer):
     def get_worker_name(self, obj: Sale) -> str | None:
         try:
             return str(obj.worker.user)
-        except Exception:
+        except AttributeError:
             return None
 
     def get_customer_name(self, obj: Sale) -> str | None:
@@ -313,7 +313,7 @@ class SaleDetailSerializer(serializers.ModelSerializer):
     def get_worker_name(self, obj: Sale) -> str | None:
         try:
             return str(obj.worker.user)
-        except Exception:
+        except AttributeError:
             return None
 
     def get_customer_name(self, obj: Sale) -> str | None:
