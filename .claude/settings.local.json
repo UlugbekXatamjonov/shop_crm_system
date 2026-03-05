@@ -30,7 +30,11 @@
       "Bash(myenv/Scripts/python.exe manage.py check --settings=config.settings.local)",
       "Bash(xargs wc -l)",
       "Bash(python3 -c \":*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(python3 -c \"import sys, json; lines = sys.stdin.read\\(\\).strip\\(\\).split\\(''\\\\n''\\); [print\\(json.dumps\\(json.loads\\(l\\), indent=2, ensure_ascii=False\\)[:2000]\\) for l in lines[-5:] if l.strip\\(\\)]\")",
+      "Bash(/c/Users/Ulugbek/myenv/Scripts/python.exe --version)",
+      "Bash(git pull origin main)",
+      "Bash(git merge:*)"
     ]
   }
 }
