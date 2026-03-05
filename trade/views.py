@@ -43,6 +43,7 @@ from config.cache_utils import get_store_settings
 from store.models import Smena, SmenaStatus
 
 from warehouse.models import MovementType, Stock, StockMovement
+from warehouse.utils import fifo_deduct
 
 from .models import (
     Customer,
@@ -607,20 +608,31 @@ class SaleViewSet(viewsets.ModelViewSet):
             product    = item_data['product']
             quantity   = item_data['quantity']
 
-            SaleItem.objects.create(
+            # ── FIFO: manbaa partiyalardan yechib olish ──────────────
+            loc_kwargs = {'branch': branch, 'warehouse': None}
+            deductions, total_cost = fifo_deduct(product, loc_kwargs, quantity)
+            avg_cost = (
+                total_cost / quantity
+                if quantity > 0
+                else Decimal('0')
+            )
+
+            sale_item = SaleItem.objects.create(
                 sale        = sale,
                 product     = product,
                 quantity    = quantity,
                 unit_price  = item_data['unit_price'],
                 total_price = item_data['total_price'],
+                unit_cost   = avg_cost,
             )
 
-            # StockMovement(OUT)
+            # StockMovement(OUT) — FIFO narxi bilan
             StockMovement.objects.create(
                 product       = product,
                 branch        = branch,
                 movement_type = MovementType.OUT,
                 quantity      = quantity,
+                unit_cost     = avg_cost,
                 worker        = worker,
                 note          = f"Sotuv #{sale.id}",
             )

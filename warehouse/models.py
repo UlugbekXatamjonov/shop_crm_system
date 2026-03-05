@@ -14,9 +14,10 @@ Modellar:
   Product         — Mahsulot (nom, kategoriya, subkat, birlik, narx, shtrix-kod, valyuta)
   Warehouse       — Ombor (Anbar) — alohida saqlash joyi (Branch != Warehouse)
   Stock           — Filial YOKI Ombor bo'yicha qoldiq (Product + Branch|Warehouse + miqdor)
-  StockMovement   — Kirim/chiqim tarixi (immutable log)
+  StockMovement   — Kirim/chiqim tarixi (immutable log) + unit_cost (tannarx)
   Transfer        — Tovar ko'chirish (Filial↔Ombor↔Filial, guruhlab)
   TransferItem    — Transfer satri (1 Transfer → N mahsulot)
+  StockBatch      — FIFO partiya (har bir IN harakati uchun, qty_left kamayadi)
 
 Muhim farq:
   Branch (Filial)   — sotuv nuqtasi (kassa, sotuvchi).
@@ -29,6 +30,12 @@ Transfer holatlari:
   pending   → yaratilgan, hali tasdiqlanmagan (stock o'zgarmaydi)
   confirmed → tasdiqlangan, stock yangilangan (immutable)
   cancelled → bekor qilingan (faqat pending dan)
+
+FIFO (StockBatch):
+  Har bir IN StockMovement uchun StockBatch yaratiladi.
+  Chiqimda (OUT, Sotuv, Transfer.confirm) eng eski batch dan boshlab yechiladi.
+  batch_code: {DO'KON[:5].upper()}-{YY}-{MM}-{DD}-{seq:04d}
+  Misol: BESTM-26-03-10-0001
 """
 
 from django.db import models
@@ -538,6 +545,13 @@ class StockMovement(models.Model):
         decimal_places=3,
         verbose_name="Miqdori"
     )
+    unit_cost     = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Tannarx (birlik)"
+    )
     note          = models.TextField(
         blank=True,
         verbose_name="Izoh"
@@ -738,3 +752,110 @@ class TransferItem(models.Model):
 
     def __str__(self) -> str:
         return f"{self.product.name} × {self.quantity}"
+
+
+# ============================================================
+# FIFO PARTIYASI (STOCKBATCH)
+# ============================================================
+
+class StockBatch(models.Model):
+    """
+    Har bir kelgan mahsulot partiyasi (FIFO uchun).
+
+    Har bir IN StockMovement uchun avtomatik yaratiladi.
+    Chiqimda (OUT harakat, Sotuv, Transfer.confirm) eng eski partiyadan
+    boshlab qty_left kamayadi.
+
+    Immutable maydonlar (yaratilgandan keyin o'zgartirilmaydi):
+      batch_code, product, branch|warehouse, unit_cost, qty_received, movement
+
+    O'zgaruvchi maydon:
+      qty_left — FIFO da kamayadi (0 gacha)
+
+    batch_code formati: {DO'KON[:5].upper()}-{YY}-{MM}-{DD}-{seq:04d}
+    Misol: BESTM-26-03-10-0001
+      BESTM — "Best Market" do'koni nomi (5 ta harf)
+      26-03-10 — 2026-yil 10-mart (qisqa format)
+      0001 — shu kun uchun birinchi partiya
+
+    Constraint: branch va warehouse dan AYNAN bittasi to'ldirilishi SHART
+      (Stock va StockMovement bilan bir xil pattern).
+    """
+    batch_code   = models.CharField(
+        max_length=30,
+        unique=True,
+        verbose_name='Partiya kodi',
+    )
+    product      = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name='batches',
+        verbose_name='Mahsulot',
+    )
+    branch       = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='batches',
+        verbose_name='Filial',
+    )
+    warehouse    = models.ForeignKey(
+        Warehouse,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='batches',
+        verbose_name='Ombor',
+    )
+    unit_cost    = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        verbose_name='Tannarx (birlik)',
+    )
+    qty_received = models.DecimalField(
+        max_digits=14,
+        decimal_places=3,
+        verbose_name='Qabul qilingan miqdor',
+    )
+    qty_left     = models.DecimalField(
+        max_digits=14,
+        decimal_places=3,
+        verbose_name='Qoldiq miqdor',
+    )
+    movement     = models.OneToOneField(
+        StockMovement,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='batch',
+        verbose_name='Kirim harakati',
+    )
+    store        = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name='batches',
+        verbose_name="Do'koni",
+    )
+    received_at  = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Qabul vaqti',
+    )
+
+    class Meta:
+        verbose_name        = 'Partiya'
+        verbose_name_plural = 'Partiyalar'
+        ordering            = ['received_at', 'id']  # FIFO tartibi: eng eski birinchi
+        constraints         = [
+            CheckConstraint(
+                check=(
+                    Q(branch__isnull=False, warehouse__isnull=True) |
+                    Q(branch__isnull=True,  warehouse__isnull=False)
+                ),
+                name='batch_branch_xor_warehouse',
+            )
+        ]
+
+    def __str__(self) -> str:
+        location = self.branch.name if self.branch_id else self.warehouse.name
+        return f"{self.batch_code}: {self.product.name} @ {location} — qoldiq: {self.qty_left}"

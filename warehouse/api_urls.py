@@ -48,6 +48,15 @@ Router avtomatik quyidagi URL'larni yaratadi:
   GET    /api/v1/warehouse/movements/            — harakatlar ro'yxati (branch|warehouse)
   POST   /api/v1/warehouse/movements/            — harakat yaratish (kirim/chiqim, branch yoki warehouse)
   GET    /api/v1/warehouse/movements/{id}/       — harakat tafsilotlari
+
+  GET    /api/v1/warehouse/transfers/            — transferlar ro'yxati
+  POST   /api/v1/warehouse/transfers/            — yangi transfer (pending holat)
+  GET    /api/v1/warehouse/transfers/{id}/       — transfer tafsilotlari
+  POST   /api/v1/warehouse/transfers/{id}/confirm/ — tasdiqlash (stock yangilanadi, FIFO)
+  POST   /api/v1/warehouse/transfers/{id}/cancel/  — bekor qilish (faqat pending)
+
+  GET    /api/v1/warehouse/batches/              — FIFO partiyalar ro'yxati (?product=<id>)
+  GET    /api/v1/warehouse/batches/{id}/         — partiya tafsilotlari
 """
 
 from rest_framework.routers import DefaultRouter
@@ -57,6 +66,7 @@ from .views import (
     CurrencyViewSet,
     ExchangeRateViewSet,
     ProductViewSet,
+    StockBatchViewSet,
     StockMovementViewSet,
     StockViewSet,
     SubCategoryViewSet,
@@ -74,5 +84,6 @@ router.register(r'warehouses',     WarehouseViewSet,     basename='warehouse')
 router.register(r'stocks',         StockViewSet,         basename='stock')
 router.register(r'movements',      StockMovementViewSet, basename='movement')
 router.register(r'transfers',      TransferViewSet,      basename='transfer')
+router.register(r'batches',        StockBatchViewSet,    basename='batch')
 
 urlpatterns = router.urls

@@ -55,8 +55,8 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 |-------------|-------------------|--------------------------------------------------------|
 | `accaunt`   | ✅ Tugallangan    | CustomUser, Worker, AuditLog, JWT auth — password reset, WorkerList/Detail da store+branch |
 | `store`     | ✅ Tugallangan    | Store, Branch CRUD (soft delete, multi-tenant, workers in detail, Uzbek errors) |
-| `warehouse` | ✅ Tugallangan    | Category, **SubCategory**, Product(+image, +barcode EAN-13, +subcategory, +price_currency), **Currency**, **ExchangeRate**, **Warehouse**(ombor, soft delete), Stock(branch\|warehouse), StockMovement(branch\|warehouse), **Transfer**+TransferItem(guruhlab ko'chirish, confirm/cancel, atomic) — BOSQICH 1 + 1.5 + 1.6 ✅ |
-| `trade`     | ✅ Tugallangan   | BOSQICH 4 ✅ — CustomerGroup, Customer (soft delete), Sale (@transaction.atomic, 13-qadam), SaleItem, cancel action, _build_report() to'ldirildi |
+| `warehouse` | ✅ Tugallangan    | Category, **SubCategory**, Product(+image, +barcode EAN-13, +subcategory, +price_currency), **Currency**, **ExchangeRate**, **Warehouse**(ombor, soft delete), Stock(branch\|warehouse), StockMovement(branch\|warehouse, unit_cost), **Transfer**+TransferItem(guruhlab ko'chirish, confirm/cancel, atomic), **StockBatch**(FIFO partiya, batch_code, unit_cost, qty_left) — BOSQICH 1 + 1.5 + 1.6 + 1.7 ✅ |
+| `trade`     | ✅ Tugallangan   | BOSQICH 4 ✅ — CustomerGroup, Customer (soft delete), Sale (@transaction.atomic, 13-qadam + FIFO deduction), SaleItem(+unit_cost), cancel action, _build_report() to'ldirildi |
 | `expense`   | ❌ Boshlanmagan  | BOSQICH 6 — ExpenseCategory, Expense                   |
 | `StoreSettings` | ✅ Tugallangan  | BOSQICH 2 ✅ — 10 guruh, 30+ maydon, signal+Redis kesh |
 | `Smena`     | ✅ Tugallangan   | BOSQICH 3 ✅ — SmenaStatus+Smena model, SmenaViewSet (open/close/x-report), migration 0005 |

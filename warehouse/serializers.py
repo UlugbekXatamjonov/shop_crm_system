@@ -16,8 +16,9 @@ Tartib:
   5. Product serializers
   6. Warehouse serializers
   7. Stock serializers       (branch|warehouse)
-  8. StockMovement serializers (branch|warehouse)
-  9. Transfer serializers    <- YANGI (guruhlab ko'chirish)
+  8. StockMovement serializers (branch|warehouse, unit_cost)
+  9. Transfer serializers    (guruhlab ko'chirish)
+  10. StockBatch serializers  (FIFO partiyalar)
 """
 
 from rest_framework import serializers
@@ -32,6 +33,7 @@ from .models import (
     Product,
     ProductStatus,
     Stock,
+    StockBatch,
     StockMovement,
     SubCategory,
     Transfer,
@@ -771,7 +773,7 @@ class MovementListSerializer(serializers.ModelSerializer):
             'id', 'product_name', 'product_unit',
             'location_type', 'location_name',
             'movement_type', 'movement_type_display',
-            'quantity', 'worker_name', 'created_on',
+            'quantity', 'unit_cost', 'worker_name', 'created_on',
         )
 
     def get_worker_name(self, obj):
@@ -809,7 +811,7 @@ class MovementDetailSerializer(serializers.ModelSerializer):
             'branch_id', 'branch_name',
             'warehouse_id', 'warehouse_name',
             'movement_type', 'movement_type_display',
-            'quantity', 'note',
+            'quantity', 'unit_cost', 'note',
             'worker_name', 'created_on',
         )
 
@@ -823,9 +825,18 @@ class MovementDetailSerializer(serializers.ModelSerializer):
 
 
 class MovementCreateSerializer(serializers.ModelSerializer):
+    # unit_cost: IN harakatda xarid narxi. OUT da e'tiborsiz (FIFO dan hisoblanadi).
+    unit_cost = serializers.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        required=False,
+        allow_null=True,
+        help_text="Kirim narxi (IN uchun). Chiqimda avtomatik hisoblanadi.",
+    )
+
     class Meta:
         model  = StockMovement
-        fields = ('product', 'branch', 'warehouse', 'movement_type', 'quantity', 'note')
+        fields = ('product', 'branch', 'warehouse', 'movement_type', 'quantity', 'unit_cost', 'note')
         extra_kwargs = {
             'product': {
                 'error_messages': {
@@ -1156,3 +1167,48 @@ class TransferCreateSerializer(serializers.Serializer):
         for item in items_data:
             TransferItem.objects.create(transfer=transfer, **item)
         return transfer
+
+
+# ============================================================
+# STOCKBATCH SERIALIZERLARI (FIFO PARTIYALAR)
+# ============================================================
+
+class StockBatchSerializer(serializers.ModelSerializer):
+    """
+    FIFO partiya — o'qish uchun (read-only).
+
+    GET /api/v1/warehouse/batches/           — ro'yxat (?product=<id>)
+    GET /api/v1/warehouse/batches/{id}/      — tafsilotlar
+    """
+    product_name   = serializers.CharField(source='product.name',              read_only=True)
+    product_unit   = serializers.CharField(source='product.get_unit_display',  read_only=True)
+    branch_name    = serializers.CharField(source='branch.name',               read_only=True)
+    warehouse_name = serializers.CharField(source='warehouse.name',            read_only=True)
+    location_type  = serializers.SerializerMethodField()
+    location_name  = serializers.SerializerMethodField()
+    is_empty       = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = StockBatch
+        fields = (
+            'id', 'batch_code',
+            'product', 'product_name', 'product_unit',
+            'location_type', 'location_name',
+            'branch_name', 'warehouse_name',
+            'unit_cost',
+            'qty_received', 'qty_left',
+            'is_empty',
+            'movement', 'received_at',
+        )
+
+    def get_location_type(self, obj):
+        return 'branch' if obj.branch_id else 'warehouse'
+
+    def get_location_name(self, obj):
+        if obj.branch_id:
+            return obj.branch.name
+        return obj.warehouse.name if obj.warehouse_id else None
+
+    def get_is_empty(self, obj):
+        """qty_left == 0 bo'lsa — partiya tamom."""
+        return obj.qty_left == 0

@@ -288,6 +288,13 @@ class SaleItem(models.Model):
         decimal_places=2,
         verbose_name='Jami (miqdor × narx)',
     )
+    unit_cost   = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name='Tannarx (FIFO bo\'yicha, sotuv paytida)',
+    )
 
     class Meta:
         verbose_name        = 'Sotuv elementi'

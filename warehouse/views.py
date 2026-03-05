@@ -10,7 +10,9 @@ ViewSet'lar:
   ProductViewSet       — Mahsulotlarni boshqarish + barcode_image action (BOSQICH 1.2)
   WarehouseViewSet     — Omborlarni boshqarish (BOSQICH 6)
   StockViewSet         — Ombor qoldiqlarini boshqarish (branch|warehouse)
-  StockMovementViewSet — Kirim/chiqim harakatlarini boshqarish (branch|warehouse)
+  StockMovementViewSet — Kirim/chiqim harakatlarini boshqarish (branch|warehouse, FIFO)
+  TransferViewSet      — Guruhlab ko'chirish (BOSQICH 1.6, FIFO propagatsiya)
+  StockBatchViewSet    — FIFO partiyalar (read-only, BOSQICH 1.7)
 
 Ruxsatlar:
   list/retrieve → CanAccess('mahsulotlar') yoki CanAccess('ombor')
@@ -20,7 +22,11 @@ StockMovement:
   Harakatlar faqat POST (create) bilan yaratiladi.
   UPDATE va DELETE yo'q — harakatlar immutable.
   Yaratishda Stock qoldig'i avtomatik yangilanadi.
+  IN harakatda unit_cost bo'lsa → StockBatch yaratiladi (FIFO).
+  OUT harakatda FIFO dan narx hisoblanadi → unit_cost saqlashadi.
 """
+
+from decimal import Decimal
 
 from django.db import transaction
 from django.db.models import F
@@ -44,6 +50,7 @@ from .models import (
     Product,
     ProductStatus,
     Stock,
+    StockBatch,
     StockMovement,
     SubCategory,
     Transfer,
@@ -68,6 +75,7 @@ from .serializers import (
     ProductDetailSerializer,
     ProductListSerializer,
     ProductUpdateSerializer,
+    StockBatchSerializer,
     StockCreateSerializer,
     StockDetailSerializer,
     StockListSerializer,
@@ -84,6 +92,7 @@ from .serializers import (
     WarehouseListSerializer,
     WarehouseUpdateSerializer,
 )
+from .utils import fifo_deduct, generate_batch_code
 
 
 # ============================================================
@@ -1025,8 +1034,10 @@ class StockMovementViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_create(self, serializer):
-        worker   = getattr(self.request.user, 'worker', None)
-        instance = serializer.save(worker=worker)
+        worker    = getattr(self.request.user, 'worker', None)
+        store     = getattr(worker, 'store', None)
+        unit_cost = serializer.validated_data.get('unit_cost')
+        instance  = serializer.save(worker=worker)
 
         # Stock qoldig'ini yangilash (branch YOKI warehouse)
         # get_or_create + F() expression — parallel so'rovlarda race condition yo'q
@@ -1050,11 +1061,39 @@ class StockMovementViewSet(viewsets.ModelViewSet):
                 quantity=F('quantity') + instance.quantity,
                 updated_on=timezone.now(),
             )
+            # ── FIFO: IN harakat uchun yangi partiya yaratish ──
+            if unit_cost and store:
+                batch_code = generate_batch_code(store)
+                StockBatch.objects.create(
+                    batch_code   = batch_code,
+                    product      = instance.product,
+                    branch       = instance.branch,
+                    warehouse    = instance.warehouse,
+                    unit_cost    = unit_cost,
+                    qty_received = instance.quantity,
+                    qty_left     = instance.quantity,
+                    movement     = instance,
+                    store        = store,
+                )
         else:
             Stock.objects.filter(pk=stock.pk).update(
                 quantity=F('quantity') - instance.quantity,
                 updated_on=timezone.now(),
             )
+            # ── FIFO: OUT harakat uchun partiyalardan yechib olish ──
+            if store:
+                loc_kwargs = {
+                    'branch':    instance.branch,
+                    'warehouse': instance.warehouse,
+                }
+                deductions, total_cost = fifo_deduct(
+                    instance.product, loc_kwargs, instance.quantity
+                )
+                if instance.quantity > 0:
+                    avg_cost = total_cost / instance.quantity
+                    StockMovement.objects.filter(pk=instance.pk).update(
+                        unit_cost=avg_cost
+                    )
 
         AuditLog.objects.create(
             actor=self.request.user,
@@ -1255,17 +1294,33 @@ class TransferViewSet(viewsets.ModelViewSet):
 
         # ── QADAM 2: Har bir item uchun OUT + IN ──────────────────────
         worker = getattr(request.user, 'worker', None)
+        store  = transfer.store
 
         for item in items:
             from_stock = locked_stocks[item.product_id]
 
+            # ── FIFO: manbaa partiyalardan yechib olish ──────────────
+            loc_from = {
+                'branch':    from_branch,
+                'warehouse': from_warehouse,
+            }
+            deductions, total_cost = fifo_deduct(
+                item.product, loc_from, item.quantity
+            )
+            avg_cost = (
+                total_cost / item.quantity
+                if item.quantity > 0
+                else Decimal('0')
+            )
+
             # OUT — manbaa
-            StockMovement.objects.create(
+            out_movement = StockMovement.objects.create(
                 product       = item.product,
                 branch        = from_branch,
                 warehouse     = from_warehouse,
                 movement_type = MovementType.OUT,
                 quantity      = item.quantity,
+                unit_cost     = avg_cost,
                 worker        = worker,
                 note          = f"Transfer #{transfer.id} chiqim",
             )
@@ -1275,12 +1330,13 @@ class TransferViewSet(viewsets.ModelViewSet):
             )
 
             # IN — manzil
-            StockMovement.objects.create(
+            in_movement = StockMovement.objects.create(
                 product       = item.product,
                 branch        = to_branch,
                 warehouse     = to_warehouse,
                 movement_type = MovementType.IN,
                 quantity      = item.quantity,
+                unit_cost     = avg_cost,
                 worker        = worker,
                 note          = f"Transfer #{transfer.id} kirim",
             )
@@ -1301,6 +1357,20 @@ class TransferViewSet(viewsets.ModelViewSet):
             Stock.objects.filter(pk=to_stock.pk).update(
                 quantity   = F('quantity') + item.quantity,
                 updated_on = timezone.now(),
+            )
+
+            # ── FIFO: manzilda yangi batch yaratish ─────────────────
+            batch_code = generate_batch_code(store)
+            StockBatch.objects.create(
+                batch_code   = batch_code,
+                product      = item.product,
+                branch       = to_branch,
+                warehouse    = to_warehouse,
+                unit_cost    = avg_cost,
+                qty_received = item.quantity,
+                qty_left     = item.quantity,
+                movement     = in_movement,
+                store        = store,
             )
 
         # ── QADAM 3: Transfer tasdiqlash ──────────────────────────────
@@ -1370,3 +1440,40 @@ class TransferViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK,
         )
+
+
+# ============================================================
+# STOCKBATCH VIEWSET (FIFO PARTIYALAR)
+# ============================================================
+
+class StockBatchViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    FIFO partiyalarini ko'rish (faqat o'qish).
+
+    Endpointlar:
+      GET /api/v1/warehouse/batches/           — ro'yxat (?product=<id>)
+      GET /api/v1/warehouse/batches/{id}/      — tafsilotlar
+
+    Filtrlash:
+      ?product=<id>  — ma'lum mahsulotning barcha partiyadlari
+
+    Foydalanish:
+      Mahsulotning FIFO tannarxini kuzatish, moliyaviy hisobot uchun.
+      qty_left=0 bo'lgan partiyalar tamom (eski arxiv).
+    """
+    serializer_class   = StockBatchSerializer
+    permission_classes = [IsAuthenticated, CanAccess('ombor')]
+
+    def get_queryset(self):
+        worker = getattr(self.request.user, 'worker', None)
+        if not worker or not worker.store:
+            return StockBatch.objects.none()
+        qs = (
+            StockBatch.objects
+            .filter(store=worker.store)
+            .select_related('product', 'branch', 'warehouse', 'movement')
+        )
+        product_id = self.request.query_params.get('product')
+        if product_id:
+            qs = qs.filter(product_id=product_id)
+        return qs
