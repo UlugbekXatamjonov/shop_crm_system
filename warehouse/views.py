@@ -29,6 +29,7 @@ from django.utils import timezone
 
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -45,6 +46,8 @@ from .models import (
     Stock,
     StockMovement,
     SubCategory,
+    Transfer,
+    TransferStatus,
     Warehouse,
 )
 from .serializers import (
@@ -73,6 +76,9 @@ from .serializers import (
     SubCategoryDetailSerializer,
     SubCategoryListSerializer,
     SubCategoryUpdateSerializer,
+    TransferCreateSerializer,
+    TransferDetailSerializer,
+    TransferListSerializer,
     WarehouseCreateSerializer,
     WarehouseDetailSerializer,
     WarehouseListSerializer,
@@ -1075,4 +1081,292 @@ class StockMovementViewSet(viewsets.ModelViewSet):
                 ).data,
             },
             status=status.HTTP_201_CREATED,
+        )
+
+
+# ============================================================
+# TRANSFER VIEWSET
+# ============================================================
+
+class TransferViewSet(viewsets.ModelViewSet):
+    """
+    Tovar ko'chirish (Transfer) — bir nechta mahsulotni guruhlab jo'natish.
+
+    Endpointlar:
+      GET    /api/v1/warehouse/transfers/              — ro'yxat
+      POST   /api/v1/warehouse/transfers/              — yangi transfer (pending)
+      GET    /api/v1/warehouse/transfers/{id}/         — tafsilotlar
+      POST   /api/v1/warehouse/transfers/{id}/confirm/ — tasdiqlash (stock yangilanadi)
+      POST   /api/v1/warehouse/transfers/{id}/cancel/  — bekor qilish (faqat pending)
+
+    Muhim:
+      Yaratishda status=pending — stock o'zgarmaydi.
+      confirm() da BARCHA mahsulotlar atomik yangilanadi (transaction.atomic).
+      Agar bitta mahsulotda qoldiq yetishmasa → HECH BIRI o'zgarmaydi.
+      confirmed va cancelled — immutable (o'zgartirib bo'lmaydi).
+    """
+    http_method_names = ['get', 'post']
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated(), CanAccess('ombor')]
+        return [IsAuthenticated(), IsManagerOrAbove()]
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return TransferListSerializer
+        if self.action == 'create':
+            return TransferCreateSerializer
+        return TransferDetailSerializer
+
+    def get_queryset(self):
+        worker = getattr(self.request.user, 'worker', None)
+        if not worker or not worker.store:
+            return Transfer.objects.none()
+        return (
+            Transfer.objects
+            .filter(store=worker.store)
+            .select_related(
+                'from_branch', 'from_warehouse',
+                'to_branch',   'to_warehouse',
+                'worker__user',
+            )
+            .prefetch_related('items__product')
+        )
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        worker = getattr(self.request.user, 'worker', None)
+        if worker:
+            context['store']  = worker.store
+            context['worker'] = worker
+        return context
+
+    def _from_name(self, transfer: Transfer) -> str:
+        if transfer.from_branch_id:
+            return transfer.from_branch.name
+        return transfer.from_warehouse.name if transfer.from_warehouse_id else '—'
+
+    def _to_name(self, transfer: Transfer) -> str:
+        if transfer.to_branch_id:
+            return transfer.to_branch.name
+        return transfer.to_warehouse.name if transfer.to_warehouse_id else '—'
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        transfer = serializer.save()
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditLog.Action.CREATE,
+            target_model='Transfer',
+            target_id=transfer.id,
+            description=(
+                f"Transfer yaratildi (pending): "
+                f"{self._from_name(transfer)} → {self._to_name(transfer)}, "
+                f"{transfer.items.count()} ta mahsulot"
+            ),
+        )
+        return Response(
+            {
+                'message': "Transfer muvaffaqiyatli yaratildi. Tasdiqlash uchun /confirm/ ga murojaat qiling.",
+                'data': TransferDetailSerializer(
+                    transfer,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=['post'], url_path='confirm')
+    @transaction.atomic
+    def confirm(self, request, pk=None):
+        """
+        Transferni tasdiqlash — barcha mahsulotlar atomik yangilanadi.
+
+        Jarayon:
+          1. Status pending ekanligini tekshirish
+          2. Barcha itemlar uchun manbaa stockni LOCK (select_for_update)
+          3. Qoldiq yetarliligini tekshirish (HAMMASI tekshiriladi, keyin yangilash)
+          4. Har bir item uchun:
+             a. StockMovement(OUT) — manbaa
+             b. Manbaa Stock kamayadi (F())
+             c. StockMovement(IN)  — manzil
+             d. Manzil Stock ko'payadi (get_or_create + F())
+          5. Transfer.status = confirmed, confirmed_at = now()
+          6. AuditLog
+        """
+        transfer = self.get_object()
+
+        if transfer.status != TransferStatus.PENDING:
+            return Response(
+                {'error': f"Faqat 'pending' transferni tasdiqlash mumkin. Hozirgi holat: '{transfer.get_status_display()}'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        items = list(transfer.items.select_related('product').all())
+        if not items:
+            return Response(
+                {'error': "Transfer bo'sh — hech qanday mahsulot yo'q."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Manbaa joyi
+        from_branch    = transfer.from_branch
+        from_warehouse = transfer.from_warehouse
+
+        # Manzil joyi
+        to_branch    = transfer.to_branch
+        to_warehouse = transfer.to_warehouse
+
+        # ── QADAM 1: Barcha manbaa stocklarni LOCK va tekshirish ──────
+        errors = []
+        locked_stocks = {}
+
+        for item in items:
+            if from_branch:
+                stock, _ = Stock.objects.select_for_update().get_or_create(
+                    product=item.product,
+                    branch=from_branch,
+                    warehouse=None,
+                    defaults={'quantity': 0},
+                )
+            else:
+                stock, _ = Stock.objects.select_for_update().get_or_create(
+                    product=item.product,
+                    branch=None,
+                    warehouse=from_warehouse,
+                    defaults={'quantity': 0},
+                )
+            locked_stocks[item.product_id] = stock
+
+            if stock.quantity < item.quantity:
+                errors.append(
+                    f"'{item.product.name}': mavjud {stock.quantity}, "
+                    f"kerakli {item.quantity}."
+                )
+
+        if errors:
+            # Hech narsa o'zgarmaydi — transaction rollback
+            raise ValidationError({
+                'detail': "Qoldiq yetarli emas — transfer bekor qilindi.",
+                'errors': errors,
+            })
+
+        # ── QADAM 2: Har bir item uchun OUT + IN ──────────────────────
+        worker = getattr(request.user, 'worker', None)
+
+        for item in items:
+            from_stock = locked_stocks[item.product_id]
+
+            # OUT — manbaa
+            StockMovement.objects.create(
+                product       = item.product,
+                branch        = from_branch,
+                warehouse     = from_warehouse,
+                movement_type = MovementType.OUT,
+                quantity      = item.quantity,
+                worker        = worker,
+                note          = f"Transfer #{transfer.id} chiqim",
+            )
+            Stock.objects.filter(pk=from_stock.pk).update(
+                quantity   = F('quantity') - item.quantity,
+                updated_on = timezone.now(),
+            )
+
+            # IN — manzil
+            StockMovement.objects.create(
+                product       = item.product,
+                branch        = to_branch,
+                warehouse     = to_warehouse,
+                movement_type = MovementType.IN,
+                quantity      = item.quantity,
+                worker        = worker,
+                note          = f"Transfer #{transfer.id} kirim",
+            )
+            if to_branch:
+                to_stock, _ = Stock.objects.select_for_update().get_or_create(
+                    product=item.product,
+                    branch=to_branch,
+                    warehouse=None,
+                    defaults={'quantity': 0},
+                )
+            else:
+                to_stock, _ = Stock.objects.select_for_update().get_or_create(
+                    product=item.product,
+                    branch=None,
+                    warehouse=to_warehouse,
+                    defaults={'quantity': 0},
+                )
+            Stock.objects.filter(pk=to_stock.pk).update(
+                quantity   = F('quantity') + item.quantity,
+                updated_on = timezone.now(),
+            )
+
+        # ── QADAM 3: Transfer tasdiqlash ──────────────────────────────
+        transfer.status       = TransferStatus.CONFIRMED
+        transfer.confirmed_at = timezone.now()
+        transfer.save(update_fields=['status', 'confirmed_at'])
+
+        total_qty = sum(item.quantity for item in items)
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditLog.Action.UPDATE,
+            target_model='Transfer',
+            target_id=transfer.id,
+            description=(
+                f"Transfer tasdiqlandi: "
+                f"{self._from_name(transfer)} → {self._to_name(transfer)}, "
+                f"{len(items)} ta mahsulot, jami {total_qty} birlik"
+            ),
+        )
+
+        return Response(
+            {
+                'message': "Transfer muvaffaqiyatli tasdiqlandi. Qoldiqlar yangilandi.",
+                'data': TransferDetailSerializer(
+                    transfer,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=['post'], url_path='cancel')
+    def cancel(self, request, pk=None):
+        """
+        Transferni bekor qilish — faqat pending holatda.
+        Stock o'zgarmaydi.
+        """
+        transfer = self.get_object()
+
+        if transfer.status != TransferStatus.PENDING:
+            return Response(
+                {'error': f"Faqat 'pending' transferni bekor qilish mumkin. Hozirgi holat: '{transfer.get_status_display()}'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        transfer.status = TransferStatus.CANCELLED
+        transfer.save(update_fields=['status'])
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditLog.Action.DELETE,
+            target_model='Transfer',
+            target_id=transfer.id,
+            description=(
+                f"Transfer bekor qilindi: "
+                f"{self._from_name(transfer)} → {self._to_name(transfer)}"
+            ),
+        )
+
+        return Response(
+            {
+                'message': "Transfer bekor qilindi.",
+                'data': TransferDetailSerializer(
+                    transfer,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_200_OK,
         )

@@ -6,6 +6,7 @@ Modellar:
   ProductUnit     — Mahsulot o'lchov birliklari (TextChoices)
   ProductStatus   — Mahsulot/kategoriya holati (TextChoices)
   MovementType    — Kirim/chiqim turi (TextChoices)
+  TransferStatus  — Transfer holati (TextChoices)
   Category        — Mahsulot kategoriyasi
   SubCategory     — Mahsulot subkategoriyasi (ixtiyoriy, StoreSettings.subcategory_enabled)
   Currency        — Valyuta (UZS, USD, EUR, RUB, ...)
@@ -14,6 +15,8 @@ Modellar:
   Warehouse       — Ombor (Anbar) — alohida saqlash joyi (Branch != Warehouse)
   Stock           — Filial YOKI Ombor bo'yicha qoldiq (Product + Branch|Warehouse + miqdor)
   StockMovement   — Kirim/chiqim tarixi (immutable log)
+  Transfer        — Tovar ko'chirish (Filial↔Ombor↔Filial, guruhlab)
+  TransferItem    — Transfer satri (1 Transfer → N mahsulot)
 
 Muhim farq:
   Branch (Filial)   — sotuv nuqtasi (kassa, sotuvchi).
@@ -21,6 +24,11 @@ Muhim farq:
   Stock va StockMovement AYNAN bittasiga bog'lanadi:
     branch IS NOT NULL, warehouse IS NULL     → filial stoki
     branch IS NULL,     warehouse IS NOT NULL → ombor stoki
+
+Transfer holatlari:
+  pending   → yaratilgan, hali tasdiqlanmagan (stock o'zgarmaydi)
+  confirmed → tasdiqlangan, stock yangilangan (immutable)
+  cancelled → bekor qilingan (faqat pending dan)
 """
 
 from django.db import models
@@ -53,6 +61,12 @@ class ProductStatus(models.TextChoices):
 class MovementType(models.TextChoices):
     IN  = 'in',  'Kirim'
     OUT = 'out', 'Chiqim'
+
+
+class TransferStatus(models.TextChoices):
+    PENDING   = 'pending',   'Kutilmoqda'
+    CONFIRMED = 'confirmed', 'Tasdiqlangan'
+    CANCELLED = 'cancelled', 'Bekor qilingan'
 
 
 # ============================================================
@@ -562,3 +576,165 @@ class StockMovement(models.Model):
             f"{self.product.name} × {self.quantity} "
             f"({location})"
         )
+
+
+# ============================================================
+# TOVAR KO'CHIRISH (TRANSFER)
+# ============================================================
+
+class Transfer(models.Model):
+    """
+    Tovar ko'chirish — bir joydan ikkinchi joyga mahsulotlar guruhi.
+
+    Yo'nalishlar (barchasi qo'llab-quvvatlanadi):
+      Ombor  → Filial   (eng ko'p ishlatiladigan)
+      Filial → Ombor    (qaytarish)
+      Ombor  → Ombor    (ichki ko'chirish)
+      Filial → Filial   (filiallar o'rtasida)
+
+    Holatlari:
+      pending   → yaratilgan, tasdiqlanmagan.
+                  Stock o'ZGARMAYDI. Xato bo'lsa bekor qilish mumkin.
+      confirmed → TASDIQLANGAN. Stock yangilangan (OUT + IN).
+                  Immutable — o'zgartirib bo'lmaydi.
+      cancelled → Bekor qilingan (faqat pending dan).
+                  Stock o'zgarmaydi.
+
+    Constraint:
+      from_branch XOR from_warehouse — manbaa (aynan bittasi)
+      to_branch   XOR to_warehouse   — manzil (aynan bittasi)
+      from != to  — o'ziga o'zi jo'natib bo'lmaydi
+    """
+    from_branch    = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='transfers_out',
+        verbose_name="Manbaa filial"
+    )
+    from_warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='transfers_out',
+        verbose_name="Manbaa ombor"
+    )
+    to_branch      = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='transfers_in',
+        verbose_name="Manzil filial"
+    )
+    to_warehouse   = models.ForeignKey(
+        Warehouse,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='transfers_in',
+        verbose_name="Manzil ombor"
+    )
+    store          = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name='transfers',
+        verbose_name="Do'koni"
+    )
+    worker         = models.ForeignKey(
+        'accaunt.Worker',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='transfers',
+        verbose_name="Hodim"
+    )
+    status         = models.CharField(
+        max_length=15,
+        choices=TransferStatus.choices,
+        default=TransferStatus.PENDING,
+        verbose_name="Holati"
+    )
+    note           = models.TextField(
+        blank=True,
+        verbose_name="Izoh"
+    )
+    confirmed_at   = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Tasdiqlangan vaqti"
+    )
+    created_on     = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Yaratilgan vaqti"
+    )
+
+    class Meta:
+        verbose_name        = "Ko'chirish"
+        verbose_name_plural = "Ko'chirishlar"
+        ordering            = ['-created_on']
+        constraints         = [
+            CheckConstraint(
+                check=(
+                    Q(from_branch__isnull=False, from_warehouse__isnull=True) |
+                    Q(from_branch__isnull=True,  from_warehouse__isnull=False)
+                ),
+                name='transfer_from_branch_xor_warehouse',
+            ),
+            CheckConstraint(
+                check=(
+                    Q(to_branch__isnull=False, to_warehouse__isnull=True) |
+                    Q(to_branch__isnull=True,  to_warehouse__isnull=False)
+                ),
+                name='transfer_to_branch_xor_warehouse',
+            ),
+        ]
+
+    def __str__(self) -> str:
+        from_loc = self.from_branch.name if self.from_branch_id else self.from_warehouse.name
+        to_loc   = self.to_branch.name   if self.to_branch_id   else self.to_warehouse.name
+        return f"Transfer #{self.id}: {from_loc} → {to_loc} ({self.get_status_display()})"
+
+
+class TransferItem(models.Model):
+    """
+    Transfer satri — bitta mahsulot, bitta miqdor.
+
+    Transfer tasdiqlangandan keyin immutable:
+      - Stock harakat yozuvlari (StockMovement) yaratiladi
+      - Qoldiqlar yangilanadi
+      - TransferItem o'zgartirilmaydi va o'chirilmaydi
+
+    Xato tuzatish: yangi Transfer yaratilib, teskari yo'nalishda jo'natiladi.
+    """
+    transfer  = models.ForeignKey(
+        Transfer,
+        on_delete=models.CASCADE,
+        related_name='items',
+        verbose_name="Transfer"
+    )
+    product   = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name='transfer_items',
+        verbose_name="Mahsulot"
+    )
+    quantity  = models.DecimalField(
+        max_digits=14,
+        decimal_places=3,
+        verbose_name="Miqdori"
+    )
+    note      = models.TextField(
+        blank=True,
+        verbose_name="Izoh"
+    )
+
+    class Meta:
+        verbose_name        = "Transfer satri"
+        verbose_name_plural = "Transfer satrlari"
+        ordering            = ['id']
+
+    def __str__(self) -> str:
+        return f"{self.product.name} × {self.quantity}"

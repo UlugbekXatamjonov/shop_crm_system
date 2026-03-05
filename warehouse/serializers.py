@@ -14,12 +14,15 @@ Tartib:
   3. Currency serializers
   4. ExchangeRate serializers
   5. Product serializers
-  6. Warehouse serializers   <- YANGI
-  7. Stock serializers       <- YANGILANDI (branch|warehouse)
-  8. StockMovement serializers <- YANGILANDI (branch|warehouse)
+  6. Warehouse serializers
+  7. Stock serializers       (branch|warehouse)
+  8. StockMovement serializers (branch|warehouse)
+  9. Transfer serializers    <- YANGI (guruhlab ko'chirish)
 """
 
 from rest_framework import serializers
+
+from store.models import Branch
 
 from .models import (
     Category,
@@ -31,6 +34,9 @@ from .models import (
     Stock,
     StockMovement,
     SubCategory,
+    Transfer,
+    TransferItem,
+    TransferStatus,
     Warehouse,
 )
 
@@ -906,3 +912,247 @@ class MovementCreateSerializer(serializers.ModelSerializer):
                     f"qoldig'i: {current_qty}, so'ralgan: {quantity}."
                 )
         return data
+
+
+# ============================================================
+# TRANSFER SERIALIZERLARI
+# ============================================================
+
+class TransferItemReadSerializer(serializers.ModelSerializer):
+    """Transfer satri — o'qish uchun (list/detail ichida nested)."""
+    product_id   = serializers.IntegerField(source='product.id', read_only=True)
+    product_name = serializers.CharField(source='product.name', read_only=True)
+    product_unit = serializers.CharField(source='product.get_unit_display', read_only=True)
+
+    class Meta:
+        model  = TransferItem
+        fields = ('id', 'product_id', 'product_name', 'product_unit', 'quantity', 'note')
+
+
+class TransferItemWriteSerializer(serializers.Serializer):
+    """Transfer satri — yozish uchun (create da items[] ichida)."""
+    product  = serializers.PrimaryKeyRelatedField(queryset=Product.objects.none())
+    quantity = serializers.DecimalField(max_digits=14, decimal_places=3)
+    note     = serializers.CharField(required=False, allow_blank=True, default='')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        store = self.context.get('store')
+        if store:
+            self.fields['product'].queryset = Product.objects.filter(store=store)
+
+    def validate_quantity(self, value):
+        if value <= 0:
+            raise serializers.ValidationError(
+                "Miqdor 0 dan katta bo'lishi shart."
+            )
+        return value
+
+
+class TransferListSerializer(serializers.ModelSerializer):
+    """Transfer ro'yxati — qisqa ko'rinish."""
+    from_location_type = serializers.SerializerMethodField()
+    from_location_name = serializers.SerializerMethodField()
+    to_location_type   = serializers.SerializerMethodField()
+    to_location_name   = serializers.SerializerMethodField()
+    status_display     = serializers.CharField(source='get_status_display', read_only=True)
+    item_count         = serializers.SerializerMethodField()
+    worker_name        = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = Transfer
+        fields = (
+            'id',
+            'from_location_type', 'from_location_name',
+            'to_location_type',   'to_location_name',
+            'status', 'status_display',
+            'item_count', 'worker_name', 'created_on',
+        )
+
+    def get_from_location_type(self, obj):
+        return 'branch' if obj.from_branch_id else 'warehouse'
+
+    def get_from_location_name(self, obj):
+        if obj.from_branch_id:
+            return obj.from_branch.name
+        return obj.from_warehouse.name if obj.from_warehouse_id else None
+
+    def get_to_location_type(self, obj):
+        return 'branch' if obj.to_branch_id else 'warehouse'
+
+    def get_to_location_name(self, obj):
+        if obj.to_branch_id:
+            return obj.to_branch.name
+        return obj.to_warehouse.name if obj.to_warehouse_id else None
+
+    def get_item_count(self, obj):
+        return obj.items.count()
+
+    def get_worker_name(self, obj):
+        if obj.worker_id:
+            return obj.worker.user.get_full_name() or obj.worker.user.username
+        return None
+
+
+class TransferDetailSerializer(serializers.ModelSerializer):
+    """Transfer tafsilotlari — to'liq ma'lumot + nested items."""
+    from_location_type = serializers.SerializerMethodField()
+    from_location_name = serializers.SerializerMethodField()
+    from_branch_id     = serializers.IntegerField(source='from_branch.id', read_only=True)
+    from_warehouse_id  = serializers.IntegerField(source='from_warehouse.id', read_only=True)
+    to_location_type   = serializers.SerializerMethodField()
+    to_location_name   = serializers.SerializerMethodField()
+    to_branch_id       = serializers.IntegerField(source='to_branch.id', read_only=True)
+    to_warehouse_id    = serializers.IntegerField(source='to_warehouse.id', read_only=True)
+    status_display     = serializers.CharField(source='get_status_display', read_only=True)
+    worker_name        = serializers.SerializerMethodField()
+    store_name         = serializers.CharField(source='store.name', read_only=True)
+    items              = TransferItemReadSerializer(many=True, read_only=True)
+
+    class Meta:
+        model  = Transfer
+        fields = (
+            'id',
+            'from_location_type', 'from_location_name',
+            'from_branch_id',     'from_warehouse_id',
+            'to_location_type',   'to_location_name',
+            'to_branch_id',       'to_warehouse_id',
+            'store_name',
+            'status', 'status_display',
+            'note', 'confirmed_at',
+            'worker_name', 'created_on',
+            'items',
+        )
+
+    def get_from_location_type(self, obj):
+        return 'branch' if obj.from_branch_id else 'warehouse'
+
+    def get_from_location_name(self, obj):
+        if obj.from_branch_id:
+            return obj.from_branch.name
+        return obj.from_warehouse.name if obj.from_warehouse_id else None
+
+    def get_to_location_type(self, obj):
+        return 'branch' if obj.to_branch_id else 'warehouse'
+
+    def get_to_location_name(self, obj):
+        if obj.to_branch_id:
+            return obj.to_branch.name
+        return obj.to_warehouse.name if obj.to_warehouse_id else None
+
+    def get_worker_name(self, obj):
+        if obj.worker_id:
+            return obj.worker.user.get_full_name() or obj.worker.user.username
+        return None
+
+
+class TransferCreateSerializer(serializers.Serializer):
+    """
+    Yangi transfer yaratish.
+
+    items[] — bir nechta mahsulot bir vaqtda jo'natiladi.
+    Tasdiqlash (confirm) alohida action orqali.
+
+    Tekshiruvlar:
+      - from_branch XOR from_warehouse (manbaa)
+      - to_branch   XOR to_warehouse   (manzil)
+      - from != to  (o'ziga o'zi jo'natib bo'lmaydi)
+      - items bo'sh bo'lmasligi
+      - har bir mahsulot do'konga tegishli
+      - bir transfer ichida bir xil mahsulot takrorlanmasligi
+    """
+    from_branch    = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.none(),
+        required=False,
+        allow_null=True,
+        default=None,
+    )
+    from_warehouse = serializers.PrimaryKeyRelatedField(
+        queryset=Warehouse.objects.none(),
+        required=False,
+        allow_null=True,
+        default=None,
+    )
+    to_branch      = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.none(),
+        required=False,
+        allow_null=True,
+        default=None,
+    )
+    to_warehouse   = serializers.PrimaryKeyRelatedField(
+        queryset=Warehouse.objects.none(),
+        required=False,
+        allow_null=True,
+        default=None,
+    )
+    note  = serializers.CharField(required=False, allow_blank=True, default='')
+    items = TransferItemWriteSerializer(many=True)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        store = self.context.get('store')
+        if store:
+            self.fields['from_branch'].queryset    = Branch.objects.filter(store=store)
+            self.fields['to_branch'].queryset      = Branch.objects.filter(store=store)
+            self.fields['from_warehouse'].queryset = Warehouse.objects.filter(store=store)
+            self.fields['to_warehouse'].queryset   = Warehouse.objects.filter(store=store)
+
+    def validate_items(self, value):
+        if not value:
+            raise serializers.ValidationError(
+                "Kamida bitta mahsulot kiritilishi shart."
+            )
+        # Takroriy mahsulot tekshiruvi
+        product_ids = [item['product'].id for item in value]
+        if len(product_ids) != len(set(product_ids)):
+            raise serializers.ValidationError(
+                "Bir transfer ichida bir xil mahsulot ikki marta kiritilishi mumkin emas."
+            )
+        return value
+
+    def validate(self, data):
+        from_branch    = data.get('from_branch')
+        from_warehouse = data.get('from_warehouse')
+        to_branch      = data.get('to_branch')
+        to_warehouse   = data.get('to_warehouse')
+
+        # Manbaa: from_branch XOR from_warehouse
+        if from_branch and from_warehouse:
+            raise serializers.ValidationError(
+                "Manbaa uchun filial va ombor bir vaqtda ko'rsatilishi mumkin emas."
+            )
+        if not from_branch and not from_warehouse:
+            raise serializers.ValidationError(
+                "Manbaa (from_branch yoki from_warehouse) ko'rsatilishi shart."
+            )
+
+        # Manzil: to_branch XOR to_warehouse
+        if to_branch and to_warehouse:
+            raise serializers.ValidationError(
+                "Manzil uchun filial va ombor bir vaqtda ko'rsatilishi mumkin emas."
+            )
+        if not to_branch and not to_warehouse:
+            raise serializers.ValidationError(
+                "Manzil (to_branch yoki to_warehouse) ko'rsatilishi shart."
+            )
+
+        # O'ziga o'zi jo'natib bo'lmaydi
+        if from_branch and to_branch and from_branch == to_branch:
+            raise serializers.ValidationError(
+                "Manbaa va manzil bir xil filial bo'lishi mumkin emas."
+            )
+        if from_warehouse and to_warehouse and from_warehouse == to_warehouse:
+            raise serializers.ValidationError(
+                "Manbaa va manzil bir xil ombor bo'lishi mumkin emas."
+            )
+
+        return data
+
+    def create(self, validated_data):
+        items_data = validated_data.pop('items')
+        store      = self.context['store']
+        worker     = self.context.get('worker')
+        transfer   = Transfer.objects.create(store=store, worker=worker, **validated_data)
+        for item in items_data:
+            TransferItem.objects.create(transfer=transfer, **item)
+        return transfer

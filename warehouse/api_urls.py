@@ -60,6 +60,7 @@ from .views import (
     StockMovementViewSet,
     StockViewSet,
     SubCategoryViewSet,
+    TransferViewSet,
     WarehouseViewSet,
 )
 
@@ -72,5 +73,6 @@ router.register(r'products',       ProductViewSet,       basename='product')
 router.register(r'warehouses',     WarehouseViewSet,     basename='warehouse')
 router.register(r'stocks',         StockViewSet,         basename='stock')
 router.register(r'movements',      StockMovementViewSet, basename='movement')
+router.register(r'transfers',      TransferViewSet,      basename='transfer')
 
 urlpatterns = router.urls

@@ -55,7 +55,7 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 |-------------|-------------------|--------------------------------------------------------|
 | `accaunt`   | ✅ Tugallangan    | CustomUser, Worker, AuditLog, JWT auth — password reset, WorkerList/Detail da store+branch |
 | `store`     | ✅ Tugallangan    | Store, Branch CRUD (soft delete, multi-tenant, workers in detail, Uzbek errors) |
-| `warehouse` | ✅ Tugallangan    | Category, **SubCategory**, Product(+image, +barcode EAN-13, +subcategory, +price_currency), **Currency**, **ExchangeRate**, Stock, StockMovement (race condition tuzatildi) — BOSQICH 1 ✅ |
+| `warehouse` | ✅ Tugallangan    | Category, **SubCategory**, Product(+image, +barcode EAN-13, +subcategory, +price_currency), **Currency**, **ExchangeRate**, **Warehouse**(ombor, soft delete), Stock(branch\|warehouse), StockMovement(branch\|warehouse), **Transfer**+TransferItem(guruhlab ko'chirish, confirm/cancel, atomic) — BOSQICH 1 + 1.5 + 1.6 ✅ |
 | `trade`     | ✅ Tugallangan   | BOSQICH 4 ✅ — CustomerGroup, Customer (soft delete), Sale (@transaction.atomic, 13-qadam), SaleItem, cancel action, _build_report() to'ldirildi |
 | `expense`   | ❌ Boshlanmagan  | BOSQICH 6 — ExpenseCategory, Expense                   |
 | `StoreSettings` | ✅ Tugallangan  | BOSQICH 2 ✅ — 10 guruh, 30+ maydon, signal+Redis kesh |
@@ -532,6 +532,84 @@ PORT=8000
 - `warehouse/tasks.py` — `update_exchange_rates` Celery task (CBU API, retry 3×5min)
 - `warehouse/migrations/0004_subcategory.py` — SubCategory + Product.subcategory
 - `warehouse/migrations/0005_currency_exchangerate.py` — Currency + ExchangeRate + Product.price_currency + seed
+
+---
+
+### BOSQICH 1.5 — Warehouse (Ombor) modeli ✅ BAJARILDI (05.03.2026)
+| # | Vazifa | Holat |
+|---|--------|-------|
+| 1.5.1 | Warehouse modeli (nom, manzil, is_active, store FK) | ✅ Bajarildi |
+| 1.5.2 | Stock: branch OR warehouse (XOR constraint) | ✅ Bajarildi |
+| 1.5.3 | StockMovement: branch OR warehouse (XOR constraint) | ✅ Bajarildi |
+| 1.5.4 | WarehouseViewSet: CRUD + soft delete (is_active=False) | ✅ Bajarildi |
+| 1.5.5 | StockViewSet, MovementViewSet — branch\|warehouse qo'llab-quvvatlash | ✅ Bajarildi |
+
+**Muhim farq:**
+- `Branch` (Filial) → sotuv nuqtasi (kassa, sotuvchi)
+- `Warehouse` (Ombor) → faqat saqlash (tovar keladi, filiallarga uzatiladi)
+- `Stock` va `StockMovement` → `branch IS NOT NULL, warehouse IS NULL` YOKI `branch IS NULL, warehouse IS NOT NULL`
+
+**Yangi fayllar:**
+- `warehouse/migrations/0006_warehouse.py` — Warehouse modeli + Stock/StockMovement yangilash
+
+**Endpointlar:**
+```
+GET/POST   /api/v1/warehouse/warehouses/
+GET/PATCH  /api/v1/warehouse/warehouses/{id}/
+DELETE     /api/v1/warehouse/warehouses/{id}/   ← soft delete (is_active=False)
+```
+
+---
+
+### BOSQICH 1.6 — Transfer (Tovar ko'chirish) ✅ BAJARILDI (05.03.2026)
+| # | Vazifa | Holat |
+|---|--------|-------|
+| 1.6.1 | Transfer modeli (from/to: branch\|warehouse, status, confirmed_at) | ✅ Bajarildi |
+| 1.6.2 | TransferItem modeli (transfer FK, product FK, quantity) | ✅ Bajarildi |
+| 1.6.3 | TransferCreateSerializer — guruhlab, from XOR, to XOR, items[] | ✅ Bajarildi |
+| 1.6.4 | TransferViewSet.confirm() — @transaction.atomic, select_for_update, F() | ✅ Bajarildi |
+| 1.6.5 | TransferViewSet.cancel() — faqat pending dan | ✅ Bajarildi |
+
+**Yo'nalishlar (barchasi qo'llab-quvvatlanadi):**
+```
+Ombor  → Filial    (eng ko'p)
+Filial → Ombor     (qaytarish)
+Ombor  → Ombor     (ichki ko'chirish)
+Filial → Filial    (filiallar o'rtasida)
+```
+
+**Holatlari:**
+```
+pending   → yaratilgan, Stock O'ZGARMAYDI. Xato bo'lsa cancel qilish mumkin.
+confirmed → tasdiqlangan. Stock yangilangan. IMMUTABLE.
+cancelled → bekor qilingan. Stock o'zgarmaydi.
+```
+
+**confirm() jarayoni (atomic):**
+```
+1. status == pending tekshirish
+2. Barcha itemlar uchun from_stock LOCK (select_for_update)
+3. Qoldiq yetarliligini tekshirish (HAMMASI tekshiriladi)
+   → Bitta mahsulot kam bo'lsa → HECH BIRI o'zgarmaydi (rollback)
+4. Har bir item uchun:
+   StockMovement(OUT) → from joyi
+   from Stock - quantity  (F())
+   StockMovement(IN)  → to joyi
+   to Stock + quantity (get_or_create + F())
+5. transfer.status = confirmed, confirmed_at = now()
+6. AuditLog (bitta yozuv, jami qty bilan)
+```
+
+**Yangi fayllar:**
+- `warehouse/migrations/0007_transfer.py` — Transfer + TransferItem modellari
+
+**Endpointlar:**
+```
+GET/POST   /api/v1/warehouse/transfers/
+GET        /api/v1/warehouse/transfers/{id}/
+POST       /api/v1/warehouse/transfers/{id}/confirm/
+POST       /api/v1/warehouse/transfers/{id}/cancel/
+```
 
 ---
 

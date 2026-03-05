@@ -8,6 +8,8 @@ from .models import (
     Stock,
     StockMovement,
     SubCategory,
+    Transfer,
+    TransferItem,
     Warehouse,
 )
 
@@ -71,3 +73,24 @@ class StockMovementAdmin(admin.ModelAdmin):
     list_filter     = ('movement_type', 'branch', 'warehouse')
     search_fields   = ('product__name',)
     readonly_fields = ('created_on',)
+
+
+class TransferItemInline(admin.TabularInline):
+    model           = TransferItem
+    extra           = 0
+    readonly_fields = ('product', 'quantity', 'note')
+    can_delete      = False
+
+
+@admin.register(Transfer)
+class TransferAdmin(admin.ModelAdmin):
+    list_display    = (
+        'id', 'store', 'status',
+        'from_branch', 'from_warehouse',
+        'to_branch',   'to_warehouse',
+        'worker', 'confirmed_at', 'created_on',
+    )
+    list_filter     = ('status', 'store')
+    search_fields   = ('id', 'note')
+    readonly_fields = ('status', 'confirmed_at', 'created_on', 'worker')
+    inlines         = [TransferItemInline]
