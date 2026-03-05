@@ -2,13 +2,15 @@
 
 
 ------ Qilish kerak ---------
-Obuna va Try except ni tushuntirish
-
+valyuta kursidan manba ni olib tashlash
+store ditailga do'konning  settings ma'lumotlarinni ham qo'shish, va kerak bo'lsa ayni vaqtdagi ochiq smenalarni ham qo'shish
+dastur nomidan worker yoki ownerlarga sms yuborishni qo'shish kerak
 
 ------ Tugadi ---------
 workerda email edit bo'lmayapdi
 xodim qo'shganda do'kon avtomatik olinishi kk
 filial listga adress va ishchilar soni qo'shildi
+Obuna va Try except ni tushuntirish
 
 
 --------- Qoldi ----------
