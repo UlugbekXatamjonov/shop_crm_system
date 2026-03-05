@@ -8,8 +8,9 @@ ViewSet'lar:
   CurrencyViewSet      — Valyutalarni boshqarish (BOSQICH 1.3)
   ExchangeRateViewSet  — Valyuta kurslarini boshqarish (BOSQICH 1.3)
   ProductViewSet       — Mahsulotlarni boshqarish + barcode_image action (BOSQICH 1.2)
-  StockViewSet         — Ombor qoldiqlarini boshqarish
-  StockMovementViewSet — Kirim/chiqim harakatlarini boshqarish
+  WarehouseViewSet     — Omborlarni boshqarish (BOSQICH 6)
+  StockViewSet         — Ombor qoldiqlarini boshqarish (branch|warehouse)
+  StockMovementViewSet — Kirim/chiqim harakatlarini boshqarish (branch|warehouse)
 
 Ruxsatlar:
   list/retrieve → CanAccess('mahsulotlar') yoki CanAccess('ombor')
@@ -44,6 +45,7 @@ from .models import (
     Stock,
     StockMovement,
     SubCategory,
+    Warehouse,
 )
 from .serializers import (
     CategoryCreateSerializer,
@@ -71,6 +73,10 @@ from .serializers import (
     SubCategoryDetailSerializer,
     SubCategoryListSerializer,
     SubCategoryUpdateSerializer,
+    WarehouseCreateSerializer,
+    WarehouseDetailSerializer,
+    WarehouseListSerializer,
+    WarehouseUpdateSerializer,
 )
 
 
@@ -702,6 +708,126 @@ class ProductViewSet(viewsets.ModelViewSet):
 
 
 # ============================================================
+# OMBOR (WAREHOUSE) VIEWSET
+# ============================================================
+
+class WarehouseViewSet(viewsets.ModelViewSet):
+    """
+    Omborlarni boshqarish.
+
+    Endpointlar:
+      GET    /api/v1/warehouse/warehouses/       — ro'yxat
+      POST   /api/v1/warehouse/warehouses/       — yangi ombor qo'shish (manager+)
+      GET    /api/v1/warehouse/warehouses/{id}/  — tafsilotlar
+      PATCH  /api/v1/warehouse/warehouses/{id}/  — yangilash (manager+)
+      DELETE /api/v1/warehouse/warehouses/{id}/  — nofaol qilish (manager+, soft delete)
+
+    Multi-tenant: har bir ombor bitta do'konga tegishli.
+    Soft delete: is_active=False bilan o'chiriladi (haqiqiy o'chirish yo'q).
+    """
+    http_method_names = ['get', 'post', 'patch', 'delete']
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated(), CanAccess('ombor')]
+        return [IsAuthenticated(), IsManagerOrAbove()]
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return WarehouseListSerializer
+        if self.action == 'create':
+            return WarehouseCreateSerializer
+        if self.action in ('update', 'partial_update'):
+            return WarehouseUpdateSerializer
+        return WarehouseDetailSerializer
+
+    def get_queryset(self):
+        worker = getattr(self.request.user, 'worker', None)
+        if not worker or not worker.store:
+            return Warehouse.objects.none()
+        return Warehouse.objects.filter(store=worker.store)
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        worker = getattr(self.request.user, 'worker', None)
+        if worker:
+            context['store'] = worker.store
+        return context
+
+    def perform_create(self, serializer):
+        worker = getattr(self.request.user, 'worker', None)
+        instance = serializer.save(store=worker.store)
+        AuditLog.objects.create(
+            actor=self.request.user,
+            action=AuditLog.Action.CREATE,
+            target_model='Warehouse',
+            target_id=instance.id,
+            description=f"Yangi ombor qo'shildi: '{instance.name}'",
+        )
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        AuditLog.objects.create(
+            actor=self.request.user,
+            action=AuditLog.Action.UPDATE,
+            target_model='Warehouse',
+            target_id=instance.id,
+            description=f"Ombor yangilandi: '{instance.name}'",
+        )
+
+    def perform_destroy(self, instance: Warehouse):
+        """Soft delete — is_active=False."""
+        instance.is_active = False
+        instance.save(update_fields=['is_active'])
+        AuditLog.objects.create(
+            actor=self.request.user,
+            action=AuditLog.Action.DELETE,
+            target_model='Warehouse',
+            target_id=instance.id,
+            description=f"Ombor nofaol qilindi: '{instance.name}'",
+        )
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(
+            {
+                'message': "Ombor muvaffaqiyatli qo'shildi.",
+                'data': WarehouseDetailSerializer(
+                    serializer.instance,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(
+            {
+                'message': "Ombor muvaffaqiyatli yangilandi.",
+                'data': WarehouseDetailSerializer(
+                    serializer.instance,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response(
+            {'message': "Ombor nofaol qilindi."},
+            status=status.HTTP_200_OK,
+        )
+
+
+# ============================================================
 # OMBOR QOLDIG'I VIEWSET
 # ============================================================
 
@@ -742,7 +868,7 @@ class StockViewSet(viewsets.ModelViewSet):
         return (
             Stock.objects
             .filter(product__store=worker.store)
-            .select_related('product', 'branch')
+            .select_related('product', 'branch', 'warehouse')
         )
 
     def get_serializer_context(self):
@@ -751,6 +877,11 @@ class StockViewSet(viewsets.ModelViewSet):
         if worker:
             context['store'] = worker.store
         return context
+
+    def _location_name(self, instance: Stock) -> str:
+        if instance.branch_id:
+            return instance.branch.name
+        return instance.warehouse.name if instance.warehouse_id else '—'
 
     def perform_create(self, serializer):
         instance = serializer.save()
@@ -761,7 +892,7 @@ class StockViewSet(viewsets.ModelViewSet):
             target_id=instance.id,
             description=(
                 f"Ombor qoldig'i qo'shildi: '{instance.product.name}' "
-                f"({instance.branch.name}) = {instance.quantity}"
+                f"({self._location_name(instance)}) = {instance.quantity}"
             ),
         )
 
@@ -774,13 +905,13 @@ class StockViewSet(viewsets.ModelViewSet):
             target_id=instance.id,
             description=(
                 f"Ombor qoldig'i yangilandi: '{instance.product.name}' "
-                f"({instance.branch.name}) = {instance.quantity}"
+                f"({self._location_name(instance)}) = {instance.quantity}"
             ),
         )
 
     def perform_destroy(self, instance: Stock):
         pk   = instance.id
-        name = f"{instance.product.name} ({instance.branch.name})"
+        name = f"{instance.product.name} ({self._location_name(instance)})"
         instance.delete()
         AuditLog.objects.create(
             actor=self.request.user,
@@ -797,7 +928,10 @@ class StockViewSet(viewsets.ModelViewSet):
         return Response(
             {
                 'message': "Ombor qoldig'i muvaffaqiyatli qo'shildi.",
-                'data': StockDetailSerializer(serializer.instance).data,
+                'data': StockDetailSerializer(
+                    serializer.instance,
+                    context=self.get_serializer_context(),
+                ).data,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -810,7 +944,10 @@ class StockViewSet(viewsets.ModelViewSet):
         return Response(
             {
                 'message': "Ombor qoldig'i muvaffaqiyatli yangilandi.",
-                'data': StockDetailSerializer(serializer.instance).data,
+                'data': StockDetailSerializer(
+                    serializer.instance,
+                    context=self.get_serializer_context(),
+                ).data,
             },
             status=status.HTTP_200_OK,
         )
@@ -865,7 +1002,7 @@ class StockMovementViewSet(viewsets.ModelViewSet):
         return (
             StockMovement.objects
             .filter(product__store=worker.store)
-            .select_related('product', 'branch', 'worker__user')
+            .select_related('product', 'branch', 'warehouse', 'worker__user')
         )
 
     def get_serializer_context(self):
@@ -875,18 +1012,33 @@ class StockMovementViewSet(viewsets.ModelViewSet):
             context['store'] = worker.store
         return context
 
+    def _location_name(self, instance: StockMovement) -> str:
+        if instance.branch_id:
+            return instance.branch.name
+        return instance.warehouse.name if instance.warehouse_id else '—'
+
     @transaction.atomic
     def perform_create(self, serializer):
         worker   = getattr(self.request.user, 'worker', None)
         instance = serializer.save(worker=worker)
 
-        # Stock qoldig'ini yangilash
+        # Stock qoldig'ini yangilash (branch YOKI warehouse)
         # get_or_create + F() expression — parallel so'rovlarda race condition yo'q
-        stock, _ = Stock.objects.select_for_update().get_or_create(
-            product=instance.product,
-            branch=instance.branch,
-            defaults={'quantity': 0},
-        )
+        if instance.branch_id:
+            stock, _ = Stock.objects.select_for_update().get_or_create(
+                product=instance.product,
+                branch=instance.branch,
+                warehouse=None,
+                defaults={'quantity': 0},
+            )
+        else:
+            stock, _ = Stock.objects.select_for_update().get_or_create(
+                product=instance.product,
+                branch=None,
+                warehouse=instance.warehouse,
+                defaults={'quantity': 0},
+            )
+
         if instance.movement_type == MovementType.IN:
             Stock.objects.filter(pk=stock.pk).update(
                 quantity=F('quantity') + instance.quantity,
@@ -906,7 +1058,7 @@ class StockMovementViewSet(viewsets.ModelViewSet):
             description=(
                 f"{instance.get_movement_type_display()}: "
                 f"'{instance.product.name}' × {instance.quantity} "
-                f"({instance.branch.name})"
+                f"({self._location_name(instance)})"
             ),
         )
 
