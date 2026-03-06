@@ -13,9 +13,31 @@
 # Mavjud ma'lumotlar haqida:
 #   Barcha mavjud Stock va StockMovement yozuvlarida branch to'ldirilgan,
 #   warehouse NULL — CheckConstraint shartini qoniqtiradi.
+#
+# ESLATMA: 0003_expand_warehouse_models migration avval (non-empty holda) production-ga
+#   deploy qilingan va warehouse_warehouse jadvali yaratilgan edi. Keyin 0003 bo'sh
+#   qilib o'zgartirildi. CreateModel IF NOT EXISTS orqali idempotent qilindi.
 
 import django.db.models.deletion
 from django.db import migrations, models
+
+
+def _create_warehouse_if_not_exists(apps, schema_editor):
+    """warehouse_warehouse jadvali mavjud bo'lmasa yaratadi (idempotent)."""
+    tables = schema_editor.connection.introspection.table_names()
+    if 'warehouse_warehouse' in tables:
+        return  # Jadval allaqachon mavjud — o'tkazib yuboriladi
+    Warehouse = apps.get_model('warehouse', 'Warehouse')
+    schema_editor.create_model(Warehouse)
+
+
+def _drop_warehouse_if_exists(apps, schema_editor):
+    """Rollback: jadval mavjud bo'lsa o'chiradi."""
+    tables = schema_editor.connection.introspection.table_names()
+    if 'warehouse_warehouse' not in tables:
+        return
+    Warehouse = apps.get_model('warehouse', 'Warehouse')
+    schema_editor.delete_model(Warehouse)
 
 
 class Migration(migrations.Migration):
@@ -27,28 +49,38 @@ class Migration(migrations.Migration):
 
     operations = [
 
-        # ── 1. Warehouse modeli ─────────────────────────────────
-        migrations.CreateModel(
-            name='Warehouse',
-            fields=[
-                ('id',         models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name',       models.CharField(max_length=200, verbose_name='Nomi')),
-                ('address',    models.TextField(blank=True, verbose_name='Manzili')),
-                ('is_active',  models.BooleanField(default=True, verbose_name='Faolmi')),
-                ('created_on', models.DateTimeField(auto_now_add=True, verbose_name='Yaratilgan vaqti')),
-                ('store',      models.ForeignKey(
-                    on_delete=django.db.models.deletion.CASCADE,
-                    related_name='warehouses',
-                    to='store.store',
-                    verbose_name="Do'koni",
-                )),
+        # ── 1. Warehouse modeli (idempotent — IF NOT EXISTS) ────
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.CreateModel(
+                    name='Warehouse',
+                    fields=[
+                        ('id',         models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                        ('name',       models.CharField(max_length=200, verbose_name='Nomi')),
+                        ('address',    models.TextField(blank=True, verbose_name='Manzili')),
+                        ('is_active',  models.BooleanField(default=True, verbose_name='Faolmi')),
+                        ('created_on', models.DateTimeField(auto_now_add=True, verbose_name='Yaratilgan vaqti')),
+                        ('store',      models.ForeignKey(
+                            on_delete=django.db.models.deletion.CASCADE,
+                            related_name='warehouses',
+                            to='store.store',
+                            verbose_name="Do'koni",
+                        )),
+                    ],
+                    options={
+                        'verbose_name':        'Ombor',
+                        'verbose_name_plural': 'Omborlar',
+                        'ordering':            ['name'],
+                        'unique_together':     {('store', 'name')},
+                    },
+                ),
             ],
-            options={
-                'verbose_name':        'Ombor',
-                'verbose_name_plural': 'Omborlar',
-                'ordering':            ['name'],
-                'unique_together':     {('store', 'name')},
-            },
+            database_operations=[
+                migrations.RunPython(
+                    _create_warehouse_if_not_exists,
+                    _drop_warehouse_if_exists,
+                ),
+            ],
         ),
 
         # ── 2. Stock.branch → nullable ──────────────────────────
