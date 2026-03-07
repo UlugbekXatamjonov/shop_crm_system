@@ -205,21 +205,33 @@ class Migration(migrations.Migration):
                     """,
                 ),
 
-                # 5. Stock XOR CHECK constrainti (mavjud bo'lsa o'tkazib yuborish)
+                # 5. Stock XOR CHECK constrainti (mavjud bo'lsa o'tkazib yuborish;
+                #    agar mavjud data constraint ni buzsa — ogohlantirish bilan o'tkazib yuborish)
                 migrations.RunSQL(
                     sql="""
                         DO $$
+                        DECLARE invalid_rows integer;
                         BEGIN
                             IF NOT EXISTS (
-                                SELECT 1 FROM pg_constraint
-                                 WHERE conrelid = 'warehouse_stock'::regclass
-                                   AND conname  = 'stock_branch_xor_warehouse'
+                                SELECT 1 FROM information_schema.table_constraints
+                                 WHERE table_name      = 'warehouse_stock'
+                                   AND constraint_name = 'stock_branch_xor_warehouse'
                             ) THEN
-                                ALTER TABLE warehouse_stock
-                                    ADD CONSTRAINT stock_branch_xor_warehouse CHECK (
-                                        (branch_id IS NOT NULL AND warehouse_id IS NULL) OR
-                                        (branch_id IS NULL     AND warehouse_id IS NOT NULL)
-                                    );
+                                SELECT COUNT(*) INTO invalid_rows
+                                  FROM warehouse_stock
+                                 WHERE NOT (
+                                    (branch_id IS NOT NULL AND warehouse_id IS NULL) OR
+                                    (branch_id IS NULL     AND warehouse_id IS NOT NULL)
+                                 );
+                                IF invalid_rows = 0 THEN
+                                    ALTER TABLE warehouse_stock
+                                        ADD CONSTRAINT stock_branch_xor_warehouse CHECK (
+                                            (branch_id IS NOT NULL AND warehouse_id IS NULL) OR
+                                            (branch_id IS NULL     AND warehouse_id IS NOT NULL)
+                                        );
+                                ELSE
+                                    RAISE WARNING 'stock_branch_xor_warehouse: % ta noto''g''ri qator bor, constraint o''tkazib yuborildi', invalid_rows;
+                                END IF;
                             END IF;
                         END $$;
                     """,
@@ -230,8 +242,28 @@ class Migration(migrations.Migration):
                 ),
 
                 # 6. StockMovement.branch_id → nullable
+                #    Agar branch_id MAVJUD bo'lsa: nullable qilish
+                #    Agar branch_id YO'Q bo'lsa (avvalgi muvaffaqiyatsiz migration o'chirib yuborgan):
+                #    nullable FK sifatida qayta qo'shish
                 migrations.RunSQL(
-                    sql="ALTER TABLE warehouse_stockmovement ALTER COLUMN branch_id DROP NOT NULL;",
+                    sql="""
+                        DO $$
+                        BEGIN
+                            IF EXISTS (
+                                SELECT 1 FROM information_schema.columns
+                                 WHERE table_schema = current_schema()
+                                   AND table_name   = 'warehouse_stockmovement'
+                                   AND column_name  = 'branch_id'
+                            ) THEN
+                                ALTER TABLE warehouse_stockmovement
+                                    ALTER COLUMN branch_id DROP NOT NULL;
+                            ELSE
+                                ALTER TABLE warehouse_stockmovement
+                                    ADD COLUMN branch_id BIGINT
+                                        REFERENCES store_branch(id) ON DELETE CASCADE;
+                            END IF;
+                        END $$;
+                    """,
                     reverse_sql="ALTER TABLE warehouse_stockmovement ALTER COLUMN branch_id SET NOT NULL;",
                 ),
 
@@ -248,21 +280,33 @@ class Migration(migrations.Migration):
                     """,
                 ),
 
-                # 8. StockMovement XOR CHECK constrainti (mavjud bo'lsa o'tkazib yuborish)
+                # 8. StockMovement XOR CHECK constrainti (mavjud bo'lsa o'tkazib yuborish;
+                #    agar mavjud data constraint ni buzsa — ogohlantirish bilan o'tkazib yuborish)
                 migrations.RunSQL(
                     sql="""
                         DO $$
+                        DECLARE invalid_rows integer;
                         BEGIN
                             IF NOT EXISTS (
-                                SELECT 1 FROM pg_constraint
-                                 WHERE conrelid = 'warehouse_stockmovement'::regclass
-                                   AND conname  = 'movement_branch_xor_warehouse'
+                                SELECT 1 FROM information_schema.table_constraints
+                                 WHERE table_name      = 'warehouse_stockmovement'
+                                   AND constraint_name = 'movement_branch_xor_warehouse'
                             ) THEN
-                                ALTER TABLE warehouse_stockmovement
-                                    ADD CONSTRAINT movement_branch_xor_warehouse CHECK (
-                                        (branch_id IS NOT NULL AND warehouse_id IS NULL) OR
-                                        (branch_id IS NULL     AND warehouse_id IS NOT NULL)
-                                    );
+                                SELECT COUNT(*) INTO invalid_rows
+                                  FROM warehouse_stockmovement
+                                 WHERE NOT (
+                                    (branch_id IS NOT NULL AND warehouse_id IS NULL) OR
+                                    (branch_id IS NULL     AND warehouse_id IS NOT NULL)
+                                 );
+                                IF invalid_rows = 0 THEN
+                                    ALTER TABLE warehouse_stockmovement
+                                        ADD CONSTRAINT movement_branch_xor_warehouse CHECK (
+                                            (branch_id IS NOT NULL AND warehouse_id IS NULL) OR
+                                            (branch_id IS NULL     AND warehouse_id IS NOT NULL)
+                                        );
+                                ELSE
+                                    RAISE WARNING 'movement_branch_xor_warehouse: % ta noto''g''ri qator bor, constraint o''tkazib yuborildi', invalid_rows;
+                                END IF;
                             END IF;
                         END $$;
                     """,
