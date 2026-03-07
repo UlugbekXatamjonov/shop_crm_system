@@ -1,0 +1,58 @@
+# ============================================================
+# .dockerignore — Docker build context dan istisno qilinadigan fayllar
+# ============================================================
+
+# Git
+.git/
+.gitignore
+
+# Python virtual environment
+myenv/
+venv/
+env/
+.venv/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyc
+.Python
+
+# Local database (production PostgreSQL ishlatadi)
+db.sqlite3
+*.sqlite3
+
+# Claude AI worktrees va konfiguratsiya
+.claude/
+
+# Tests va coverage
+.coverage
+htmlcov/
+.pytest_cache/
+*.test.py
+
+# IDE va editor fayllar
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS fayllar
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Env fayllar (secrets)
+.env
+.env.*
+!.env.example
+
+# Node (agar frontend bo'lsa)
+node_modules/
+
+# Media (production S3 yoki Railway volume ishlatadi)
+media/
