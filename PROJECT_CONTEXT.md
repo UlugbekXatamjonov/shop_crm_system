@@ -66,6 +66,7 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 | `WorkerKPI` | ❌ Boshlanmagan  | BOSQICH 9 — accaunt app da                             |
 | `Z/X-report` | ❌ Boshlanmagan | BOSQICH 10 — trade app da                              |
 | `Telegram bot` | ❌ Boshlanmagan | BOSQICH 11 — config/telegram.py yoki alohida          |
+| `SMS xabar`  | ❌ Boshlanmagan  | BOSQICH 11.5 — Eskiz/PlayMobile API, worker/owner ga SMS |
 | `PriceList` | ❌ Boshlanmagan  | BOSQICH 12 — trade app da                              |
 | `Supplier`  | ❌ Boshlanmagan  | BOSQICH 13 — v2, keyingi versiyada                     |
 | `OFD`       | ❌ Boshlanmagan  | BOSQICH 14 — v2, keyingi versiyada (Uzbekistonda MAJBURIY 2026) |
@@ -989,6 +990,36 @@ Texnik:
   httpx.post() yoki python-telegram-bot (async)
   Barcha xabarlar Celery task orqali (async, queue da)
   → requirements/base.txt ga python-telegram-bot yoki httpx qo'shiladi
+```
+
+---
+
+### BOSQICH 11.5 — SMS xabar yuborish tizimi ← YANGI
+```
+Dastur nomidan worker yoki ownerlarga SMS yuborish funksiyasi.
+
+Xabar turlari:
+  - Smena ochilganda/yopilganda owner ga SMS xabar
+  - Kam qoldiq (low_stock) ogohlantirish SMS orqali
+  - Kunlik sotuv hisoboti (Celery beat, har kuni 20:00)
+  - Yangi xodim qo'shilganda owner ga bildirishnoma
+
+SMS provayderlar (Uzbekiston):
+  - Eskiz.uz API (https://eskiz.uz)
+  - PlayMobile API (https://playmobile.uz)
+
+StoreSettings ga qo'shiladigan maydonlar:
+  sms_enabled      = BooleanField(default=False)
+  sms_provider     = CharField(choices=[('eskiz','Eskiz'),('playmobile','PlayMobile')], default='eskiz')
+  sms_api_token    = CharField(null=True, blank=True)  ← owner o'z tokenini kiritadi
+  sms_notify_owner = BooleanField(default=True)  ← owner ga SMS yuborish
+
+Texnik:
+  SMS_DEFAULT_SENDER → env variable (settings.py da)
+  httpx.post() orqali API chaqirish
+  Barcha SMS lar Celery task orqali (async, queue da)
+  SmsLog modeli — yuborilgan SMS lar tarixi (phone, message, status, sent_at)
+  → requirements/base.txt ga httpx qo'shiladi (agar hali bo'lmasa)
 ```
 
 ---
