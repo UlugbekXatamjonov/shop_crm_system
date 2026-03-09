@@ -2,9 +2,13 @@
 
 
 ------ Qilish kerak ---------
-
+warehousda status maydoni to'g'ri kelmayapdi, shuning uchun yangi ombor  qo'shib bo'lmayapdi 
+subcategory statusi edit bo'lmayapdi
 
 ------ Tugadi ---------
+barcha delete larni soft delete dan oddiy delete ga o'tkazish kerak.
+Costomers groups da biro maydon edit bo'lmasa ham "yangilandi" deyapdi, qolgan viewlarni ham ko'rib qo'yish kerak.  
+Mijozga qaysi sotuvdan qancha qarzi borligini ham qo'shish kerak, BIZDA BU XUSUSIYAT BORMIN ?
 valyuta kursidan manba ni olib tashlash
 store ditailga do'konning settings ma'lumotlarinni ham qo'shish, va ochiq smenalarni ham qo'shish
 workerda email edit bo'lmayapdi
@@ -13,10 +17,3 @@ filial listga adress va ishchilar soni qo'shildi
 StockBatch.batch_code — store ID formatiga o'tkazildi (S{id}-YY-MM-DD-seq)
 
 
---------- Qoldi ----------
-SMS xabar yuborish tizimi:
-  - Dastur nomidan worker yoki ownerlarga SMS yuborish
-  - Smena ochilganda/yopilganda owner ga SMS xabar
-  - Kam qoldiq (low_stock) ogohlantirish SMS orqali
-  - Eskiz/PlayMobile API integratsiya
-  - StoreSettings ga sms_enabled, sms_provider, sms_api_key maydonlari qo'shish
