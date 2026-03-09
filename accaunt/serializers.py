@@ -877,3 +877,101 @@ class WorkerUpdateSerializer(serializers.ModelSerializer):
         instance.save()
 
         return instance
+
+
+class WorkerSelfUpdateSerializer(serializers.Serializer):
+    """
+    Hodim o'zining shaxsiy ma'lumotlarini yangilash.
+    PATCH /api/v1/workers/me/ da ishlatiladi.
+
+    Faqat 3 ta maydon:
+      - email
+      - phone1
+      - password (current_password + new_password + new_password2)
+
+    Barcha rollar (owner, manager, seller) foydalana oladi.
+    """
+    email  = serializers.EmailField(required=False, label="Elektron pochta")
+    phone1 = serializers.CharField(
+        required=False, label="Asosiy telefon",
+        validators=[phone_regex],
+    )
+
+    current_password = serializers.CharField(
+        write_only=True, required=False, label="Joriy parol",
+    )
+    new_password = serializers.CharField(
+        write_only=True, required=False, min_length=8, label="Yangi parol",
+        error_messages={
+            'min_length': "Parol kamida 8 belgidan iborat bo'lishi kerak.",
+        },
+    )
+    new_password2 = serializers.CharField(
+        write_only=True, required=False, label="Yangi parolni tasdiqlash",
+    )
+
+    def validate_email(self, value: str) -> str:
+        if not value:
+            return value
+        qs = CustomUser.objects.filter(email=value).exclude(pk=self.instance.user.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                "Bu email allaqachon boshqa foydalanuvchida band."
+            )
+        return value
+
+    def validate_phone1(self, value: str) -> str:
+        qs = CustomUser.objects.filter(phone1=value).exclude(pk=self.instance.user.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                "Bu telefon raqami allaqachon boshqa foydalanuvchida band."
+            )
+        return value
+
+    def validate(self, attrs):
+        cur  = attrs.get('current_password')
+        new  = attrs.get('new_password')
+        new2 = attrs.get('new_password2')
+
+        password_fields = [cur, new, new2]
+        filled = [f for f in password_fields if f]
+
+        if filled and len(filled) != 3:
+            raise serializers.ValidationError({
+                'password': "Parolni o'zgartirish uchun current_password, "
+                            "new_password va new_password2 maydonlari kerak."
+            })
+
+        if cur:
+            user = self.instance.user
+            if not user.check_password(cur):
+                raise serializers.ValidationError({
+                    'current_password': "Joriy parol noto'g'ri."
+                })
+            if new != new2:
+                raise serializers.ValidationError({
+                    'new_password2': "Yangi parollar mos kelmaydi."
+                })
+
+        return attrs
+
+    def update(self, instance, validated_data):
+        user = instance.user
+        changed_fields = []
+
+        if 'email' in validated_data:
+            user.email = validated_data['email']
+            changed_fields.append('email')
+
+        if 'phone1' in validated_data:
+            user.phone1 = validated_data['phone1']
+            changed_fields.append('phone1')
+
+        if changed_fields:
+            user.save(update_fields=changed_fields)
+
+        if validated_data.get('new_password'):
+            user.set_password(validated_data['new_password'])
+            user.save(update_fields=['password'])
+
+        return instance

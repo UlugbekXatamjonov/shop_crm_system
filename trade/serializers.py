@@ -105,12 +105,23 @@ class CustomerListSerializer(serializers.ModelSerializer):
         )
 
 
+class CustomerDebtSaleSerializer(serializers.ModelSerializer):
+    """Mijozning nasiya sotuvlari — CustomerDetailSerializer ichida nested."""
+    class Meta:
+        model  = Sale
+        fields = (
+            'id', 'total_price', 'paid_amount', 'debt_amount',
+            'status', 'created_on',
+        )
+
+
 class CustomerDetailSerializer(serializers.ModelSerializer):
     """Mijoz to'liq ma'lumoti. GET /api/v1/customers/{id}/"""
     group_name     = serializers.CharField(
         source='group.name', read_only=True, allow_null=True, default=None,
     )
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    debt_sales     = serializers.SerializerMethodField()
 
     class Meta:
         model  = Customer
@@ -119,7 +130,17 @@ class CustomerDetailSerializer(serializers.ModelSerializer):
             'group', 'group_name',
             'status', 'status_display',
             'created_on',
+            'debt_sales',
         )
+
+    def get_debt_sales(self, obj: Customer) -> list:
+        """Mijozning barcha nasiya sotuvlari (yakunlangan, qarzi bor)."""
+        sales = obj.sales.filter(
+            payment_type=PaymentType.DEBT,
+            debt_amount__gt=0,
+            status=SaleStatus.COMPLETED,
+        ).order_by('-created_on')
+        return CustomerDebtSaleSerializer(sales, many=True).data
 
 
 class CustomerCreateSerializer(serializers.ModelSerializer):
