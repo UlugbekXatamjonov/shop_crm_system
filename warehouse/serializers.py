@@ -274,10 +274,10 @@ class CurrencyDetailSerializer(serializers.ModelSerializer):
 
     def get_latest_rate(self, obj):
         if obj.is_base:
-            return {'rate': '1.0000', 'date': None, 'source': 'Base'}
+            return {'rate': '1.0000', 'date': None}
         latest = obj.rates.order_by('-date').first()
         if latest:
-            return {'rate': str(latest.rate), 'date': str(latest.date), 'source': latest.source}
+            return {'rate': str(latest.rate), 'date': str(latest.date)}
         return None
 
 
@@ -312,7 +312,7 @@ class ExchangeRateListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = ExchangeRate
-        fields = ('id', 'currency_code', 'currency_symbol', 'rate', 'date', 'source')
+        fields = ('id', 'currency_code', 'currency_symbol', 'rate', 'date')
 
 
 class ExchangeRateDetailSerializer(serializers.ModelSerializer):
@@ -326,14 +326,14 @@ class ExchangeRateDetailSerializer(serializers.ModelSerializer):
         fields = (
             'id',
             'currency_id', 'currency_code', 'currency_name', 'currency_symbol',
-            'rate', 'date', 'source', 'created_on',
+            'rate', 'date', 'created_on',
         )
 
 
 class ExchangeRateCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = ExchangeRate
-        fields = ('currency', 'rate', 'date', 'source')
+        fields = ('currency', 'rate', 'date')
         extra_kwargs = {
             'currency': {'error_messages': {'required': "Valyuta tanlanishi shart.", 'does_not_exist': "Bunday valyuta topilmadi.", 'incorrect_type': "Valyuta ID butun son bo'lishi kerak."}},
             'rate'    : {'error_messages': {'required': "Kurs kiritilishi shart.", 'invalid': "To'g'ri raqam kiritilishi shart.", 'max_digits': "Raqam juda katta."}},

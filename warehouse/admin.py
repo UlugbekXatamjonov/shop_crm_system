@@ -39,8 +39,8 @@ class CurrencyAdmin(admin.ModelAdmin):
 
 @admin.register(ExchangeRate)
 class ExchangeRateAdmin(admin.ModelAdmin):
-    # ExchangeRate: currency, rate, date, source, created_on — store yo'q
-    list_display  = ('currency', 'rate', 'date', 'source', 'created_on')
+    # ExchangeRate: currency, rate, date, created_on — store yo'q
+    list_display  = ('currency', 'rate', 'date', 'created_on')
     list_filter   = ('currency',)
     search_fields = ('currency__code',)
 

@@ -90,8 +90,7 @@ def update_exchange_rates(self):
             currency=currency,
             date=today,
             defaults={
-                'rate':   rate_value,
-                'source': 'CBU',
+                'rate': rate_value,
             },
         )
 

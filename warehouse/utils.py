@@ -200,11 +200,15 @@ def generate_batch_code(store) -> str:
     """
     Do'kon uchun FIFO partiya kodi generatsiya qilish.
 
-    Format: {DO'KON[:5].upper()}-{YY}-{MM}-{DD}-{seq:04d}
-    Misol:  BESTM-26-03-10-0001
-      BESTM  — "Best Market" do'kon nomi (maks 5 ta harf, katta)
+    Format: S{store_id}-{YY}-{MM}-{DD}-{seq:04d}
+    Misol:  S1-26-03-10-0001
+      S1     — do'kon ID si (unikal, to'qnashish bo'lmaydi)
       26-03-10 — 2026-yil 10-mart (qisqa sana formati)
       0001   — shu kun uchun birinchi partiya
+
+    Eski format: {DO'KON[:5].upper()}-YY-MM-DD-seq — bir xil nomdagi
+    do'konlar to'qnashishi mumkin edi. Yangi format store.id orqali
+    har doim unikal.
 
     Thread-safe: select_for_update() + transaction.atomic() ichida ishlaydi.
     Kod benzersizligi: unique=True bilan DB darajasida kafolatlanadi.
@@ -217,7 +221,7 @@ def generate_batch_code(store) -> str:
     from .models import StockBatch
 
     today  = timezone.localdate()
-    prefix = f"{store.name[:5].upper()}-{today.strftime('%y-%m-%d')}-"
+    prefix = f"S{store.id}-{today.strftime('%y-%m-%d')}-"
 
     with transaction.atomic():
         # Bugungi kundagi so'nggi partiyani toping (select_for_update — thread-safe)

@@ -186,13 +186,16 @@ class StoreDetailSerializer(serializers.ModelSerializer):
     """
     Do'konning to'liq ma'lumoti.
     GET /api/v1/stores/{id}/ da ishlatiladi.
+    settings (do'kon sozlamalari) va open_smenas (ochiq smenalar) ham qaytariladi.
     """
     status_display = serializers.CharField(
         source='get_status_display',
         read_only=True
     )
-    branches = serializers.SerializerMethodField()
-    workers  = serializers.SerializerMethodField()
+    branches    = serializers.SerializerMethodField()
+    workers     = serializers.SerializerMethodField()
+    settings    = serializers.SerializerMethodField()
+    open_smenas = serializers.SerializerMethodField()
 
     class Meta:
         model  = Store
@@ -200,6 +203,7 @@ class StoreDetailSerializer(serializers.ModelSerializer):
             'id', 'name', 'address', 'phone',
             'status', 'status_display',
             'created_on', 'branches', 'workers',
+            'settings', 'open_smenas',
         )
 
     def get_branches(self, obj: Store) -> list:
@@ -212,6 +216,19 @@ class StoreDetailSerializer(serializers.ModelSerializer):
             _worker_short(w)
             for w in obj.workers.select_related('user').order_by('user__first_name')
         ]
+
+    def get_settings(self, obj: Store) -> dict | None:
+        """Do'kon sozlamalari (StoreSettings)."""
+        if hasattr(obj, 'settings'):
+            return StoreSettingsSerializer(obj.settings).data
+        return None
+
+    def get_open_smenas(self, obj: Store) -> list:
+        """Hozirda ochiq smenalar ro'yxati."""
+        qs = obj.smenas.filter(status=SmenaStatus.OPEN).select_related(
+            'branch', 'worker_open__user',
+        )
+        return SmenaListSerializer(qs, many=True).data
 
 
 class StoreCreateSerializer(serializers.ModelSerializer):

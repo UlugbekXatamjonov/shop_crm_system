@@ -34,8 +34,8 @@ Transfer holatlari:
 FIFO (StockBatch):
   Har bir IN StockMovement uchun StockBatch yaratiladi.
   Chiqimda (OUT, Sotuv, Transfer.confirm) eng eski batch dan boshlab yechiladi.
-  batch_code: {DO'KON[:5].upper()}-{YY}-{MM}-{DD}-{seq:04d}
-  Misol: BESTM-26-03-10-0001
+  batch_code: S{store_id}-{YY}-{MM}-{DD}-{seq:04d}
+  Misol: S1-26-03-10-0001
 """
 
 from django.db import models
@@ -244,11 +244,6 @@ class ExchangeRate(models.Model):
     )
     date       = models.DateField(
         verbose_name="Sana"
-    )
-    source     = models.CharField(
-        max_length=50,
-        default='CBU',
-        verbose_name="Manba"
     )
     created_on = models.DateTimeField(
         auto_now_add=True,
@@ -772,9 +767,9 @@ class StockBatch(models.Model):
     O'zgaruvchi maydon:
       qty_left — FIFO da kamayadi (0 gacha)
 
-    batch_code formati: {DO'KON[:5].upper()}-{YY}-{MM}-{DD}-{seq:04d}
-    Misol: BESTM-26-03-10-0001
-      BESTM — "Best Market" do'koni nomi (5 ta harf)
+    batch_code formati: S{store_id}-{YY}-{MM}-{DD}-{seq:04d}
+    Misol: S1-26-03-10-0001
+      S1 — do'kon ID si (unikal, to'qnashish bo'lmaydi)
       26-03-10 — 2026-yil 10-mart (qisqa format)
       0001 — shu kun uchun birinchi partiya
 

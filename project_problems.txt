@@ -2,17 +2,21 @@
 
 
 ------ Qilish kerak ---------
-valyuta kursidan manba ni olib tashlash
-store ditailga do'konning  settings ma'lumotlarinni ham qo'shish, va kerak bo'lsa ayni vaqtdagi ochiq smenalarni ham qo'shish
-dastur nomidan worker yoki ownerlarga sms yuborishni qo'shish kerak
+
 
 ------ Tugadi ---------
+valyuta kursidan manba ni olib tashlash
+store ditailga do'konning settings ma'lumotlarinni ham qo'shish, va ochiq smenalarni ham qo'shish
 workerda email edit bo'lmayapdi
 xodim qo'shganda do'kon avtomatik olinishi kk
 filial listga adress va ishchilar soni qo'shildi
-Obuna va Try except ni tushuntirish
+StockBatch.batch_code — store ID formatiga o'tkazildi (S{id}-YY-MM-DD-seq)
 
 
 --------- Qoldi ----------
-
-
+SMS xabar yuborish tizimi:
+  - Dastur nomidan worker yoki ownerlarga SMS yuborish
+  - Smena ochilganda/yopilganda owner ga SMS xabar
+  - Kam qoldiq (low_stock) ogohlantirish SMS orqali
+  - Eskiz/PlayMobile API integratsiya
+  - StoreSettings ga sms_enabled, sms_provider, sms_api_key maydonlari qo'shish

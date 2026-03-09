@@ -95,7 +95,11 @@ class StoreViewSet(viewsets.ModelViewSet):
         worker = getattr(self.request.user, 'worker', None)
         if not worker or not worker.store:
             return Store.objects.none()
-        return Store.objects.filter(id=worker.store.id)
+        return (
+            Store.objects
+            .filter(id=worker.store.id)
+            .select_related('settings')       # QOIDA 2: N+1 query oldini olish
+        )
 
     def perform_create(self, serializer):
         instance = serializer.save()
