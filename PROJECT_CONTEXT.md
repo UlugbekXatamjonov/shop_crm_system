@@ -1548,10 +1548,80 @@ d1fc1b8  feat(warehouse): Product.image + WarehouseListSerializer.address (main)
 
 ---
 
-## LOYIHA TUZILMASI
+## QILINGAN ISHLAR (07.03.2026)
+
+### Git log (so'nggi commitlar, 07.03.2026)
+```
+24460eb  fix(warehouse): migration 0006 — step 5/6/8 to'liq idempotent (branch_id yo'q holat va noto'g'ri data uchun)
+ad767d2  fix(warehouse): migration 0006 — SeparateDatabaseAndState + RunSQL IF NOT EXISTS (idempotent) Railway PostgreSQL uchun
+b9e0a30  chore: add .dockerignore, untrack db.sqlite3 va .pyc fayllar
+ce9d69e  tushunmovchilik tuzatildi
+a476f10  tushunmovchilik tuzatildi
+268de04  fix(warehouse): migration 0006 — barcha operatsiyalar idempotent qilindi
+c926112  fix(warehouse): migration 0006 — CreateModel Warehouse idempotent qilindi
+8c77ec7  add
+d019d95  Merge branch 'claude/objective-aryabhata': BOSQICH 1.7 — FIFO StockBatch
+768456b  feat(warehouse): BOSQICH 1.7 — FIFO StockBatch (partiyali ombor hisob-kitob)
+```
+
+### Qo'shilgan xususiyatlar (07.03.2026)
+| Xususiyat | Joyi | Izoh |
+|-----------|------|------|
+| `.dockerignore` | root | `myenv/`, `.git/`, `__pycache__/`, `db.sqlite3`, `.claude/` Docker image dan chiqarildi. Build vaqti: **41s → 14s** |
+| `db.sqlite3` untrack | `.gitignore` allaqachon bor edi | `git rm --cached db.sqlite3` — production PostgreSQL ishlatadi, git da keraksiz |
+| 39 ta `.pyc` fayl untrack | barcha applar | Tasodifan commit qilingan bytecode fayllar tozalandi |
+
+### Topilgan va tuzatilgan muammolar (07.03.2026)
+
+#### 1. `0006_warehouse.py` — Railway PostgreSQL deploy muammosi (TUZATILDI)
+**Muammo zanjiri:**
+1. `d019d95` merge → `0006_warehouse.py` `SeparateDatabaseAndState + RunPython` ishlatardi
+   - Local SQLite: `LookupError` (apps.get_model from_state da Warehouse yo'q)
+   - Railway PostgreSQL: `pg_constraint` query ishlaydi, lekin...
+2. `268de04` commit ("idempotent qilindi") — Railway PostgreSQL da:
+   - `warehouse_warehouse` jadvalini yaratdi (**django_migrations ga yozilmadi** — atomic bo'lmagan `cursor.execute()`)
+   - `warehouse_stockmovement.branch_id` kolumnasini **o'chirib yubordi** (sababı noma'lum, ehtimol DROP + qayta yaratishda xato)
+3. `a476f10` — oddiy `CreateModel` → `"relation warehouse_warehouse already exists"` xatosi
+4. `b9e0a30` — `.dockerignore` qo'shildi → build tezlashdi, lekin migrate hali xato
+5. `ad767d2` — `SeparateDatabaseAndState + RunSQL IF NOT EXISTS` → `"column branch_id does not exist"` xatosi (stockmovement da)
+6. **`24460eb` — TO'LIQ YECHIM** (push qilindi, Railway natijasi kutilmoqda):
+   - Step 6 (`stockmovement.branch_id`): `DO $$ IF EXISTS → DROP NOT NULL; ELSE → ADD COLUMN $$`
+   - Step 5, 8 (XOR constraint): `DECLARE invalid_rows; SELECT COUNT(*) → IF 0 THEN ADD CONSTRAINT ELSE RAISE WARNING`
+
+**Hozirgi `warehouse/migrations/0006_warehouse.py` tuzilmasi:**
+```python
+migrations.SeparateDatabaseAndState(
+    state_operations=[...],   # 8 ta standart Django op (CreateModel, AlterField, AddField, ...)
+    database_operations=[     # 8 ta RunSQL (IF NOT EXISTS, DO $$ ... $$)
+        RunSQL("CREATE TABLE IF NOT EXISTS warehouse_warehouse ..."),
+        RunSQL("ALTER TABLE warehouse_stock ALTER COLUMN branch_id DROP NOT NULL"),
+        RunSQL("ALTER TABLE warehouse_stock ADD COLUMN IF NOT EXISTS warehouse_id ..."),
+        RunSQL("CREATE UNIQUE INDEX IF NOT EXISTS ... ON warehouse_stock(product_id, warehouse_id)"),
+        RunSQL("DO $$ ... stock_branch_xor_warehouse (data check bilan) ...$$"),
+        RunSQL("DO $$ IF branch_id EXISTS: DROP NOT NULL; ELSE: ADD COLUMN $$"),  # KEY FIX
+        RunSQL("ALTER TABLE warehouse_stockmovement ADD COLUMN IF NOT EXISTS warehouse_id ..."),
+        RunSQL("DO $$ ... movement_branch_xor_warehouse (data check bilan) ... $$"),
+    ]
+)
+```
+
+#### 2. MIXED payment validatsiya bagi (HALI TUZATILMAGAN)
+- **Joyi**: `trade/views.py:533-538`
+- **Muammo**: `PaymentType.MIXED` uchun `paid_amount > net_price` tekshiriladi, lekin `paid_amount != net_price` tekshirilmaydi
+- **FIX kerak**: `if paid_amount > net_price:` → `if paid_amount != net_price:`
+
+#### 3. N+1 query muammo (HALI TUZATILMAGAN)
+- **Joyi**: `store/serializers.py:58`
+- **Muammo**: `obj.workers.count()` — prefetch_related cacheni ishlatmaydi
+- **FIX kerak**: `len([w for w in obj.workers.all() if w.status in ('active', 'tatil')])`
+
+---
+
+## LOYIHA TUZILMASI (07.03.2026)
 
 ```
 shop_crm_system/
+├── .dockerignore         ← ✅ YANGI (b9e0a30) — myenv/, .git/, __pycache__/, db.sqlite3 chiqarildi
 ├── config/
 │   ├── __init__.py       ← Celery import
 │   ├── celery.py         ← Celery konfiguratsiya
@@ -1574,29 +1644,49 @@ shop_crm_system/
 │   └── migrations/
 │       ├── 0004_...      ← role/status o'zgarishlar + data migration
 │       └── 0005_...      ← extra_permissions → permissions + data migration
-├── store/                ✅ Store, Branch (soft delete, multi-tenant, workers in detail)
-│   ├── models.py         ← Store, Branch, StoreStatus; Branch unique_together(store,name)
-│   ├── views.py          ← StoreViewSet, BranchViewSet
-│   ├── serializers.py    ← workers detail da, status update da, _worker_short helper
+├── store/                ✅ Store, Branch, StoreSettings (soft delete, multi-tenant)
+│   ├── models.py         ← Store, Branch, StoreStatus, StoreSettings (10 guruh, 30+ maydon)
+│   ├── views.py          ← StoreViewSet, BranchViewSet, StoreSettingsViewSet
+│   ├── serializers.py    ← workers detail, BranchListSerializer (workers_count — N+1 bug bor!)
 │   ├── api_urls.py       ← /api/v1/stores/, /api/v1/branches/, /api/v1/settings/
-│   ├── signals.py        ← ✅ BOSQICH 2 — QOIDA 1 (auto StoreSettings yaratish)
+│   ├── signals.py        ← ✅ QOIDA 1 (auto StoreSettings yaratish)
+│   └── migrations/
+│       ├── 0003_alter_branch_unique_together.py
+│       ├── 0004_storesettings.py
+│       └── 0005_smena.py
+├── warehouse/            ✅ BOSQICH 1–1.7 (Category, SubCategory, Product, Currency,
+│   │                        ExchangeRate, Warehouse, Stock, StockMovement, Transfer,
+│   │                        TransferItem, StockBatch)
+│   ├── models.py
+│   ├── views.py          ← 10 ta ViewSet
+│   ├── serializers.py
+│   ├── api_urls.py       ← /api/v1/warehouse/ (10 router)
+│   ├── tasks.py          ← Celery: valyuta kursi yangilash (har kuni 9:00)
 │   └── migrations/
 │       ├── 0001_initial.py
-│       └── 0003_alter_branch_unique_together.py ← unique_together qo'shildi
-├── warehouse/            ✅ Category, Product, Stock, StockMovement
-│   ├── models.py         ← Category, Product(unique_together store+name, store+barcode), Stock, StockMovement
-│   ├── views.py          ← CategoryViewSet, ProductViewSet, StockViewSet, StockMovementViewSet
-│   ├── serializers.py    ← 14 ta serializer (per-store unique validation)
-│   ├── api_urls.py       ← /api/v1/warehouse/
+│       ├── 0002_alter_product_unique_together.py
+│       ├── 0003_expand_warehouse_models.py  ← intentionally empty
+│       ├── 0004_product_image.py
+│       ├── 0004_subcategory.py
+│       ├── 0005_currency_exchangerate.py
+│       ├── 0006_warehouse.py  ← ⚠️ SeparateDatabaseAndState+RunSQL (idempotent, Railway fix)
+│       ├── 0007_transfer.py
+│       └── 0008_stockbatch.py
+├── trade/                ✅ BOSQICH 4 (CustomerGroup, Customer, Sale, SaleItem, Smena)
+│   ├── models.py         ← PaymentType(CASH/CARD/DEBT/MIXED), Sale, SaleItem, CustomerGroup, Customer
+│   ├── views.py          ← SaleViewSet (13-qadam + FIFO), SmenaViewSet (open/close/x-report)
+│   │                     ← ⚠️ MIXED payment bug: paid_amount != net_price tekshirilmaydi (line 533)
+│   ├── serializers.py
+│   ├── api_urls.py       ← /api/v1/sales/, /api/v1/customers/, /api/v1/shifts/, ...
 │   └── migrations/
 │       ├── 0001_initial.py
-│       └── 0002_alter_product_unique_together.py ← unique_together qo'shildi
-├── trade/                ❌ Hali boshlanmagan
-├── expense/              ❌ Hali boshlanmagan
+│       └── 0002_saleitem_unit_cost.py
+├── expense/              ❌ Hali boshlanmagan (BOSQICH 6)
 ├── requirements/
 │   ├── base.txt
-│   └── production.txt    ← gunicorn, whitenoise, dj-database-url
+│   └── production.txt    ← gunicorn, whitenoise, dj-database-url, psycopg2
 ├── requirements.txt      ← -r requirements/production.txt
-├── Dockerfile            ← collectstatic BUILD vaqtida
-└── railway.toml          ← port 8000 hardcode
+├── Dockerfile            ← python:3.12-slim, collectstatic BUILD vaqtida, appuser
+├── entrypoint.sh         ← set -e; migrate; gunicorn (PORT env)
+└── railway.toml          ← builder=DOCKERFILE, healthcheckPath=/health/, timeout=300
 ```
