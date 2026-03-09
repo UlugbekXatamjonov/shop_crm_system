@@ -38,7 +38,7 @@ from accaunt.permissions import CanAccess, IsOwner
 
 from config.cache_utils import get_store_settings, invalidate_store_settings
 
-from .models import Branch, Smena, SmenaStatus, Store, StoreSettings, StoreStatus
+from .models import Branch, Smena, SmenaStatus, Store, StoreSettings
 from .serializers import (
     BranchCreateSerializer,
     BranchDetailSerializer,
@@ -118,16 +118,15 @@ class StoreViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance: Store):
-        """Soft delete — o'chirish o'rniga status='inactive' ga o'tkaziladi."""
-        instance.status = StoreStatus.INACTIVE
-        instance.save(update_fields=['status'])
+        """Hard delete — do'konni bazadan o'chiradi."""
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditLog.Action.DELETE,
             target_model='Store',
             target_id=instance.id,
-            description=f"Do'kon nofaol qilindi: '{instance.name}'",
+            description=f"Do'kon o'chirildi: '{instance.name}'",
         )
+        instance.delete()
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -145,6 +144,11 @@ class StoreViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data:
+            return Response(
+                {'message': "Yangilash uchun kamida bitta maydon yuborilishi kerak."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         self.perform_update(serializer)
         return Response(
             {
@@ -238,16 +242,15 @@ class BranchViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance: Branch):
-        """Soft delete — o'chirish o'rniga status='inactive' ga o'tkaziladi."""
-        instance.status = StoreStatus.INACTIVE
-        instance.save(update_fields=['status'])
+        """Hard delete — filialni bazadan o'chiradi."""
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditLog.Action.DELETE,
             target_model='Branch',
             target_id=instance.id,
-            description=f"Filial nofaol qilindi: '{instance.name}'",
+            description=f"Filial o'chirildi: '{instance.name}'",
         )
+        instance.delete()
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -268,6 +271,11 @@ class BranchViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data:
+            return Response(
+                {'message': "Yangilash uchun kamida bitta maydon yuborilishi kerak."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         self.perform_update(serializer)
         return Response(
             {
@@ -358,6 +366,11 @@ class StoreSettingsViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data:
+            return Response(
+                {'message': "Yangilash uchun kamida bitta maydon yuborilishi kerak."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         self.perform_update(serializer)
         return Response(
             {

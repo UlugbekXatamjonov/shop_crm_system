@@ -48,7 +48,6 @@ from .models import (
     ExchangeRate,
     MovementType,
     Product,
-    ProductStatus,
     Stock,
     StockBatch,
     StockMovement,
@@ -164,16 +163,15 @@ class CategoryViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance: Category):
-        """Soft delete — o'chirish o'rniga status='inactive' ga o'tkaziladi."""
-        instance.status = ProductStatus.INACTIVE
-        instance.save(update_fields=['status'])
+        """Hard delete — kategoriyani bazadan o'chiradi."""
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditLog.Action.DELETE,
             target_model='Category',
             target_id=instance.id,
-            description=f"Kategoriya nofaol qilindi: '{instance.name}'",
+            description=f"Kategoriya o'chirildi: '{instance.name}'",
         )
+        instance.delete()
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -194,6 +192,11 @@ class CategoryViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data:
+            return Response(
+                {'message': "Yangilash uchun kamida bitta maydon yuborilishi kerak."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         self.perform_update(serializer)
         return Response(
             {
@@ -298,15 +301,15 @@ class SubCategoryViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance: SubCategory):
-        instance.status = ProductStatus.INACTIVE
-        instance.save(update_fields=['status'])
+        """Hard delete — subkategoriyani bazadan o'chiradi."""
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditLog.Action.DELETE,
             target_model='SubCategory',
             target_id=instance.id,
-            description=f"Subkategoriya nofaol qilindi: '{instance.name}'",
+            description=f"Subkategoriya o'chirildi: '{instance.name}'",
         )
+        instance.delete()
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -327,6 +330,11 @@ class SubCategoryViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data:
+            return Response(
+                {'message': "Yangilash uchun kamida bitta maydon yuborilishi kerak."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         self.perform_update(serializer)
         return Response(
             {
@@ -411,6 +419,11 @@ class CurrencyViewSet(viewsets.ModelViewSet):
         # PATCH uchun faqat name, symbol o'zgartiriladi (code va is_base himoyalangan)
         allowed_fields = {'name', 'symbol'}
         data = {k: v for k, v in request.data.items() if k in allowed_fields}
+        if not data:
+            return Response(
+                {'message': "Yangilash uchun kamida bitta maydon yuborilishi kerak."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         serializer = self.get_serializer(instance, data=data, partial=True)
         serializer.is_valid(raise_exception=True)
         instance = serializer.save()
@@ -623,16 +636,15 @@ class ProductViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance: Product):
-        """Soft delete — o'chirish o'rniga status='inactive' ga o'tkaziladi."""
-        instance.status = ProductStatus.INACTIVE
-        instance.save(update_fields=['status'])
+        """Hard delete — mahsulotni bazadan o'chiradi."""
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditLog.Action.DELETE,
             target_model='Product',
             target_id=instance.id,
-            description=f"Mahsulot nofaol qilindi: '{instance.name}'",
+            description=f"Mahsulot o'chirildi: '{instance.name}'",
         )
+        instance.delete()
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -653,6 +665,11 @@ class ProductViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data:
+            return Response(
+                {'message': "Yangilash uchun kamida bitta maydon yuborilishi kerak."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         self.perform_update(serializer)
         return Response(
             {
@@ -791,16 +808,15 @@ class WarehouseViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance: Warehouse):
-        """Soft delete — is_active=False."""
-        instance.is_active = False
-        instance.save(update_fields=['is_active'])
+        """Hard delete — omborni bazadan o'chiradi."""
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditLog.Action.DELETE,
             target_model='Warehouse',
             target_id=instance.id,
-            description=f"Ombor nofaol qilindi: '{instance.name}'",
+            description=f"Ombor o'chirildi: '{instance.name}'",
         )
+        instance.delete()
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -821,6 +837,11 @@ class WarehouseViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data:
+            return Response(
+                {'message': "Yangilash uchun kamida bitta maydon yuborilishi kerak."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         self.perform_update(serializer)
         return Response(
             {
@@ -955,6 +976,11 @@ class StockViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data:
+            return Response(
+                {'message': "Yangilash uchun kamida bitta maydon yuborilishi kerak."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         self.perform_update(serializer)
         return Response(
             {

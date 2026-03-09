@@ -4,7 +4,7 @@ WAREHOUSE APP — Modellar
 ============================================================
 Modellar:
   ProductUnit     — Mahsulot o'lchov birliklari (TextChoices)
-  ProductStatus   — Mahsulot/kategoriya holati (TextChoices)
+  ActiveStatus   — Mahsulot/kategoriya holati (TextChoices)
   MovementType    — Kirim/chiqim turi (TextChoices)
   TransferStatus  — Transfer holati (TextChoices)
   Category        — Mahsulot kategoriyasi
@@ -60,7 +60,7 @@ class ProductUnit(models.TextChoices):
     QUTI   = 'quti',   'Quti'
 
 
-class ProductStatus(models.TextChoices):
+class ActiveStatus(models.TextChoices):
     ACTIVE   = 'active',   'Faol'
     INACTIVE = 'inactive', 'Nofaol'
 
@@ -102,8 +102,8 @@ class Category(models.Model):
     )
     status      = models.CharField(
         max_length=10,
-        choices=ProductStatus.choices,
-        default=ProductStatus.ACTIVE,
+        choices=ActiveStatus.choices,
+        default=ActiveStatus.ACTIVE,
         verbose_name="Holati"
     )
     created_on  = models.DateTimeField(
@@ -157,8 +157,8 @@ class SubCategory(models.Model):
     )
     status      = models.CharField(
         max_length=10,
-        choices=ProductStatus.choices,
-        default=ProductStatus.ACTIVE,
+        choices=ActiveStatus.choices,
+        default=ActiveStatus.ACTIVE,
         verbose_name="Holati"
     )
     created_on  = models.DateTimeField(
@@ -351,8 +351,8 @@ class Product(models.Model):
     )
     status         = models.CharField(
         max_length=10,
-        choices=ProductStatus.choices,
-        default=ProductStatus.ACTIVE,
+        choices=ActiveStatus.choices,
+        default=ActiveStatus.ACTIVE,
         verbose_name="Holati"
     )
     created_on     = models.DateTimeField(

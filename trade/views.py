@@ -152,6 +152,11 @@ class CustomerGroupViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data:
+            return Response(
+                {'message': "Yangilash uchun kamida bitta maydon yuborilishi kerak."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         self.perform_update(serializer)
         return Response(
             {
@@ -217,6 +222,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
             Customer.objects
             .filter(store=worker.store)
             .select_related('group')
+            .prefetch_related('sales')
         )
 
         # ?status=active|inactive
@@ -275,16 +281,15 @@ class CustomerViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance: Customer):
-        """Soft delete — status='inactive' ga o'tkaziladi."""
-        instance.status = CustomerStatus.INACTIVE
-        instance.save(update_fields=['status'])
+        """Hard delete — mijozni bazadan o'chiradi."""
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditLog.Action.DELETE,
             target_model='Customer',
             target_id=instance.id,
-            description=f"Mijoz nofaol qilindi: '{instance.name}'",
+            description=f"Mijoz o'chirildi: '{instance.name}'",
         )
+        instance.delete()
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -302,6 +307,11 @@ class CustomerViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data:
+            return Response(
+                {'message': "Yangilash uchun kamida bitta maydon yuborilishi kerak."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         self.perform_update(serializer)
         return Response(
             {

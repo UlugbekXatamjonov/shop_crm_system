@@ -21,6 +21,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status, viewsets, mixins
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import SearchFilter
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -41,6 +42,7 @@ from .serializers import (
     WorkerDetailSerializer,
     WorkerCreateSerializer,
     WorkerUpdateSerializer,
+    WorkerSelfUpdateSerializer,
 )
 
 
@@ -263,13 +265,18 @@ class WorkerViewSet(viewsets.ModelViewSet):
       GET    /api/v1/workers/      — ro'yxat        (manager/seller ham ko'ra oladi)
       POST   /api/v1/workers/      — hodim qo'shish  (faqat owner)
       GET    /api/v1/workers/{id}/ — hodim ma'lumoti (manager/seller ham ko'ra oladi)
-      PATCH  /api/v1/workers/{id}/ — hodimni yangilash (faqat owner)
+      PATCH  /api/v1/workers/{id}/ — hodimni yangilash (faqat owner, paroldan tashqari)
       DELETE /api/v1/workers/{id}/ — hodimni o'chirish (faqat owner, hard delete)
+      GET    /api/v1/workers/me/   — o'z profilini ko'rish (barcha rollar)
+      PATCH  /api/v1/workers/me/   — email, phone1, parol yangilash (barcha rollar)
 
-    PATCH bir so'rovda barchasini o'zgartiradi:
-      - User: first_name, last_name, phone1, phone2
+    Owner PATCH (/{id}/):
+      - User: first_name, last_name, phone1, phone2, email, username
       - Worker: role, branch, salary, status
       - Permissions: permissions = ["sotuv", "ombor", ...]
+
+    Self PATCH (/me/):
+      - email, phone1, password (current_password + new_password + new_password2)
 
     Multi-tenant xavfsizlik:
       Faqat o'z do'konining hodimlarini ko'radi va boshqaradi.
@@ -292,9 +299,12 @@ class WorkerViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         """
+        me             → IsAuthenticated   (har qanday hodim o'zini ko'radi/yangilaydi)
         list/retrieve  → IsManagerOrAbove  (manager va seller ham ko'ra oladi)
         create/update/destroy → IsOwner   (faqat ega)
         """
+        if self.action == 'me':
+            return [IsAuthenticated()]
         if self.action in ('list', 'retrieve'):
             return [IsAuthenticated(), IsManagerOrAbove()]
         return [IsAuthenticated(), IsOwner()]
@@ -407,6 +417,52 @@ class WorkerViewSet(viewsets.ModelViewSet):
                 'data': WorkerDetailSerializer(instance, context={'request': request}).data,
             },
             status=status.HTTP_200_OK
+        )
+
+    @action(detail=False, methods=['get', 'patch'], url_path='me')
+    def me(self, request):
+        """
+        Hodim o'z ma'lumotlarini ko'rish va yangilash.
+
+        GET   /api/v1/workers/me/ — o'z profilini ko'rish
+        PATCH /api/v1/workers/me/ — email, phone1, parol yangilash
+
+        Barcha rollar (owner, manager, seller) foydalana oladi.
+        Faqat 3 ta maydon yangilanadi: email, phone1, password.
+        """
+        worker = getattr(request.user, 'worker', None)
+        if not worker:
+            return Response(
+                {'message': "Hodim profili topilmadi."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if request.method == 'GET':
+            return Response(
+                WorkerDetailSerializer(worker, context={'request': request}).data
+            )
+
+        # PATCH
+        serializer = WorkerSelfUpdateSerializer(
+            worker, data=request.data, partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditLog.Action.UPDATE,
+            target_model='Worker',
+            target_id=worker.id,
+            description=f"Hodim o'z ma'lumotlarini yangiladi: {request.user}",
+        )
+
+        return Response(
+            {
+                'message': "Ma'lumotlaringiz muvaffaqiyatli yangilandi.",
+                'data': WorkerDetailSerializer(worker, context={'request': request}).data,
+            },
+            status=status.HTTP_200_OK,
         )
 
     def destroy(self, request, *args, **kwargs):

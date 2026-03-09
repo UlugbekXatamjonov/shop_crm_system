@@ -31,7 +31,6 @@ from .models import (
     ExchangeRate,
     MovementType,
     Product,
-    ProductStatus,
     Stock,
     StockBatch,
     StockMovement,
@@ -57,10 +56,10 @@ class CategoryListSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'status', 'status_display', 'product_count', 'subcategory_count')
 
     def get_product_count(self, obj):
-        return obj.products.filter(status=ProductStatus.ACTIVE).count()
+        return obj.products.count()
 
     def get_subcategory_count(self, obj):
-        return obj.subcategories.filter(status=ProductStatus.ACTIVE).count()
+        return obj.subcategories.count()
 
 
 class CategoryDetailSerializer(serializers.ModelSerializer):
@@ -78,10 +77,10 @@ class CategoryDetailSerializer(serializers.ModelSerializer):
         )
 
     def get_product_count(self, obj):
-        return obj.products.filter(status=ProductStatus.ACTIVE).count()
+        return obj.products.count()
 
     def get_subcategory_count(self, obj):
-        return obj.subcategories.filter(status=ProductStatus.ACTIVE).count()
+        return obj.subcategories.count()
 
 
 class CategoryCreateSerializer(serializers.ModelSerializer):
@@ -148,7 +147,7 @@ class SubCategoryListSerializer(serializers.ModelSerializer):
         )
 
     def get_product_count(self, obj):
-        return obj.products.filter(status=ProductStatus.ACTIVE).count()
+        return obj.products.count()
 
 
 class SubCategoryDetailSerializer(serializers.ModelSerializer):
@@ -168,7 +167,7 @@ class SubCategoryDetailSerializer(serializers.ModelSerializer):
         )
 
     def get_product_count(self, obj):
-        return obj.products.filter(status=ProductStatus.ACTIVE).count()
+        return obj.products.count()
 
 
 class SubCategoryCreateSerializer(serializers.ModelSerializer):
