@@ -76,6 +76,20 @@ class CustomerGroupCreateSerializer(serializers.ModelSerializer):
             },
         }
 
+    def validate_name(self, value: str) -> str:
+        request = self.context.get('request')
+        worker  = getattr(request.user, 'worker', None) if request else None
+        store   = worker.store if worker else None
+        if store:
+            qs = CustomerGroup.objects.filter(store=store, name=value)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError(
+                    f"'{value}' nomli guruh allaqachon mavjud."
+                )
+        return value
+
     def validate_discount(self, value: Decimal) -> Decimal:
         if value < 0 or value > 100:
             raise serializers.ValidationError(
