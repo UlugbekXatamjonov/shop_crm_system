@@ -1088,7 +1088,7 @@ class StockMovementViewSet(viewsets.ModelViewSet):
                 updated_on=timezone.now(),
             )
             # ── FIFO: IN harakat uchun yangi partiya yaratish ──
-            if unit_cost and store:
+            if unit_cost is not None and store:
                 batch_code = generate_batch_code(store)
                 StockBatch.objects.create(
                     batch_code   = batch_code,
@@ -1487,8 +1487,10 @@ class StockBatchViewSet(viewsets.ReadOnlyModelViewSet):
       Mahsulotning FIFO tannarxini kuzatish, moliyaviy hisobot uchun.
       qty_left=0 bo'lgan partiyalar tamom (eski arxiv).
     """
-    serializer_class   = StockBatchSerializer
-    permission_classes = [IsAuthenticated, CanAccess('ombor')]
+    serializer_class = StockBatchSerializer
+
+    def get_permissions(self):
+        return [IsAuthenticated(), CanAccess('ombor')]
 
     def get_queryset(self):
         worker = getattr(self.request.user, 'worker', None)
