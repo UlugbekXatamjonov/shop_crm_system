@@ -191,6 +191,8 @@ permissions  # ["sotuv", "ombor", ...]  — to'liq ro'yxat almashadi
 |--------|-------------------|-----------------|---------------------------------------------------------|
 | GET    | `/workers/`       | IsManagerOrAbove | Hodimlar ro'yxati (faqat o'z do'koni, status tartibda) |
 | POST   | `/workers/`       | IsOwner         | Yangi hodim qo'shish                                    |
+| GET    | `/workers/me/`    | IsAuthenticated | O'z profilini ko'rish (barcha rollar)                   |
+| PATCH  | `/workers/me/`    | IsAuthenticated | email, phone1, parol yangilash (barcha rollar)          |
 | GET    | `/workers/{id}/`  | IsManagerOrAbove | Hodim to'liq ma'lumoti                                 |
 | PATCH  | `/workers/{id}/`  | IsOwner         | user+worker+permissions bitta so'rovda                  |
 | DELETE | `/workers/{id}/`  | IsOwner         | Soft delete — status='ishdan_ketgan' ga o'tkazadi       |
@@ -252,7 +254,7 @@ permissions  # ["sotuv", "ombor", ...]  — to'liq ro'yxat almashadi
 | `Branch` | store(FK), name, address, phone, status, created_on    | `unique_together = [('store','name')]` |
 
 - `StoreStatus`: `active`, `inactive`
-- **Soft delete**: `status='inactive'` ga o'tkaziladi (o'chirilmaydi)
+- **Hard delete**: `instance.delete()` — `status='inactive'` faqat PATCH orqali o'zgartiriladi (o'chirish emas)
 
 ### Serializer maydonlari
 
@@ -262,7 +264,7 @@ permissions  # ["sotuv", "ombor", ...]  — to'liq ro'yxat almashadi
 | `StoreDetailSerializer` | id, name, address, phone, status, status_display, created_on, **branches**, **workers** |
 | `StoreCreateSerializer` | name, address, phone                                    |
 | `StoreUpdateSerializer` | name, address, phone, **status**                        |
-| `BranchListSerializer`  | id, name, store_name, phone, status, status_display     |
+| `BranchListSerializer`  | id, name, **address**, store_name, phone, status, status_display, **workers_count** |
 | `BranchDetailSerializer`| id, name, address, phone, store_id, store_name, status, status_display, created_on, **workers** |
 | `BranchCreateSerializer`| name, address, phone                                    |
 | `BranchUpdateSerializer`| name, address, phone, **status**                        |
@@ -284,12 +286,12 @@ permissions  # ["sotuv", "ombor", ...]  — to'liq ro'yxat almashadi
 | POST   | `/api/v1/stores/`     | IsOwner                       | Yaratish               |
 | GET    | `/api/v1/stores/{id}/`| IsAuthenticated + CanAccess('dokonlar') | Detail (branches+workers) |
 | PATCH  | `/api/v1/stores/{id}/`| IsOwner                       | Yangilash (+ status)   |
-| DELETE | `/api/v1/stores/{id}/`| IsOwner                       | Soft delete            |
+| DELETE | `/api/v1/stores/{id}/`| IsOwner                       | Hard delete            |
 | GET    | `/api/v1/branches/`   | IsAuthenticated               | Ro'yxat                |
 | POST   | `/api/v1/branches/`   | IsOwner                       | Yaratish               |
 | GET    | `/api/v1/branches/{id}/`| IsAuthenticated             | Detail (workers)       |
 | PATCH  | `/api/v1/branches/{id}/`| IsOwner                     | Yangilash (+ status)   |
-| DELETE | `/api/v1/branches/{id}/`| IsOwner                     | Soft delete            |
+| DELETE | `/api/v1/branches/{id}/`| IsOwner                     | Hard delete            |
 
 ---
 
@@ -571,7 +573,7 @@ PORT=8000
 | 1.5.1 | Warehouse modeli (nom, manzil, is_active, store FK) | ✅ Bajarildi |
 | 1.5.2 | Stock: branch OR warehouse (XOR constraint) | ✅ Bajarildi |
 | 1.5.3 | StockMovement: branch OR warehouse (XOR constraint) | ✅ Bajarildi |
-| 1.5.4 | WarehouseViewSet: CRUD + soft delete (is_active=False) | ✅ Bajarildi |
+| 1.5.4 | WarehouseViewSet: CRUD + hard delete (is_active — faqat flag, o'chirish emas) | ✅ Bajarildi |
 | 1.5.5 | StockViewSet, MovementViewSet — branch\|warehouse qo'llab-quvvatlash | ✅ Bajarildi |
 
 **Muhim farq:**
@@ -586,7 +588,7 @@ PORT=8000
 ```
 GET/POST   /api/v1/warehouse/warehouses/
 GET/PATCH  /api/v1/warehouse/warehouses/{id}/
-DELETE     /api/v1/warehouse/warehouses/{id}/   ← soft delete (is_active=False)
+DELETE     /api/v1/warehouse/warehouses/{id}/   ← hard delete (instance.delete())
 ```
 
 ---
@@ -792,7 +794,7 @@ CustomerGroup: name, store(FK), discount(%), created_on
 
 Customer:      name, phone, address, debt_balance, group(FK,null),
                store(FK), status(active|inactive), created_on
-               → Soft delete: status='inactive'
+               → Hard delete: instance.delete() — status='inactive' faqat PATCH orqali
 
 Sale:          branch(FK), store(FK), worker(FK), customer(FK,null),
                smena(FK,null), payment_type(cash|card|mixed|debt),
@@ -817,6 +819,7 @@ SaleDetailSerializer
 ```
 GET/POST   /api/v1/customer-groups/  + GET/PATCH/DELETE /{id}/  (IsManagerOrAbove)
 GET/POST   /api/v1/customers/        + GET/PATCH/DELETE /{id}/  (CanAccess('sotuv'))
+           → GET /{id}/ da debt_sales: mijozning barcha nasiya sotuvlari ro'yxati
 GET/POST   /api/v1/sales/            + GET              /{id}/  (CanAccess('sotuv'))
 PATCH      /api/v1/sales/{id}/cancel/                           (@transaction.atomic)
 ```
@@ -993,10 +996,10 @@ X-report (smena davomida, smena YOPILMAYDI):
   - Istalgan vaqtda chiqariladi
 
 Texnik:
-  → trade app da Smena viewida (close action)
-  → PDF (reportlab) + JSON javob
-  → Endpoint: POST /api/v1/shifts/{id}/z-report/  ← yopadi + PDF
-              GET  /api/v1/shifts/{id}/x-report/  ← yopilmaydi + PDF
+  → store app da SmenaViewSet (close action, x_report action)
+  → JSON javob (PDF export BOSQICH 16 da qo'shiladi)
+  → Endpoint: PATCH /api/v1/shifts/{id}/close/    ← Z-report + smena yopiladi
+              GET   /api/v1/shifts/{id}/x-report/ ← X-report (smena yopilmaydi)
 ```
 
 ---
@@ -1055,15 +1058,15 @@ Texnik:
 
 ### BOSQICH 12 — PriceList (Narx ro'yxati) ← YANGI
 ```
-CustomerGroup (trade app da):
-  name, store(FK), discount_percent(default=0)
+CustomerGroup (trade app da) — BOSQICH 4 da allaqachon bor:
+  name, store(FK), discount(%), created_on
 
-PriceList (trade app da):
+⚠️ Customer.group(FK, null) → CustomerGroup bog'lanishi BOSQICH 4 da qo'shilgan.
+   BOSQICH 12 da faqat PriceList modeli va logikasi qo'shiladi.
+
+PriceList (trade app da) — YANGI:
   product(FK), customer_group(FK), price
   store(FK), valid_from, valid_to(null)
-
-Customer modeliga qo'shiladi:
-  customer_group(FK, null)
 
 → Sale yaratilganda unit_price qanday aniqlanadi:
   1. Mijozning customer_group mavjudmi?
