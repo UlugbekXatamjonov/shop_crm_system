@@ -28,6 +28,14 @@ class StoreStatus(models.TextChoices):
     INACTIVE = 'inactive', 'Nofaol'
 
 
+class DefaultCurrency(models.TextChoices):
+    UZS = 'UZS', "O'zbek so'mi (UZS)"
+    USD = 'USD', 'Amerika dollari (USD)'
+    RUB = 'RUB', 'Rossiya rubli (RUB)'
+    EUR = 'EUR', 'Yevropa yevrosi (EUR)'
+    CNY = 'CNY', 'Xitoy yuani (CNY)'
+
+
 # ============================================================
 # DO'KON MODELI
 # ============================================================
@@ -198,8 +206,9 @@ class StoreSettings(models.Model):
     # ============================================================
     default_currency      = models.CharField(
         max_length=3,
-        default='UZS',
-        verbose_name="Asosiy valyuta (UZS | USD | RUB)"
+        choices=DefaultCurrency.choices,
+        default=DefaultCurrency.UZS,
+        verbose_name="Asosiy valyuta"
     )
     show_usd_price        = models.BooleanField(
         default=False,
@@ -208,6 +217,14 @@ class StoreSettings(models.Model):
     show_rub_price        = models.BooleanField(
         default=False,
         verbose_name="RUB narxini ko'rsatish"
+    )
+    show_eur_price        = models.BooleanField(
+        default=False,
+        verbose_name="EUR narxini ko'rsatish"
+    )
+    show_cny_price        = models.BooleanField(
+        default=False,
+        verbose_name="CNY narxini ko'rsatish"
     )
 
     # ============================================================

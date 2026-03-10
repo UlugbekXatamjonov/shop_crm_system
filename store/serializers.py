@@ -302,7 +302,7 @@ class StoreSettingsSerializer(serializers.ModelSerializer):
             'wastage_enabled', 'stock_audit_enabled',
             'kpi_enabled', 'price_list_enabled',
             # Guruh 2 — Valyuta
-            'default_currency', 'show_usd_price', 'show_rub_price',
+            'default_currency', 'show_usd_price', 'show_rub_price', 'show_eur_price', 'show_cny_price',
             # Guruh 3 — To'lov
             'allow_cash', 'allow_card', 'allow_debt',
             # Guruh 4 — Chegirma
@@ -347,7 +347,7 @@ class StoreSettingsUpdateSerializer(serializers.ModelSerializer):
             'wastage_enabled', 'stock_audit_enabled',
             'kpi_enabled', 'price_list_enabled',
             # Guruh 2 — Valyuta
-            'default_currency', 'show_usd_price', 'show_rub_price',
+            'default_currency', 'show_usd_price', 'show_rub_price', 'show_eur_price', 'show_cny_price',
             # Guruh 3 — To'lov
             'allow_cash', 'allow_card', 'allow_debt',
             # Guruh 4 — Chegirma
