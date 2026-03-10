@@ -2,11 +2,13 @@
 
 
 ------ Qilish kerak ---------
-warehousda status maydoni to'g'ri kelmayapdi, shuning uchun yangi ombor  qo'shib bo'lmayapdi 
-subcategory statusi edit bo'lmayapdi
+
 
 ------ Tugadi ---------
 barcha delete larni soft delete dan oddiy delete ga o'tkazish kerak.
+subcategory statusi edit bo'lmayapdi → SubCategoryUpdateSerializer ga status qo'shildi.
+kategoriya statusi edit bo'lmayapdi → CategoryUpdateSerializer ga status qo'shildi.
+warehousda yangi ombor qo'shib bo'lmayapdi → WarehouseCreateSerializer ga is_active qo'shildi, validate_name tuzatildi (faol/nofaol farqlaydi).
 Costomers groups da biro maydon edit bo'lmasa ham "yangilandi" deyapdi, qolgan viewlarni ham ko'rib qo'yish kerak.  
 Mijozga qaysi sotuvdan qancha qarzi borligini ham qo'shish kerak, BIZDA BU XUSUSIYAT BORMIN ?
 valyuta kursidan manba ni olib tashlash

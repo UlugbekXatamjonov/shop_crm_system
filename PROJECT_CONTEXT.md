@@ -293,26 +293,32 @@ permissions  # ["sotuv", "ombor", ...]  — to'liq ro'yxat almashadi
 
 ---
 
-## WAREHOUSE APP — TUZILMA (to'liq, 03.03.2026 yangilandi)
+## WAREHOUSE APP — TUZILMA (to'liq, 10.03.2026 yangilandi)
 
 ### Modellar (haqiqiy)
 | Model           | Maydonlar                                                                 | Constraint |
 |-----------------|---------------------------------------------------------------------------|------------|
 | `Category`      | name, description, store(FK), status, created_on                          | `unique_together = [('store','name')]` |
-| `SubCategory`   | name, category(FK), store(FK), status, created_on                         | `unique_together = [('store','name')]` |
+| `SubCategory`   | name, description, category(FK), store(FK), status, created_on            | `unique_together = [('store','category','name')]` |
 | `Currency`      | code, name, symbol, is_base — **store YO'Q, global**                      | `unique: code` |
-| `ExchangeRate`  | currency(FK), rate, date, source, created_on — **store YO'Q, global**     | `unique_together = [('currency','date')]` |
-| `Product`       | name, category(FK), subcategory(FK,null), unit, purchase_price, sale_price, price_currency(FK,null), barcode(null), image(null), store(FK), status, created_on | `unique_together = [('store','name')]` |
-| `Stock`         | product(FK), branch(FK), quantity, updated_on                             | `unique_together = [('product','branch')]` |
-| `StockMovement` | product(FK), branch(FK), movement_type, quantity, note, worker(FK,null), created_on | — (immutable log) |
+| `ExchangeRate`  | currency(FK), rate, date, created_on — **store YO'Q, global**             | `unique_together = [('currency','date')]` |
+| `Product`       | name, category(FK,null), subcategory(FK,null), unit, purchase_price, sale_price, price_currency(FK,null), barcode(null), image(null), store(FK), status, created_on | `unique_together = [('store','name'),('store','barcode')]` |
+| `Warehouse`     | name, address, store(FK), **is_active**(BooleanField,default=True), created_on | `unique_together = [('store','name')]` |
+| `Stock`         | product(FK), branch(FK,null), warehouse(FK,null), quantity, updated_on    | XOR constraint: branch IS NOT NULL xor warehouse IS NOT NULL |
+| `StockMovement` | product(FK), branch(FK,null), warehouse(FK,null), movement_type, quantity, unit_cost(null), note, worker(FK,null), created_on | immutable log, XOR |
+| `Transfer`      | from_branch/from_warehouse (XOR), to_branch/to_warehouse (XOR), store(FK), worker(FK,null), status(pending\|confirmed\|cancelled), note, confirmed_at(null) | — |
+| `TransferItem`  | transfer(FK), product(FK), quantity                                       | — |
+| `StockBatch`    | product(FK), location_type(branch\|warehouse), branch(FK,null), warehouse(FK,null), batch_code, unit_cost, qty_left, created_on | FIFO partiya |
 
-⚠️ **Muhim:** `Warehouse` modeli **mavjud emas**. `Stock` faqat `branch` ga bog'liq.
-⚠️ `Currency` va `ExchangeRate` da `store` maydoni **yo'q** — ular global (barcha do'konlar uchun umumiy).
+⚠️ `Currency` va `ExchangeRate` da `store` maydoni **yo'q** — ular global.
+⚠️ `Warehouse` — `is_active` BooleanField (boshqa modellardan farqli, ular `status` CharField ishlatadi).
+⚠️ **Delete qoidasi (10.03.2026):** Barcha modellar **hard delete** — soft delete yo'q.
 
 ### Choices
 - `ProductUnit`: dona, kg, g, litr, metr, m2, yashik, qop, quti
-- `ProductStatus`: active, inactive
+- `ActiveStatus`: active, inactive (Category, SubCategory, Product uchun)
 - `MovementType`: in (Kirim), out (Chiqim)
+- `TransferStatus`: pending, confirmed, cancelled
 
 ### Migratsiyalar (to'g'ri zanjir!)
 | Migration | Fayl nomi                          | Izoh                                                    |
@@ -322,32 +328,55 @@ permissions  # ["sotuv", "ombor", ...]  — to'liq ro'yxat almashadi
 | 0003      | 0003_expand_warehouse_models.py    | Kengaytirilgan modellar                                 |
 | 0004 (a)  | 0004_product_image.py              | Product.image ImageField (0003 ga bog'liq)              |
 | 0004 (b)  | 0004_subcategory.py                | SubCategory + Product.subcategory (**0004_product_image** ga bog'liq ✅) |
-| 0005      | 0005_currency_exchangerate.py      | Currency + ExchangeRate + seed data (0004_subcategory ga bog'liq) |
+| 0005      | 0005_currency_exchangerate.py      | Currency + ExchangeRate + seed data                     |
+| 0006      | 0006_warehouse.py                  | Warehouse modeli + Stock/StockMovement XOR (SeparateDatabaseAndState) |
+| 0007      | 0007_transfer.py                   | Transfer + TransferItem                                 |
+| 0008      | 0008_stockbatch.py                 | StockBatch (FIFO partiya, batch_code, unit_cost)        |
+| 0009      | 0009_remove_exchangerate_source.py | ExchangeRate.source maydoni olib tashlandi              |
 
-⚠️ **Muhim:** `0004_subcategory` → `('warehouse', '0004_product_image')` ga bog'liq (0003_product_image emas!)
-`trade.0001_initial` → `('warehouse', '0005_currency_exchangerate')` ga bog'liq ✅
+⚠️ `0004_subcategory` → `('warehouse', '0004_product_image')` ga bog'liq (0003_product_image emas!)
+⚠️ `trade.0001_initial` → `('warehouse', '0005_currency_exchangerate')` ga bog'liq ✅
+
+### Serializer'lar (muhim maydonlar)
+| Serializer                    | fields                                          |
+|-------------------------------|-------------------------------------------------|
+| `CategoryUpdateSerializer`    | name, description, **status** ← 10.03.2026 qo'shildi |
+| `SubCategoryUpdateSerializer` | name, description, category, **status** ← 10.03.2026 qo'shildi |
+| `WarehouseCreateSerializer`   | name, address, **is_active** ← 10.03.2026 qo'shildi |
+| `WarehouseUpdateSerializer`   | name, address, is_active                        |
+
+⚠️ `WarehouseCreateSerializer.validate_name` — faol va nofaol omborlarni farqlaydi:
+- Faol ombor mavjud → "Bu nomli ombor allaqachon mavjud"
+- Nofaol ombor mavjud → "Bu nomli nofaol ombor mavjud. Iltimos avval uni o'chiring"
 
 ### Endpointlar
 ```
-GET/POST   /api/v1/warehouse/categories/    + PATCH/DELETE /{id}/
-GET/POST   /api/v1/warehouse/subcategories/ + PATCH/DELETE /{id}/
-GET/POST   /api/v1/warehouse/currencies/    + PATCH        /{id}/   (faqat list/retrieve/update)
-GET/POST   /api/v1/warehouse/exchange-rates/+ GET          /{id}/   (faqat list/retrieve/create)
-GET/POST   /api/v1/warehouse/products/      + PATCH/DELETE /{id}/
-GET/POST   /api/v1/warehouse/stocks/        + PATCH/DELETE /{id}/
-GET/POST   /api/v1/warehouse/movements/     + GET          /{id}/   (immutable)
+GET/POST   /api/v1/warehouse/categories/       + PATCH/DELETE /{id}/
+GET/POST   /api/v1/warehouse/subcategories/    + PATCH/DELETE /{id}/  (?category=<id>)
+GET/POST   /api/v1/warehouse/currencies/       + PATCH        /{id}/
+GET/POST   /api/v1/warehouse/exchange-rates/   + GET          /{id}/  (?currency=USD&date=2026-03-03)
+GET/POST   /api/v1/warehouse/products/         + PATCH/DELETE /{id}/  (?category=&subcategory=&status=)
+GET        /api/v1/warehouse/products/{id}/barcode/                   (?format=svg)
+GET/POST   /api/v1/warehouse/warehouses/       + PATCH/DELETE /{id}/
+GET/POST   /api/v1/warehouse/stocks/           + PATCH/DELETE /{id}/
+GET/POST   /api/v1/warehouse/movements/        + GET          /{id}/  (immutable)
+GET/POST   /api/v1/warehouse/transfers/        + GET          /{id}/
+POST       /api/v1/warehouse/transfers/{id}/confirm/
+POST       /api/v1/warehouse/transfers/{id}/cancel/
+GET        /api/v1/warehouse/batches/          + GET          /{id}/  (?product=<id>, read-only)
 ```
 
 ### Ruxsatlar
 - `list/retrieve` → `IsAuthenticated + CanAccess('mahsulotlar')` yoki `CanAccess('ombor')`
 - `create/update/destroy` → `IsAuthenticated + IsManagerOrAbove`
-- `StockMovement` → faqat `GET` va `POST` (http_method_names = ['get', 'post'])
+- `StockMovement` → faqat `GET` va `POST` (immutable)
 
 ### Muhim logika
-- **StockMovement POST** → `Stock.quantity` avtomatik yangilanadi (`@transaction.atomic` + `select_for_update()` + `F()` expression — race condition yo'q)
-- **Chiqim (`out`)** uchun qoldiq serializer'da tekshiriladi (yetarli bo'lmasa → 400)
-- **Soft delete**: Category, SubCategory, Product (`status='inactive'`)
-- **Stock** → hard delete (o'chirish mumkin)
+- **StockMovement POST** → `Stock.quantity` avtomatik yangilanadi (`@transaction.atomic` + `select_for_update()` + `F()`)
+- **IN harakatda unit_cost bo'lsa** → `StockBatch` yaratiladi (FIFO)
+- **OUT harakatda** → FIFO dan narx hisoblanadi → `unit_cost` saqlashadi
+- **Transfer confirm** → `@transaction.atomic`, barcha itemlar tekshiriladi, yetarli bo'lmasa rollback
+- **Soft delete YO'Q** — barcha modellar hard delete (`instance.delete()`)
 - **Multi-tenant**: `get_queryset()` — `worker.store` bo'yicha filtrlash
 - **AuditLog**: barcha write operatsiyalarda yoziladi
 

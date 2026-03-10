@@ -109,12 +109,17 @@ class CategoryCreateSerializer(serializers.ModelSerializer):
 class CategoryUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Category
-        fields = ('name', 'description')
+        fields = ('name', 'description', 'status')
         extra_kwargs = {
             'name': {
                 'error_messages': {
                     'blank'     : "Kategoriya nomi bo'sh bo'lishi mumkin emas.",
                     'max_length': "Kategoriya nomi 200 belgidan oshmasligi kerak.",
+                }
+            },
+            'status': {
+                'error_messages': {
+                    'invalid_choice': "'{input}' noto'g'ri holat. Mavjud: active, inactive.",
                 }
             },
         }
@@ -216,7 +221,7 @@ class SubCategoryCreateSerializer(serializers.ModelSerializer):
 class SubCategoryUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = SubCategory
-        fields = ('name', 'description', 'category')
+        fields = ('name', 'description', 'category', 'status')
         extra_kwargs = {
             'name': {
                 'error_messages': {
@@ -228,6 +233,11 @@ class SubCategoryUpdateSerializer(serializers.ModelSerializer):
                 'error_messages': {
                     'does_not_exist': "Bunday kategoriya topilmadi.",
                     'incorrect_type': "Kategoriya ID butun son bo'lishi kerak.",
+                }
+            },
+            'status': {
+                'error_messages': {
+                    'invalid_choice': "'{input}' noto'g'ri holat. Mavjud: active, inactive.",
                 }
             },
         }
@@ -561,7 +571,7 @@ class WarehouseDetailSerializer(serializers.ModelSerializer):
 class WarehouseCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Warehouse
-        fields = ('name', 'address')
+        fields = ('name', 'address', 'is_active')
         extra_kwargs = {
             'name': {
                 'error_messages': {
@@ -574,10 +584,16 @@ class WarehouseCreateSerializer(serializers.ModelSerializer):
 
     def validate_name(self, value):
         store = self.context.get('store')
-        if store and Warehouse.objects.filter(store=store, name=value).exists():
-            raise serializers.ValidationError(
-                "Bu nomli ombor do'koningizda allaqachon mavjud."
-            )
+        if store:
+            existing = Warehouse.objects.filter(store=store, name=value).first()
+            if existing:
+                if existing.is_active:
+                    raise serializers.ValidationError(
+                        "Bu nomli ombor do'koningizda allaqachon mavjud."
+                    )
+                raise serializers.ValidationError(
+                    "Bu nomli nofaol ombor mavjud. Iltimos avval uni o'chiring."
+                )
         return value
 
 
