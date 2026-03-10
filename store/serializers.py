@@ -119,7 +119,7 @@ class BranchCreateSerializer(serializers.ModelSerializer):
         store = self.context.get('store')
         if store and Branch.objects.filter(store=store, name=value).exists():
             raise serializers.ValidationError(
-                "Bu nomli filial ushbu do'konda allaqachon mavjud."
+                "Bunday nomli Filial mavjud. Iltimos boshqa nom tanlang !"
             )
         return value
 
@@ -154,7 +154,7 @@ class BranchUpdateSerializer(serializers.ModelSerializer):
         ).exclude(pk=self.instance.pk)
         if qs.exists():
             raise serializers.ValidationError(
-                "Bu nomli filial ushbu do'konda allaqachon mavjud."
+                "Bunday nomli Filial mavjud. Iltimos boshqa nom tanlang !"
             )
         return value
 

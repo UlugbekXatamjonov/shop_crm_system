@@ -86,7 +86,7 @@ class CustomerGroupCreateSerializer(serializers.ModelSerializer):
                 qs = qs.exclude(pk=self.instance.pk)
             if qs.exists():
                 raise serializers.ValidationError(
-                    f"'{value}' nomli guruh allaqachon mavjud."
+                    "Bunday nomli Mijoz guruhi mavjud. Iltimos boshqa nom tanlang !"
                 )
         return value
 

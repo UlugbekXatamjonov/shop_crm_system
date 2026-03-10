@@ -101,7 +101,7 @@ class CategoryCreateSerializer(serializers.ModelSerializer):
         store = self.context.get('store')
         if store and Category.objects.filter(store=store, name=value).exists():
             raise serializers.ValidationError(
-                "Bu nomli kategoriya ushbu do'konda allaqachon mavjud."
+                "Bunday nomli Kategoriya mavjud. Iltimos boshqa nom tanlang !"
             )
         return value
 
@@ -130,7 +130,7 @@ class CategoryUpdateSerializer(serializers.ModelSerializer):
         ).exclude(pk=self.instance.pk)
         if qs.exists():
             raise serializers.ValidationError(
-                "Bu nomli kategoriya ushbu do'konda allaqachon mavjud."
+                "Bunday nomli Kategoriya mavjud. Iltimos boshqa nom tanlang !"
             )
         return value
 
@@ -213,7 +213,7 @@ class SubCategoryCreateSerializer(serializers.ModelSerializer):
                 name=data.get('name'),
             ).exists():
                 raise serializers.ValidationError(
-                    "Bu kategoriyada bunday nomli subkategoriya allaqachon mavjud."
+                    "Bunday nomli SubKategoriya mavjud. Iltimos boshqa nom tanlang !"
                 )
         return data
 
@@ -259,7 +259,7 @@ class SubCategoryUpdateSerializer(serializers.ModelSerializer):
         ).exclude(pk=self.instance.pk)
         if qs.exists():
             raise serializers.ValidationError(
-                "Bu kategoriyada bunday nomli subkategoriya allaqachon mavjud."
+                "Bunday nomli SubKategoriya mavjud. Iltimos boshqa nom tanlang !"
             )
         return data
 
@@ -466,7 +466,7 @@ class ProductCreateSerializer(serializers.ModelSerializer):
         subcategory = data.get('subcategory')
         if store and name and Product.objects.filter(store=store, name=name).exists():
             raise serializers.ValidationError(
-                "Bu nomli mahsulot do'koningizda allaqachon mavjud."
+                "Bunday nomli Mahsulot mavjud. Iltimos boshqa nom tanlang !"
             )
         if category and subcategory and subcategory.category != category:
             raise serializers.ValidationError(
@@ -526,7 +526,7 @@ class ProductUpdateSerializer(serializers.ModelSerializer):
             ).exclude(pk=self.instance.pk)
             if qs.exists():
                 raise serializers.ValidationError(
-                    "Bu nomli mahsulot do'koningizda allaqachon mavjud."
+                    "Bunday nomli Mahsulot mavjud. Iltimos boshqa nom tanlang !"
                 )
         category    = data.get('category', self.instance.category)
         subcategory = data.get('subcategory', self.instance.subcategory)
@@ -587,12 +587,8 @@ class WarehouseCreateSerializer(serializers.ModelSerializer):
         if store:
             existing = Warehouse.objects.filter(store=store, name=value).first()
             if existing:
-                if existing.status == 'active':
-                    raise serializers.ValidationError(
-                        "Bu nomli ombor do'koningizda allaqachon mavjud."
-                    )
                 raise serializers.ValidationError(
-                    "Bu nomli nofaol ombor mavjud. Iltimos avval uni o'chiring."
+                    "Bunday nomli Ombor mavjud. Iltimos boshqa nom tanlang !"
                 )
         return value
 
@@ -616,7 +612,7 @@ class WarehouseUpdateSerializer(serializers.ModelSerializer):
         ).exclude(pk=self.instance.pk)
         if qs.exists():
             raise serializers.ValidationError(
-                "Bu nomli ombor do'koningizda allaqachon mavjud."
+                "Bunday nomli Ombor mavjud. Iltimos boshqa nom tanlang !"
             )
         return value
 
