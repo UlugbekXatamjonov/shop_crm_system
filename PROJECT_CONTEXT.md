@@ -54,9 +54,9 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 | App         | Holat             | Izoh                                                   |
 |-------------|-------------------|--------------------------------------------------------|
 | `accaunt`   | ✅ Tugallangan    | CustomUser, Worker, AuditLog, JWT auth — password reset, WorkerList/Detail da store+branch |
-| `store`     | ✅ Tugallangan    | Store, Branch CRUD (soft delete, multi-tenant, workers in detail, Uzbek errors) |
-| `warehouse` | ✅ Tugallangan    | Category, **SubCategory**, Product(+image, +barcode EAN-13, +subcategory, +price_currency), **Currency**, **ExchangeRate**, **Warehouse**(ombor, soft delete), Stock(branch\|warehouse), StockMovement(branch\|warehouse, unit_cost), **Transfer**+TransferItem(guruhlab ko'chirish, confirm/cancel, atomic), **StockBatch**(FIFO partiya, batch_code, unit_cost, qty_left) — BOSQICH 1 + 1.5 + 1.6 + 1.7 ✅ |
-| `trade`     | ✅ Tugallangan   | BOSQICH 4 ✅ — CustomerGroup, Customer (soft delete), Sale (@transaction.atomic, 13-qadam + FIFO deduction), SaleItem(+unit_cost), cancel action, _build_report() to'ldirildi |
+| `store`     | ✅ Tugallangan    | Store, Branch CRUD (hard delete, multi-tenant, workers in detail, Uzbek errors) |
+| `warehouse` | ✅ Tugallangan    | Category, **SubCategory**, Product(+image, +barcode EAN-13, +subcategory, +price_currency), **Currency**, **ExchangeRate**, **Warehouse**(ombor, hard delete), Stock(branch\|warehouse), StockMovement(branch\|warehouse, unit_cost), **Transfer**+TransferItem(guruhlab ko'chirish, confirm/cancel, atomic), **StockBatch**(FIFO partiya, batch_code, unit_cost, qty_left) — BOSQICH 1 + 1.5 + 1.6 + 1.7 ✅ |
+| `trade`     | ✅ Tugallangan   | BOSQICH 4 ✅ — CustomerGroup (unique name validatsiya), Customer (hard delete, debt_sales), Sale (@transaction.atomic, 13-qadam + FIFO deduction), SaleItem(+unit_cost), cancel action, _build_report() to'ldirildi |
 | `expense`   | ❌ Boshlanmagan  | BOSQICH 6 — ExpenseCategory, Expense                   |
 | `StoreSettings` | ✅ Tugallangan  | BOSQICH 2 ✅ — 10 guruh, 30+ maydon, signal+Redis kesh |
 | `Smena`     | ✅ Tugallangan   | BOSQICH 3 ✅ — SmenaStatus+Smena model, SmenaViewSet (open/close/x-report), migration 0005 |
@@ -151,6 +151,7 @@ almashtirishda so'rov formatida `{"permissions": ["sotuv", "ombor"]}` ishlatilin
 | `WorkerDetailSerializer`    | Hodim to'liq (+ username, email, phone2, branch_id, branch_name, store_id, store_name, permissions) — null safe SerializerMethodField |
 | `WorkerCreateSerializer`    | Hodim yaratish (user+worker bitta atomic da, permissions auto) |
 | `WorkerUpdateSerializer`    | Hodim yangilash — user+worker+permissions bitta PATCH da     |
+| `WorkerSelfUpdateSerializer`| PATCH /workers/me/ — email, phone1, phone2, parol (barcha rollar); validate_email/phone1/phone2 + parol tekshiruvi |
 
 **WorkerUpdateSerializer PATCH maydonlari:**
 ```python
@@ -807,7 +808,8 @@ SaleItem:      sale(FK), product(FK), quantity, unit_price, total_price
 
 **Serializer'lar (9 ta):**
 ```
-CustomerGroupListSerializer, CustomerGroupCreateSerializer
+CustomerGroupListSerializer
+CustomerGroupCreateSerializer  ← validate_name: bir do'konda bir xil nom → 400
 CustomerListSerializer, CustomerDetailSerializer
 CustomerCreateSerializer, CustomerUpdateSerializer
 SaleItemListSerializer, SaleItemInputSerializer
