@@ -70,7 +70,7 @@ class StoreViewSet(viewsets.ModelViewSet):
       POST   /api/v1/stores/       — yangi do'kon yaratish (faqat owner)
       GET    /api/v1/stores/{id}/  — do'kon tafsilotlari (dokonlar ruxsati kerak)
       PATCH  /api/v1/stores/{id}/  — do'kon ma'lumotlarini yangilash (faqat owner)
-      DELETE /api/v1/stores/{id}/  — do'konni nofaol qilish (faqat owner, soft delete)
+      DELETE /api/v1/stores/{id}/  — do'konni o'chirish (faqat owner, hard delete)
 
     Multi-tenant:
       Owner faqat o'z do'konini ko'radi va boshqaradi.
@@ -103,6 +103,13 @@ class StoreViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         instance = serializer.save()
+
+        # Owner ning worker.store ni yangilash — do'kon yaratilgandan keyin bog'lanadi
+        worker = getattr(self.request.user, 'worker', None)
+        if worker and worker.store_id is None:
+            worker.store = instance
+            worker.save(update_fields=['store'])
+
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditLog.Action.CREATE,

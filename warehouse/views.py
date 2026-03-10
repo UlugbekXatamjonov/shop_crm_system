@@ -948,7 +948,6 @@ class StockViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance: Stock):
         pk   = instance.id
         name = f"{instance.product.name} ({self._location_name(instance)})"
-        instance.delete()
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditLog.Action.DELETE,
@@ -956,6 +955,7 @@ class StockViewSet(viewsets.ModelViewSet):
             target_id=pk,
             description=f"Ombor qoldig'i o'chirildi: '{name}'",
         )
+        instance.delete()
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
