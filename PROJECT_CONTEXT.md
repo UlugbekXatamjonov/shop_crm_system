@@ -192,7 +192,7 @@ permissions  # ["sotuv", "ombor", ...]  — to'liq ro'yxat almashadi
 | GET    | `/workers/`       | IsManagerOrAbove | Hodimlar ro'yxati (faqat o'z do'koni, status tartibda) |
 | POST   | `/workers/`       | IsOwner         | Yangi hodim qo'shish                                    |
 | GET    | `/workers/me/`    | IsAuthenticated | O'z profilini ko'rish (barcha rollar)                   |
-| PATCH  | `/workers/me/`    | IsAuthenticated | email, phone1, parol yangilash (barcha rollar)          |
+| PATCH  | `/workers/me/`    | IsAuthenticated | email, phone1, phone2, parol yangilash (barcha rollar)  |
 | GET    | `/workers/{id}/`  | IsManagerOrAbove | Hodim to'liq ma'lumoti                                 |
 | PATCH  | `/workers/{id}/`  | IsOwner         | user+worker+permissions bitta so'rovda                  |
 | DELETE | `/workers/{id}/`  | IsOwner         | Soft delete — status='ishdan_ketgan' ga o'tkazadi       |

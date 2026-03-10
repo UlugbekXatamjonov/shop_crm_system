@@ -10,7 +10,7 @@ Router avtomatik quyidagi URL'larni yaratadi:
   GET    /api/v1/workers/      — hodimlar ro'yxati       (manager/seller ham)
   POST   /api/v1/workers/      — yangi hodim qo'shish    (faqat owner)
   GET    /api/v1/workers/me/   — o'z profilini ko'rish   (barcha rollar)
-  PATCH  /api/v1/workers/me/   — email, phone1, parol    (barcha rollar)
+  PATCH  /api/v1/workers/me/   — email, phone1, phone2, parol (barcha rollar)
   GET    /api/v1/workers/{id}/ — hodim ma'lumoti         (manager/seller ham)
   PATCH  /api/v1/workers/{id}/ — hodimni yangilash       (faqat owner)
                                   user, worker, permissions bitta so'rovda

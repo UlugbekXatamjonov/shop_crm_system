@@ -884,9 +884,10 @@ class WorkerSelfUpdateSerializer(serializers.Serializer):
     Hodim o'zining shaxsiy ma'lumotlarini yangilash.
     PATCH /api/v1/workers/me/ da ishlatiladi.
 
-    Faqat 3 ta maydon:
+    Faqat 4 ta maydon:
       - email
       - phone1
+      - phone2
       - password (current_password + new_password + new_password2)
 
     Barcha rollar (owner, manager, seller) foydalana oladi.
@@ -894,6 +895,10 @@ class WorkerSelfUpdateSerializer(serializers.Serializer):
     email  = serializers.EmailField(required=False, label="Elektron pochta")
     phone1 = serializers.CharField(
         required=False, label="Asosiy telefon",
+        validators=[phone_regex],
+    )
+    phone2 = serializers.CharField(
+        required=False, allow_blank=True, label="Qo'shimcha telefon",
         validators=[phone_regex],
     )
 
@@ -925,6 +930,16 @@ class WorkerSelfUpdateSerializer(serializers.Serializer):
         if qs.exists():
             raise serializers.ValidationError(
                 "Bu telefon raqami allaqachon boshqa foydalanuvchida band."
+            )
+        return value
+
+    def validate_phone2(self, value: str) -> str:
+        if not value:
+            return value
+        qs = CustomUser.objects.filter(phone2=value).exclude(pk=self.instance.user.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                "Bu qo'shimcha telefon raqami allaqachon boshqa foydalanuvchida band."
             )
         return value
 
@@ -966,6 +981,10 @@ class WorkerSelfUpdateSerializer(serializers.Serializer):
         if 'phone1' in validated_data:
             user.phone1 = validated_data['phone1']
             changed_fields.append('phone1')
+
+        if 'phone2' in validated_data:
+            user.phone2 = validated_data['phone2']
+            changed_fields.append('phone2')
 
         if changed_fields:
             user.save(update_fields=changed_fields)
