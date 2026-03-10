@@ -202,6 +202,11 @@ class ProfileView(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.G
         instance   = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data:
+            return Response(
+                {'message': "Yangilash uchun kamida bitta maydon yuborilishi kerak."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         serializer.save()
         return Response(
             {
@@ -447,6 +452,11 @@ class WorkerViewSet(viewsets.ModelViewSet):
             worker, data=request.data, partial=True,
         )
         serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data:
+            return Response(
+                {'message': "Yangilash uchun kamida bitta maydon yuborilishi kerak."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         serializer.save()
 
         AuditLog.objects.create(
@@ -473,7 +483,6 @@ class WorkerViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         pk   = instance.id
         name = str(instance.user)
-        instance.user.delete()  # Worker ham CASCADE o'chadi
 
         AuditLog.objects.create(
             actor=request.user,
@@ -482,6 +491,7 @@ class WorkerViewSet(viewsets.ModelViewSet):
             target_id=pk,
             description=f"Hodim o'chirildi: {name}",
         )
+        instance.user.delete()  # Worker ham CASCADE o'chadi
 
         return Response(
             {'message': "Hodim muvaffaqiyatli o'chirildi."},

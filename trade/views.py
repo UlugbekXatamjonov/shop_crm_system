@@ -127,7 +127,6 @@ class CustomerGroupViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance: CustomerGroup):
         name = instance.name
         pk   = instance.id
-        instance.delete()   # hard delete, Customer.group → NULL (SET_NULL)
         AuditLog.objects.create(
             actor=self.request.user,
             action=AuditLog.Action.DELETE,
@@ -135,6 +134,7 @@ class CustomerGroupViewSet(viewsets.ModelViewSet):
             target_id=pk,
             description=f"Mijoz guruhi o'chirildi: '{name}'",
         )
+        instance.delete()   # hard delete, Customer.group → NULL (SET_NULL)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
