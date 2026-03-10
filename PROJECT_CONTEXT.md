@@ -1,5 +1,59 @@
 # CLAUDE UCHUN ESLATMA — Yangi chatda bu faylni o'qi va davom et
 
+## 📅 10.03.2026 SESSION — QILINGAN ISHLAR
+
+### 1. Bug fix: StockBatchViewSet permission (`warehouse/views.py`)
+```python
+# MUAMMO: CanAccess('ombor') — instance edi, DRF class kutardi → TypeError
+# TUZATISH:
+def get_permissions(self):
+    return [IsAuthenticated(), CanAccess('ombor')]
+```
+
+### 2. Bug fix: unit_cost=0 StockBatch yaratmaydi (`warehouse/views.py`)
+```python
+# MUAMMO: if unit_cost and store: → unit_cost=0 da False
+# TUZATISH:
+if unit_cost is not None and store:
+```
+
+### 3. Production hotfix: Railway DB da warehouse_warehouse.is_active yo'q edi
+```
+migration 0010: ADD COLUMN IF NOT EXISTS is_active/address/created_on (idempotent)
+migration 0011: DROP COLUMN IF EXISTS status (eski failed migration qoldig'i, NOT NULL)
+migration 0012: is_active → status (ActiveStatus), data migration, SeparateDatabaseAndState
+```
+
+### 4. Qoida: Barcha modellarda status=ActiveStatus (is_active emas!)
+- `Warehouse.is_active` (BooleanField) → `Warehouse.status` (CharField, ActiveStatus)
+- Serializer: `WarehouseCreateSerializer`, `WarehouseUpdateSerializer` yangilandi
+- Admin: `list_display`, `list_filter` yangilandi
+
+### 5. Yagona validatsiya xabari qoidasi
+Barcha unique nom xatolarida: `"Bunday nomli [X] mavjud. Iltimos boshqa nom tanlang !"`
+O'zgartirilgan: Kategoriya, SubKategoriya, Mahsulot, Ombor (2 ta → 1 ta birlashtirildi), Filial, Mijoz guruhi
+
+### 6. StoreSettings: EUR va CNY valyutalari qo'shildi
+```python
+class DefaultCurrency(models.TextChoices):
+    UZS = 'UZS'  # O'zbek so'mi
+    USD = 'USD'  # Amerika dollari
+    RUB = 'RUB'  # Rossiya rubli
+    EUR = 'EUR'  # Yevropa yevrosi  ← YANGI
+    CNY = 'CNY'  # Xitoy yuani      ← YANGI
+# + show_eur_price, show_cny_price BooleanField lar
+# store/migrations/0006_storesettings_eur_cny.py
+```
+
+### 7. Postman test qo'llanmasi yaratildi
+`postman_test_guide.txt` — 7 bosqich, barcha endpoint, maydonlar, misollar
+
+### 8. #saqla buyrug'i
+Keyingi sessionlarda `#saqla` desangiz:
+PROJECT_CONTEXT yangilanadi + main branch ga push qilinadi.
+
+---
+
 ## ⚠️ MUHIM: 3 TA QOIDA (HECH QACHON UNUTMA)
 
 ### QOIDA 1 — StoreSettings SIGNAL
@@ -20,6 +74,15 @@ store.settings  # + 1 JOIN, undan ko'p emas
 # Yoki ViewSet da: queryset.select_related('store__settings')
 ```
 **Sabab:** N+1 query muammosi bo'lmasin.
+
+### QOIDA 4 — Barcha modellarda status=ActiveStatus (is_active EMAS!)
+```python
+# TO'G'RI:
+status = models.CharField(max_length=10, choices=ActiveStatus.choices, default=ActiveStatus.ACTIVE)
+# NOTO'G'RI:
+is_active = models.BooleanField(default=True)  # ← HECH QACHON ISHLATMA
+```
+**Sabab:** Loyiha bo'yi bir xil qoida. Status filter, admin, serializer hammasida bir xil.
 
 ### QOIDA 3 — Redis KESH (5 daqiqa)
 ```python
@@ -49,7 +112,7 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 
 ---
 
-## LOYIHA HOLATI (03.03.2026)
+## LOYIHA HOLATI (10.03.2026)
 
 | App         | Holat             | Izoh                                                   |
 |-------------|-------------------|--------------------------------------------------------|
@@ -279,6 +342,9 @@ permissions  # ["sotuv", "ombor", ...]  — to'liq ro'yxat almashadi
 | 0001      | Store, Branch dastlabki modellar                    |
 | 0002      | ...                                                 |
 | 0003      | Branch unique_together [('store', 'name')] qo'shildi |
+| 0004      | StoreSettings (10 guruh, 30+ maydon)                |
+| 0005      | Smena modeli                                        |
+| 0006      | StoreSettings: EUR+CNY valyutalari, show_eur_price, show_cny_price ← 10.03.2026 |
 
 ### Endpointlar
 | Method | URL                   | Ruxsat                        | Izoh                   |
@@ -306,7 +372,7 @@ permissions  # ["sotuv", "ombor", ...]  — to'liq ro'yxat almashadi
 | `Currency`      | code, name, symbol, is_base — **store YO'Q, global**                      | `unique: code` |
 | `ExchangeRate`  | currency(FK), rate, date, created_on — **store YO'Q, global**             | `unique_together = [('currency','date')]` |
 | `Product`       | name, category(FK,null), subcategory(FK,null), unit, purchase_price, sale_price, price_currency(FK,null), barcode(null), image(null), store(FK), status, created_on | `unique_together = [('store','name'),('store','barcode')]` |
-| `Warehouse`     | name, address, store(FK), **is_active**(BooleanField,default=True), created_on | `unique_together = [('store','name')]` |
+| `Warehouse`     | name, address, store(FK), **status**(ActiveStatus, default='active'), created_on | `unique_together = [('store','name')]` |
 | `Stock`         | product(FK), branch(FK,null), warehouse(FK,null), quantity, updated_on    | XOR constraint: branch IS NOT NULL xor warehouse IS NOT NULL |
 | `StockMovement` | product(FK), branch(FK,null), warehouse(FK,null), movement_type, quantity, unit_cost(null), note, worker(FK,null), created_on | immutable log, XOR |
 | `Transfer`      | from_branch/from_warehouse (XOR), to_branch/to_warehouse (XOR), store(FK), worker(FK,null), status(pending\|confirmed\|cancelled), note, confirmed_at(null) | — |
@@ -314,12 +380,12 @@ permissions  # ["sotuv", "ombor", ...]  — to'liq ro'yxat almashadi
 | `StockBatch`    | product(FK), location_type(branch\|warehouse), branch(FK,null), warehouse(FK,null), batch_code, unit_cost, qty_left, created_on | FIFO partiya |
 
 ⚠️ `Currency` va `ExchangeRate` da `store` maydoni **yo'q** — ular global.
-⚠️ `Warehouse` — `is_active` BooleanField (boshqa modellardan farqli, ular `status` CharField ishlatadi).
+⚠️ `Warehouse` — endi `status` CharField (ActiveStatus) ishlatadi — boshqa modellar bilan bir xil qoida.
 ⚠️ **Delete qoidasi (10.03.2026):** Barcha modellar **hard delete** — soft delete yo'q.
 
 ### Choices
 - `ProductUnit`: dona, kg, g, litr, metr, m2, yashik, qop, quti
-- `ActiveStatus`: active, inactive (Category, SubCategory, Product uchun)
+- `ActiveStatus`: active, inactive — **Barcha modellarda** (Category, SubCategory, Product, **Warehouse**)
 - `MovementType`: in (Kirim), out (Chiqim)
 - `TransferStatus`: pending, confirmed, cancelled
 
@@ -336,6 +402,9 @@ permissions  # ["sotuv", "ombor", ...]  — to'liq ro'yxat almashadi
 | 0007      | 0007_transfer.py                   | Transfer + TransferItem                                 |
 | 0008      | 0008_stockbatch.py                 | StockBatch (FIFO partiya, batch_code, unit_cost)        |
 | 0009      | 0009_remove_exchangerate_source.py | ExchangeRate.source maydoni olib tashlandi              |
+| 0010      | 0010_fix_warehouse_is_active.py    | Production fix: ADD COLUMN IF NOT EXISTS is_active/address/created_on (Railway DB da yetishmaydi edi) |
+| 0011      | 0011_fix_warehouse_drop_status.py  | Production fix: DROP COLUMN IF EXISTS status (eski failed migration qoldig'i, NOT NULL edi) |
+| 0012      | 0012_warehouse_status.py           | Warehouse.is_active → status (ActiveStatus). Data migration: TRUE→active, FALSE→inactive. SeparateDatabaseAndState |
 
 ⚠️ `0004_subcategory` → `('warehouse', '0004_product_image')` ga bog'liq (0003_product_image emas!)
 ⚠️ `trade.0001_initial` → `('warehouse', '0005_currency_exchangerate')` ga bog'liq ✅
@@ -343,14 +412,19 @@ permissions  # ["sotuv", "ombor", ...]  — to'liq ro'yxat almashadi
 ### Serializer'lar (muhim maydonlar)
 | Serializer                    | fields                                          |
 |-------------------------------|-------------------------------------------------|
-| `CategoryUpdateSerializer`    | name, description, **status** ← 10.03.2026 qo'shildi |
-| `SubCategoryUpdateSerializer` | name, description, category, **status** ← 10.03.2026 qo'shildi |
-| `WarehouseCreateSerializer`   | name, address, **is_active** ← 10.03.2026 qo'shildi |
-| `WarehouseUpdateSerializer`   | name, address, is_active                        |
+| `CategoryCreateSerializer`    | name, description, status                             |
+| `CategoryUpdateSerializer`    | name, description, status                             |
+| `SubCategoryCreateSerializer` | name, description, category, status                   |
+| `SubCategoryUpdateSerializer` | name, description, category, status                   |
+| `WarehouseCreateSerializer`   | name, address, **status** ← 10.03.2026 is_active dan o'zgartirildi |
+| `WarehouseUpdateSerializer`   | name, address, **status**                             |
 
-⚠️ `WarehouseCreateSerializer.validate_name` — faol va nofaol omborlarni farqlaydi:
-- Faol ombor mavjud → "Bu nomli ombor allaqachon mavjud"
-- Nofaol ombor mavjud → "Bu nomli nofaol ombor mavjud. Iltimos avval uni o'chiring"
+⚠️ `WarehouseCreateSerializer.validate_name` — mavjud bo'lsa (holati farqsiz):
+- "Bunday nomli Ombor mavjud. Iltimos boshqa nom tanlang !"
+
+⚠️ **YAGONA VALIDATSIYA XABARI QOIDASI (10.03.2026):**
+Barcha unique nom tekshiruvlarida: `"Bunday nomli [X] mavjud. Iltimos boshqa nom tanlang !"`
+- Kategoriya, SubKategoriya, Mahsulot, Ombor, Filial, Mijoz guruhi
 
 ### Endpointlar
 ```
@@ -571,10 +645,10 @@ PORT=8000
 ### BOSQICH 1.5 — Warehouse (Ombor) modeli ✅ BAJARILDI (05.03.2026)
 | # | Vazifa | Holat |
 |---|--------|-------|
-| 1.5.1 | Warehouse modeli (nom, manzil, is_active, store FK) | ✅ Bajarildi |
+| 1.5.1 | Warehouse modeli (nom, manzil, **status** (ActiveStatus), store FK) | ✅ Bajarildi (10.03.2026 is_active→status) |
 | 1.5.2 | Stock: branch OR warehouse (XOR constraint) | ✅ Bajarildi |
 | 1.5.3 | StockMovement: branch OR warehouse (XOR constraint) | ✅ Bajarildi |
-| 1.5.4 | WarehouseViewSet: CRUD + hard delete (is_active — faqat flag, o'chirish emas) | ✅ Bajarildi |
+| 1.5.4 | WarehouseViewSet: CRUD + hard delete (status — soft delete qoidasi) | ✅ Bajarildi |
 | 1.5.5 | StockViewSet, MovementViewSet — branch\|warehouse qo'llab-quvvatlash | ✅ Bajarildi |
 
 **Muhim farq:**
@@ -664,9 +738,11 @@ price_list_enabled    = BooleanField(default=False)  # PriceList (B12)   — faq
 # ============================================================
 # GURUH 2 — Valyuta sozlamalari
 # ============================================================
-default_currency      = CharField(max_length=3, default='UZS')  # UZS | USD | RUB
+default_currency      = CharField(max_length=3, choices=DefaultCurrency, default='UZS')  # UZS | USD | RUB | EUR | CNY ← 10.03.2026 EUR+CNY qo'shildi
 show_usd_price        = BooleanField(default=False)  # USD narxini ko'rsatish
 show_rub_price        = BooleanField(default=False)  # RUB narxini ko'rsatish
+show_eur_price        = BooleanField(default=False)  # EUR narxini ko'rsatish ← 10.03.2026 qo'shildi
+show_cny_price        = BooleanField(default=False)  # CNY narxini ko'rsatish ← 10.03.2026 qo'shildi
 
 # ============================================================
 # GURUH 3 — To'lov sozlamalari

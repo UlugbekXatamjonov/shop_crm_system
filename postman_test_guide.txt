@@ -1,0 +1,488 @@
+============================================================
+  SHOP CRM SYSTEM — POSTMAN TEST QO'LLANMASI
+  Base URL: https://shopcrmsystem-production.up.railway.app/api/v1
+  Header:   Authorization: Bearer <token>
+============================================================
+
+TO'G'RI TEST KETMA-KETLIGI:
+  1. Shifts  → ochish, x-report, yopish
+  2. Products → yaratish, detail, barcode, yangilash
+  3. Movements (IN) → branch ga kirim, warehouse ga kirim
+  4. Stocks → qoldiqlarni tekshirish
+  5. Movements (OUT) → chiqim
+  6. Transfers → yaratish, confirm, tekshirish
+  7. Batches → ko'rish (FIFO)
+  8. Sales → naqd, nasiya, bekor qilish
+
+============================================================
+  1-BOSQICH — SMENA (SHIFT)
+  shift_enabled=True bo'lsa sotuvdan OLDIN smena ochish SHART
+============================================================
+
+--- Smena ochish ---
+POST /api/v1/shifts/
+Body (form-data):
+  branch      [int]  MAJBURIY  — Filial ID
+  cash_start  [num]  ixtiyoriy — Boshlang'ich naqd pul (default: 0)
+  note        [str]  ixtiyoriy — Izoh
+
+Misol:
+{
+    "branch": 1,
+    "cash_start": 500000,
+    "note": "Ertalabki smena"
+}
+
+-------------------------------------------
+
+--- Smenalar ro'yxati ---
+GET /api/v1/shifts/
+Filter: ?branch=1  ?status=open|closed
+
+-------------------------------------------
+
+--- Smena detail ---
+GET /api/v1/shifts/{id}/
+
+-------------------------------------------
+
+--- X-Report (smena hisoboti) ---
+GET /api/v1/shifts/{id}/x-report/
+  * Smena davomidagi sotuvlar va kassa holati
+
+-------------------------------------------
+
+--- Smena yopish ---
+PATCH /api/v1/shifts/{id}/close/
+Body:
+  cash_end  [num]  require_cash_count=True bo'lsa MAJBURIY
+  note      [str]  ixtiyoriy
+
+Misol:
+{
+    "cash_end": 750000,
+    "note": "Smena yopildi"
+}
+
+
+============================================================
+  2-BOSQICH — PRODUCTS (MAHSULOTLAR)
+  Oldin: Category va SubCategory yaratilgan bo'lsin
+============================================================
+
+--- Mahsulot yaratish ---
+POST /api/v1/products/
+Body:
+  name            [str]  MAJBURIY — max 300 belgi
+  category        [int]  MAJBURIY — Category ID
+  subcategory     [int]  ixtiyoriy — null bo'lishi mumkin
+  unit            [str]  MAJBURIY — piece | kg | litre | box | meter
+  purchase_price  [num]  MAJBURIY — xarid narxi
+  sale_price      [num]  MAJBURIY — sotuv narxi
+  price_currency  [int]  MAJBURIY — Currency ID
+  barcode         [str]  ixtiyoriy — shtrix-kod (bo'sh qolsa avtomatik)
+  image           [file] ixtiyoriy — rasm
+
+Misol:
+{
+    "name": "Coca-Cola 0.5L",
+    "category": 1,
+    "subcategory": null,
+    "unit": "piece",
+    "purchase_price": "3500.00",
+    "sale_price": "5000.00",
+    "price_currency": 1,
+    "barcode": "4870204100017"
+}
+
+-------------------------------------------
+
+--- Mahsulotlar ro'yxati ---
+GET /api/v1/products/
+Filter: ?search=coca  ?category=1  ?status=active|inactive
+
+-------------------------------------------
+
+--- Mahsulot detail ---
+GET /api/v1/products/{id}/
+
+-------------------------------------------
+
+--- Barcode rasmi ---
+GET /api/v1/products/{id}/barcode/
+  * Javob: PNG yoki SVG shtrix-kod rasmi
+
+-------------------------------------------
+
+--- Mahsulot yangilash ---
+PATCH /api/v1/products/{id}/
+  * Barcha maydonlar ixtiyoriy (faqat o'zgartirilgani yuborilaveradi)
+
+Misol:
+{
+    "sale_price": "5500.00",
+    "status": "inactive"
+}
+
+-------------------------------------------
+
+--- Mahsulot o'chirish ---
+DELETE /api/v1/products/{id}/
+  * Soft delete: status=inactive ga o'tadi, bazadan o'chmaydi
+
+
+============================================================
+  3-BOSQICH — STOCKMOVEMENT (KIRIM / CHIQIM)
+  Oldin: Product, Branch yoki Warehouse yaratilgan bo'lsin
+  DIQQAT: branch YOKI warehouse — faqat BITTASINI yuboring!
+============================================================
+
+--- KIRIM (IN) — Filialni to'ldirish ---
+POST /api/v1/movements/
+Body:
+  product        [int]  MAJBURIY — Product ID
+  branch         [int]  shart*   — Filial ID
+  warehouse      [int]  shart*   — Ombor ID  (* bittasi bo'lishi shart)
+  movement_type  [str]  MAJBURIY — "in"
+  quantity       [num]  MAJBURIY — musbat son (masalan: "100.000")
+  unit_cost      [num]  ixtiyoriy — xarid narxi (FIFO batch yaratadi)
+  note           [str]  ixtiyoriy
+
+Misol (filiallga):
+{
+    "product": 1,
+    "branch": 1,
+    "movement_type": "in",
+    "quantity": "100.000",
+    "unit_cost": "3500.00",
+    "note": "Yangi tovar keldi"
+}
+
+Misol (omborga):
+{
+    "product": 1,
+    "warehouse": 1,
+    "movement_type": "in",
+    "quantity": "200.000",
+    "unit_cost": "3500.00"
+}
+
+-------------------------------------------
+
+--- CHIQIM (OUT) — Kirimdan KEYIN sinab ko'ring ---
+POST /api/v1/movements/
+Body:
+  product        [int]  MAJBURIY — Product ID
+  branch         [int]  shart*   — Filial ID
+  warehouse      [int]  shart*   — Ombor ID
+  movement_type  [str]  MAJBURIY — "out"
+  quantity       [num]  MAJBURIY — mavjud qoldiqdan oshmasin!
+  note           [str]  ixtiyoriy
+  * unit_cost OUT da e'tiborsiz — FIFO dan avtomatik hisoblanadi
+
+Misol:
+{
+    "product": 1,
+    "branch": 1,
+    "movement_type": "out",
+    "quantity": "5.000"
+}
+
+XATO HOLATLARI:
+  400 — "Qoldiq yetarli emas. 'Filial1' da 'Coca-Cola' qoldig'i: 10, so'ralgan: 50."
+
+-------------------------------------------
+
+--- Harakatlar ro'yxati ---
+GET /api/v1/movements/
+Filter: ?product=1  ?branch=1  ?warehouse=1  ?movement_type=in|out
+
+-------------------------------------------
+
+--- Harakat detail ---
+GET /api/v1/movements/{id}/
+
+
+============================================================
+  4-BOSQICH — STOCK (QOLDIQLAR)
+  Kirim qilinganidan keyin tekshirish
+============================================================
+
+--- Barcha qoldiqlar ---
+GET /api/v1/stocks/
+Filter: ?branch=1  ?warehouse=1  ?product=1
+
+-------------------------------------------
+
+--- Qoldiq detail ---
+GET /api/v1/stocks/{id}/
+
+-------------------------------------------
+
+--- Qo'lda qoldiq yaratish (movement ishlatilmagan holat) ---
+POST /api/v1/stocks/
+Body:
+  product    [int]  MAJBURIY
+  branch     [int]  shart*   — Filial ID
+  warehouse  [int]  shart*   — Ombor ID  (* bittasi)
+  quantity   [num]  MAJBURIY
+
+Misol:
+{
+    "product": 1,
+    "branch": 1,
+    "quantity": "50.000"
+}
+
+-------------------------------------------
+
+--- Qoldiq yangilash ---
+PATCH /api/v1/stocks/{id}/
+{
+    "quantity": "75.000"
+}
+
+-------------------------------------------
+
+--- Qoldiq o'chirish ---
+DELETE /api/v1/stocks/{id}/
+  * Hard delete — bazadan butunlay o'chadi
+
+
+============================================================
+  5-BOSQICH — TRANSFER (JOYLAR ORASIDA O'TKAZISH)
+  Oldin: 2 ta joylashuv va ularda stock bo'lsin
+  DIQQAT: from/to — har biridan faqat BITTASINI yuboring!
+============================================================
+
+--- Transfer yaratish ---
+POST /api/v1/transfers/
+Body:
+  from_branch     [int]  shart* — Qayerdan (filial)
+  from_warehouse  [int]  shart* — Qayerdan (ombor)  (* bittasi)
+  to_branch       [int]  shart* — Qayerga (filial)
+  to_warehouse    [int]  shart* — Qayerga (ombor)   (* bittasi)
+  items           [arr]  MAJBURIY — kamida 1 ta mahsulot
+    items[].product   [int]  MAJBURIY
+    items[].quantity  [num]  MAJBURIY — musbat son
+    items[].note      [str]  ixtiyoriy
+  note            [str]  ixtiyoriy
+
+Misol (filialdan → omborga):
+{
+    "from_branch": 1,
+    "to_warehouse": 1,
+    "items": [
+        {"product": 1, "quantity": "10.000", "note": "Qaytarish"},
+        {"product": 2, "quantity": "5.000"}
+    ],
+    "note": "Omborga qaytarish"
+}
+
+Misol (ombordan → filiallga):
+{
+    "from_warehouse": 1,
+    "to_branch": 1,
+    "items": [
+        {"product": 1, "quantity": "20.000"}
+    ]
+}
+
+DIQQAT: Transfer yaratilganda status=pending bo'ladi.
+  Stock HALI o'ZGARMAYDI — confirm qilgandan keyin o'zgaradi!
+
+-------------------------------------------
+
+--- Transferlar ro'yxati ---
+GET /api/v1/transfers/
+Filter: ?status=pending|confirmed|cancelled
+
+-------------------------------------------
+
+--- Transfer detail (items bilan) ---
+GET /api/v1/transfers/{id}/
+
+-------------------------------------------
+
+--- Transfer tasdiqlash (CONFIRM) ---
+POST /api/v1/transfers/{id}/confirm/
+Body: {} (bo'sh)
+
+  * Faqat pending holatdagi transfer tasdiqlanadi
+  * Stock "from" dan ayiriladi, "to" ga qo'shiladi
+  * FIFO tartibida amalga oshiriladi
+
+-------------------------------------------
+
+--- Transfer bekor qilish (CANCEL) ---
+POST /api/v1/transfers/{id}/cancel/
+Body: {} (bo'sh)
+
+  * Faqat pending holatdagi transfer bekor qilinadi
+  * Stock o'ZGARMAYDI
+
+
+============================================================
+  6-BOSQICH — STOCKBATCH (FIFO PARTIYALAR)
+  Avtomatik yaratiladi (movement IN da), faqat o'QISH mumkin
+============================================================
+
+--- Partiyalar ro'yxati ---
+GET /api/v1/batches/
+Filter: ?product=1  ?branch=1  ?warehouse=1
+
+Javob maydoni:
+  batch_code  — partiya kodi (format: STORE-YY-MM-DD-XXXX)
+  qty_left    — qolgan miqdor (0 = partiya tugagan, arxiv)
+  unit_cost   — bu partiyaning xarid narxi (FIFO narxi)
+
+-------------------------------------------
+
+--- Partiya detail ---
+GET /api/v1/batches/{id}/
+
+
+============================================================
+  7-BOSQICH — SALE (SOTUV)
+  Oldin: Product stock da bo'lsin
+  shift_enabled=True bo'lsa smena ochiq bo'lsin
+============================================================
+
+--- Sotuv yaratish — NAQD (cash) ---
+POST /api/v1/sales/
+Body:
+  branch          [int]  MAJBURIY — Filial ID
+  payment_type    [str]  MAJBURIY — cash | card | debt
+  paid_amount     [num]  MAJBURIY — to'langan summa
+  items           [arr]  MAJBURIY — kamida 1 ta
+    items[].product    [int]  MAJBURIY — faol mahsulot ID
+    items[].quantity   [num]  MAJBURIY — min: 0.001
+    items[].unit_price [num]  ixtiyoriy — berilmasa product.sale_price
+  customer        [int]  ixtiyoriy — Mijoz ID (null bo'lishi mumkin)
+  discount_amount [num]  ixtiyoriy — chegirma miqdori (default: 0)
+  note            [str]  ixtiyoriy
+
+Misol (naqd):
+{
+    "branch": 1,
+    "payment_type": "cash",
+    "paid_amount": "10000.00",
+    "discount_amount": "0",
+    "items": [
+        {"product": 1, "quantity": "2.000"},
+        {"product": 2, "quantity": "1.000", "unit_price": "4500.00"}
+    ],
+    "note": ""
+}
+
+-------------------------------------------
+
+--- Sotuv yaratish — NASIYA (debt) ---
+{
+    "branch": 1,
+    "customer": 1,
+    "payment_type": "debt",
+    "paid_amount": "0.00",
+    "items": [
+        {"product": 1, "quantity": "1.000"}
+    ]
+}
+
+  * payment_type=debt bo'lsa customer tavsiya etiladi
+  * paid_amount < total bo'lsa — qolgan qism customer.debt_balance ga qo'shiladi
+
+-------------------------------------------
+
+--- Sotuv yaratish — KARTA (card) ---
+{
+    "branch": 1,
+    "payment_type": "card",
+    "paid_amount": "25000.00",
+    "items": [
+        {"product": 1, "quantity": "5.000"}
+    ]
+}
+
+-------------------------------------------
+
+XATO HOLATLARI:
+  400 — "Qoldiq yetarli emas. 'Mahsulot1' uchun qoldiq: 3, so'ralgan: 5."
+  400 — "Naqd to'lov taqiqlangan (allow_cash=False)."
+  400 — "Chegirma ruxsat etilmagan (allow_discount=False)."
+  400 — "Ochiq smena topilmadi. Avval smenani oching."
+
+-------------------------------------------
+
+--- Sotuvlar ro'yxati ---
+GET /api/v1/sales/
+Filter: ?branch=1  ?status=completed|cancelled  ?payment_type=cash|card|debt
+
+-------------------------------------------
+
+--- Sotuv detail (items bilan) ---
+GET /api/v1/sales/{id}/
+
+Javob:
+  total_price    — umumiy summa
+  discount_amount — chegirma
+  paid_amount    — to'langan
+  debt_amount    — nasiya qoldig'i
+  items[]        — sotuv elementlari
+
+-------------------------------------------
+
+--- Sotuv bekor qilish ---
+PATCH /api/v1/sales/{id}/cancel/
+Body: {} (bo'sh)
+
+  * Stock qaytariladi (StockMovement IN yaratiladi)
+  * Mijoz qarzi kamayadi (agar debt bo'lsa)
+  * Faqat completed holat bekor qilinadi
+
+
+============================================================
+  QISQACHA ESLATMALAR
+============================================================
+
+1. branch YOKI warehouse — harakatlar, stock, transferlarda
+   faqat BITTASINI yuborasiz, ikkalasini emas!
+
+2. FIFO tartibi — OUT harakatda eng eski partiya avval chiqariladi.
+   unit_cost OUT da e'tiborsiz.
+
+3. Transfer confirm — faqat shundan keyin stock o'zgaradi.
+   Pending holatda hech narsa o'zgarmaydi.
+
+4. Smena — shift_enabled=True bo'lsa sotuv qilish uchun
+   ochiq smena bo'lishi shart.
+
+5. Soft delete — Product, Category, SubCategory, Customer, Warehouse
+   o'chirilganda status=inactive bo'ladi, bazadan o'chmaydi.
+
+6. Hard delete — Stock bazadan butunlay o'chadi.
+
+============================================================
+  TAVSIYA ETILGAN TEST TARTIBI
+============================================================
+
+  [1] POST /shifts/              — Smena ochish
+  [2] GET  /shifts/{id}/         — Tekshirish
+  [3] POST /products/            — Mahsulot yaratish
+  [4] GET  /products/{id}/barcode/ — Barcode
+  [5] POST /movements/ (in)      — Filiallga kirim
+  [6] POST /movements/ (in)      — Omborga kirim
+  [7] GET  /stocks/              — Qoldiqlar
+  [8] POST /movements/ (out)     — Chiqim
+  [9] POST /transfers/           — Transfer yaratish
+  [10] POST /transfers/{id}/confirm/ — Tasdiqlash
+  [11] GET  /batches/            — FIFO partiyalar
+  [12] POST /sales/  (cash)      — Naqd sotuv
+  [13] POST /sales/  (debt)      — Nasiya sotuv
+  [14] GET  /sales/{id}/         — Sotuv detail
+  [15] PATCH /sales/{id}/cancel/ — Bekor qilish
+  [16] PATCH /shifts/{id}/close/ — Smena yopish
+  [17] GET  /shifts/{id}/x-report/ — X-report
+
+============================================================
+  Sana: 10.03.2026  |  Shop CRM System v1.0
+============================================================
