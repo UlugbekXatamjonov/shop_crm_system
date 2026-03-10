@@ -380,7 +380,7 @@ class Warehouse(models.Model):
     Misol: 1 ta markaziy ombor → 3 ta filialga tovar uzatadi.
 
     Multi-tenant: har bir ombor bitta do'konga tegishli.
-    Soft delete: is_active=False bilan nofaol qilinadi.
+    Soft delete: status='inactive' bilan nofaol qilinadi.
     Subscription: max_warehouses limiti shu modelga qarab hisoblanadi.
     """
     name       = models.CharField(
@@ -397,9 +397,11 @@ class Warehouse(models.Model):
         related_name='warehouses',
         verbose_name="Do'koni"
     )
-    is_active  = models.BooleanField(
-        default=True,
-        verbose_name="Faolmi"
+    status     = models.CharField(
+        max_length=10,
+        choices=ActiveStatus.choices,
+        default=ActiveStatus.ACTIVE,
+        verbose_name="Holati"
     )
     created_on = models.DateTimeField(
         auto_now_add=True,

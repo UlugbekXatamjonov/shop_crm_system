@@ -546,7 +546,7 @@ class WarehouseListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = Warehouse
-        fields = ('id', 'name', 'address', 'is_active', 'stock_count')
+        fields = ('id', 'name', 'address', 'status', 'stock_count')
 
     def get_stock_count(self, obj):
         return obj.stocks.count()
@@ -560,7 +560,7 @@ class WarehouseDetailSerializer(serializers.ModelSerializer):
         model  = Warehouse
         fields = (
             'id', 'name', 'address',
-            'store_name', 'is_active',
+            'store_name', 'status',
             'stock_count', 'created_on',
         )
 
@@ -571,7 +571,7 @@ class WarehouseDetailSerializer(serializers.ModelSerializer):
 class WarehouseCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Warehouse
-        fields = ('name', 'address', 'is_active')
+        fields = ('name', 'address', 'status')
         extra_kwargs = {
             'name': {
                 'error_messages': {
@@ -587,7 +587,7 @@ class WarehouseCreateSerializer(serializers.ModelSerializer):
         if store:
             existing = Warehouse.objects.filter(store=store, name=value).first()
             if existing:
-                if existing.is_active:
+                if existing.status == 'active':
                     raise serializers.ValidationError(
                         "Bu nomli ombor do'koningizda allaqachon mavjud."
                     )
@@ -600,7 +600,7 @@ class WarehouseCreateSerializer(serializers.ModelSerializer):
 class WarehouseUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Warehouse
-        fields = ('name', 'address', 'is_active')
+        fields = ('name', 'address', 'status')
         extra_kwargs = {
             'name': {
                 'error_messages': {
