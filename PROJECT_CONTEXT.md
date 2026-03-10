@@ -1,5 +1,54 @@
 # CLAUDE UCHUN ESLATMA — Yangi chatda bu faylni o'qi va davom et
 
+## 📅 10.03.2026 SESSION #2 — MUHOKAMA: Product.purchase_price ARXITEKTURA QARORI
+
+### ⚠️ KEYINGI SESSIYADA HAL QILISH KERAK: purchase_price avtomatik yangilanishi
+
+**Muammo:**
+`Product.purchase_price` qo'lda kiritiladigan maydon — StockMovement (IN) yaratilganda
+avtomatik yangilanmaydi. Bu BILLZ, 1C, Odoo kabi barcha tizimlardan farqli.
+
+**Tahlil (o'rganilgan tizimlar):**
+| Tizim | purchase_price ma'nosi | Avtomatik yangilanish |
+|-------|----------------------|----------------------|
+| BILLZ (billz.io) | Oxirgi kirim narxi | ✅ kirimda yangilanadi |
+| 1C | Planovaya tsena (reference) | ✅ FIFO/AVCO |
+| Odoo | cost (AVCO/FIFO/Standard) | ✅ metod tanlanadi |
+| **Bizning tizim** | Default narx (qo'lda) | ❌ HOZIR YANGILANMAYDI |
+
+**Kelishilgan yechim (ertaga amalga oshiriladi):**
+`StockMovement (IN)` yaratilganda `Product.purchase_price` AVTOMATIK yangilanadi.
+
+Ikkita variant kelishildi:
+- 🔵 **BILLZ usuli** — `purchase_price = oxirgi kirim unit_cost` (oddiy)
+- 🟢 **AVCO usuli** — `purchase_price = o'rtacha tannarx` (aniqroq) ← TAVSIYA
+
+```python
+# warehouse/views.py — StockMovementViewSet.perform_create() ga qo'shiladi
+# AVCO usuli (o'rtacha tannarx):
+if instance.movement_type == MovementType.IN and unit_cost is not None:
+    # StockBatch yaratilgandan KEYIN average cost hisoblanadi:
+    result = (
+        StockBatch.objects
+        .filter(product=instance.product, qty_left__gt=0)
+        .aggregate(
+            total_value=Sum(F('unit_cost') * F('qty_left')),
+            total_qty=Sum('qty_left')
+        )
+    )
+    if result['total_qty']:
+        avg = result['total_value'] / result['total_qty']
+        Product.objects.filter(pk=instance.product_id).update(purchase_price=avg)
+```
+
+**purchase_price maydoni ma'nosi o'zgarmaydi:**
+- Maydon nomi: `purchase_price` (saqlanadi, migration kerak emas)
+- Ma'nosi: "O'rtacha tannarx" (AVCO — weighted average cost)
+- Read-only: Frontend da ko'rsatiladi, qo'lda o'zgartirilmaydi
+- `sale_price`: qo'lda o'rnatiladi (o'zgarmaydi)
+
+---
+
 ## 📅 10.03.2026 SESSION — QILINGAN ISHLAR
 
 ### 1. Bug fix: StockBatchViewSet permission (`warehouse/views.py`)
