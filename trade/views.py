@@ -325,7 +325,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(
-            {'message': 'Mijoz nofaol qilindi.'},
+            {'message': "Mijoz muvaffaqiyatli o'chirildi."},
             status=status.HTTP_200_OK,
         )
 

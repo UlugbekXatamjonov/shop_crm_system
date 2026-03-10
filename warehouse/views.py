@@ -107,7 +107,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
       POST   /api/v1/warehouse/categories/       — yaratish (manager+)
       GET    /api/v1/warehouse/categories/{id}/  — tafsilotlar
       PATCH  /api/v1/warehouse/categories/{id}/  — yangilash (manager+)
-      DELETE /api/v1/warehouse/categories/{id}/  — nofaol qilish (manager+, soft delete)
+      DELETE /api/v1/warehouse/categories/{id}/  — o'chirish (manager+, hard delete)
 
     Multi-tenant:
       Foydalanuvchi faqat o'z do'konining kategoriyalarini ko'radi.
@@ -213,7 +213,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(
-            {'message': "Kategoriya muvaffaqiyatli nofaol qilindi."},
+            {'message': "Kategoriya muvaffaqiyatli o'chirildi."},
             status=status.HTTP_200_OK,
         )
 
@@ -231,7 +231,7 @@ class SubCategoryViewSet(viewsets.ModelViewSet):
       POST   /api/v1/warehouse/subcategories/          — yaratish (manager+)
       GET    /api/v1/warehouse/subcategories/{id}/     — tafsilotlar
       PATCH  /api/v1/warehouse/subcategories/{id}/     — yangilash (manager+)
-      DELETE /api/v1/warehouse/subcategories/{id}/     — nofaol qilish (manager+)
+      DELETE /api/v1/warehouse/subcategories/{id}/     — o'chirish (manager+, hard delete)
 
     Filter:
       ?category=<id>   — Kategoriya bo'yicha filter
@@ -351,7 +351,7 @@ class SubCategoryViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(
-            {'message': "Subkategoriya muvaffaqiyatli nofaol qilindi."},
+            {'message': "Subkategoriya muvaffaqiyatli o'chirildi."},
             status=status.HTTP_200_OK,
         )
 
@@ -538,7 +538,7 @@ class ProductViewSet(viewsets.ModelViewSet):
       POST   /api/v1/warehouse/products/                — yaratish (manager+)
       GET    /api/v1/warehouse/products/{id}/           — tafsilotlar
       PATCH  /api/v1/warehouse/products/{id}/           — yangilash (manager+)
-      DELETE /api/v1/warehouse/products/{id}/           — nofaol qilish (manager+)
+      DELETE /api/v1/warehouse/products/{id}/           — o'chirish (manager+, hard delete)
       GET    /api/v1/warehouse/products/{id}/barcode/   — barcode PNG rasm (BOSQICH 1.2)
 
     Barcode (BOSQICH 1.2):
@@ -686,7 +686,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(
-            {'message': "Mahsulot muvaffaqiyatli nofaol qilindi."},
+            {'message': "Mahsulot muvaffaqiyatli o'chirildi."},
             status=status.HTTP_200_OK,
         )
 
@@ -752,7 +752,7 @@ class WarehouseViewSet(viewsets.ModelViewSet):
       POST   /api/v1/warehouse/warehouses/       — yangi ombor qo'shish (manager+)
       GET    /api/v1/warehouse/warehouses/{id}/  — tafsilotlar
       PATCH  /api/v1/warehouse/warehouses/{id}/  — yangilash (manager+)
-      DELETE /api/v1/warehouse/warehouses/{id}/  — nofaol qilish (manager+, soft delete)
+      DELETE /api/v1/warehouse/warehouses/{id}/  — o'chirish (manager+, hard delete)
 
     Multi-tenant: har bir ombor bitta do'konga tegishli.
     Soft delete: is_active=False bilan o'chiriladi (haqiqiy o'chirish yo'q).
@@ -858,7 +858,7 @@ class WarehouseViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(
-            {'message': "Ombor nofaol qilindi."},
+            {'message': "Ombor muvaffaqiyatli o'chirildi."},
             status=status.HTTP_200_OK,
         )
 

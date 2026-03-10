@@ -173,7 +173,7 @@ class StoreViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(
-            {'message': "Do'kon muvaffaqiyatli nofaol qilindi."},
+            {'message': "Do'kon muvaffaqiyatli o'chirildi."},
             status=status.HTTP_200_OK,
         )
 
@@ -191,7 +191,7 @@ class BranchViewSet(viewsets.ModelViewSet):
       POST   /api/v1/branches/       — yangi filial yaratish (faqat owner)
       GET    /api/v1/branches/{id}/  — filial tafsilotlari
       PATCH  /api/v1/branches/{id}/  — filial ma'lumotlarini yangilash (faqat owner)
-      DELETE /api/v1/branches/{id}/  — filialni nofaol qilish (faqat owner, soft delete)
+      DELETE /api/v1/branches/{id}/  — filialni o'chirish (faqat owner, hard delete)
 
     Multi-tenant:
       Faqat o'z do'konining filiallarini ko'radi va boshqaradi.
@@ -303,7 +303,7 @@ class BranchViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(
-            {'message': "Filial muvaffaqiyatli nofaol qilindi."},
+            {'message': "Filial muvaffaqiyatli o'chirildi."},
             status=status.HTTP_200_OK,
         )
 
