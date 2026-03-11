@@ -1,8 +1,52 @@
 # CLAUDE UCHUN ESLATMA — Yangi chatda bu faylni o'qi va davom et
 
+## 📅 11.03.2026 SESSION — QILINGAN ISHLAR
+
+### 1. AVCO: Product.purchase_price avtomatik yangilanishi ✅
+`warehouse/views.py` — `StockMovementViewSet.perform_create()` da StockBatch yaratilgandan KEYIN:
+```python
+# AVCO: weighted average cost bo'yicha purchase_price yangilanadi
+result = StockBatch.objects.filter(product=instance.product, qty_left__gt=0).aggregate(
+    total_value=Sum(F('unit_cost') * F('qty_left')), total_qty=Sum('qty_left'))
+if result['total_qty']:
+    avg = result['total_value'] / result['total_qty']
+    Product.objects.filter(pk=instance.product_id).update(purchase_price=avg)
+```
+`from django.db.models import F, Sum` — Sum qo'shildi.
+
+### 2. B5 — SaleReturn ✅ (`trade` app da)
+- `trade/models.py`: `SaleReturnStatus(TextChoices)`, `SaleReturn`, `SaleReturnItem` qo'shildi
+- `trade/migrations/0003_salereturn.py`: yangi migration
+- `trade/serializers.py`: `SaleReturnItemInputSerializer`, `SaleReturnItemListSerializer`, `SaleReturnListSerializer`, `SaleReturnDetailSerializer`, `SaleReturnCreateSerializer`
+- `trade/views.py`: `SaleReturnViewSet` (create/list/retrieve + confirm/cancel actions)
+- `trade/api_urls.py`: `router.register('sale-returns', SaleReturnViewSet)` qo'shildi
+- `trade/admin.py`: `SaleReturnAdmin`, `SaleReturnItemInline`
+
+**Endpointlar:**
+- `POST /api/v1/sale-returns/` — yaratish (status=pending)
+- `GET /api/v1/sale-returns/` — ro'yxat (?status, ?branch, ?smena)
+- `GET /api/v1/sale-returns/{id}/` — detail
+- `PATCH /api/v1/sale-returns/{id}/confirm/` — tasdiqlash (StockMovement(IN) avtomatik)
+- `PATCH /api/v1/sale-returns/{id}/cancel/` — bekor qilish
+
+### 3. B6 — expense app ✅
+- `expense/models.py`: `ExpenseCategory` (soft delete, unique_together), `Expense` (+receipt_image, +smena)
+- `expense/migrations/0001_initial.py`
+- `expense/serializers.py`: to'liq CRUD serializers
+- `expense/views.py`: `ExpenseCategoryViewSet` (soft delete), `ExpenseViewSet` (hard delete)
+- `expense/api_urls.py`: router registrations
+- `expense/admin.py`: admin registrations
+- `config/urls.py`: `path('api/v1/', include('expense.api_urls'))` qo'shildi
+
+**Endpointlar:**
+- `/api/v1/expense-categories/` — CRUD (?status filter)
+- `/api/v1/expenses/` — CRUD (?branch, ?category, ?smena, ?date filter)
+
+---
+
 ## 📅 10.03.2026 SESSION #2 — MUHOKAMA: Product.purchase_price ARXITEKTURA QARORI
 
-### ⚠️ KEYINGI SESSIYADA HAL QILISH KERAK: purchase_price avtomatik yangilanishi
+### ✅ BAJARILDI: purchase_price avtomatik yangilanishi (11.03.2026)
 
 **Muammo:**
 `Product.purchase_price` qo'lda kiritiladigan maydon — StockMovement (IN) yaratilganda
@@ -161,18 +205,18 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 
 ---
 
-## LOYIHA HOLATI (10.03.2026)
+## LOYIHA HOLATI (11.03.2026)
 
 | App         | Holat             | Izoh                                                   |
 |-------------|-------------------|--------------------------------------------------------|
 | `accaunt`   | ✅ Tugallangan    | CustomUser, Worker, AuditLog, JWT auth — password reset, WorkerList/Detail da store+branch |
 | `store`     | ✅ Tugallangan    | Store, Branch CRUD (hard delete, multi-tenant, workers in detail, Uzbek errors) |
-| `warehouse` | ✅ Tugallangan    | Category, **SubCategory**, Product(+image, +barcode EAN-13, +subcategory, +price_currency), **Currency**, **ExchangeRate**, **Warehouse**(ombor, hard delete), Stock(branch\|warehouse), StockMovement(branch\|warehouse, unit_cost), **Transfer**+TransferItem(guruhlab ko'chirish, confirm/cancel, atomic), **StockBatch**(FIFO partiya, batch_code, unit_cost, qty_left) — BOSQICH 1 + 1.5 + 1.6 + 1.7 ✅ |
-| `trade`     | ✅ Tugallangan   | BOSQICH 4 ✅ — CustomerGroup (unique name validatsiya), Customer (hard delete, debt_sales), Sale (@transaction.atomic, 13-qadam + FIFO deduction), SaleItem(+unit_cost), cancel action, _build_report() to'ldirildi |
-| `expense`   | ❌ Boshlanmagan  | BOSQICH 6 — ExpenseCategory, Expense                   |
+| `warehouse` | ✅ Tugallangan    | Category, SubCategory, Product(+image, +barcode EAN-13, +subcategory, +price_currency, **+AVCO purchase_price**), Currency, ExchangeRate, Warehouse, Stock, StockMovement, Transfer+TransferItem, StockBatch(FIFO) — BOSQICH 1 ✅ |
+| `trade`     | ✅ Tugallangan   | BOSQICH 4 ✅ + **BOSQICH 5 ✅** — Sale, SaleItem, **SaleReturn**(pending→confirmed→StockMovement(IN), cancel), CustomerGroup, Customer |
+| `expense`   | ✅ Tugallangan  | **BOSQICH 6 ✅** — ExpenseCategory(soft delete), Expense(+receipt_image, +smena, hard delete) |
 | `StoreSettings` | ✅ Tugallangan  | BOSQICH 2 ✅ — 10 guruh, 30+ maydon, signal+Redis kesh |
 | `Smena`     | ✅ Tugallangan   | BOSQICH 3 ✅ — SmenaStatus+Smena model, SmenaViewSet (open/close/x-report), migration 0005 |
-| `SaleReturn` | ❌ Boshlanmagan | BOSQICH 5 — trade app da                               |
+| `SaleReturn` | ✅ Tugallangan  | BOSQICH 5 ✅ — trade app da, migration 0003             |
 | `WastageRecord` | ❌ Boshlanmagan | BOSQICH 7 — warehouse app da                        |
 | `StockAudit` | ❌ Boshlanmagan | BOSQICH 8 — warehouse app da                           |
 | `WorkerKPI` | ❌ Boshlanmagan  | BOSQICH 9 — accaunt app da                             |
