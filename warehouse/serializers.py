@@ -15,10 +15,12 @@ Tartib:
   4. ExchangeRate serializers
   5. Product serializers
   6. Warehouse serializers
-  7. Stock serializers       (branch|warehouse)
+  7. Stock serializers         (branch|warehouse)
   8. StockMovement serializers (branch|warehouse, unit_cost)
-  9. Transfer serializers    (guruhlab ko'chirish)
-  10. StockBatch serializers  (FIFO partiyalar)
+  9. Transfer serializers      (guruhlab ko'chirish)
+  10. StockBatch serializers   (FIFO partiyalar)
+  11. WastageRecord serializers (B7 — isrof)
+  12. StockAudit serializers    (B8 — inventarizatsiya)
 """
 
 from rest_framework import serializers
@@ -26,12 +28,15 @@ from rest_framework import serializers
 from store.models import Branch
 
 from .models import (
+    AuditStatus,
     Category,
     Currency,
     ExchangeRate,
     MovementType,
     Product,
     Stock,
+    StockAudit,
+    StockAuditItem,
     StockBatch,
     StockMovement,
     SubCategory,
@@ -39,6 +44,8 @@ from .models import (
     TransferItem,
     TransferStatus,
     Warehouse,
+    WastageReason,
+    WastageRecord,
 )
 
 
@@ -1223,3 +1230,355 @@ class StockBatchSerializer(serializers.ModelSerializer):
     def get_is_empty(self, obj):
         """qty_left == 0 bo'lsa — partiya tamom."""
         return obj.qty_left == 0
+
+
+# ============================================================
+# ISROF (WASTAGE) SERIALIZERLARI  B7
+# ============================================================
+
+class WastageRecordListSerializer(serializers.ModelSerializer):
+    """Isrof ro'yxati uchun qisqa serializer."""
+    product_name   = serializers.CharField(source='product.name',             read_only=True)
+    product_unit   = serializers.CharField(source='product.get_unit_display', read_only=True)
+    reason_display = serializers.CharField(source='get_reason_display',       read_only=True)
+    worker_name    = serializers.SerializerMethodField()
+    location_type  = serializers.SerializerMethodField()
+    location_name  = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = WastageRecord
+        fields = (
+            'id', 'product', 'product_name', 'product_unit',
+            'location_type', 'location_name',
+            'reason', 'reason_display',
+            'quantity', 'date', 'worker_name', 'created_on',
+        )
+
+    def get_worker_name(self, obj):
+        if obj.worker_id:
+            return obj.worker.user.get_full_name() or obj.worker.user.username
+        return None
+
+    def get_location_type(self, obj):
+        return 'branch' if obj.branch_id else 'warehouse'
+
+    def get_location_name(self, obj):
+        if obj.branch_id:
+            return obj.branch.name
+        return obj.warehouse.name if obj.warehouse_id else None
+
+
+class WastageRecordDetailSerializer(serializers.ModelSerializer):
+    """Isrof tafsiloti uchun to'liq serializer."""
+    product_name   = serializers.CharField(source='product.name',             read_only=True)
+    product_unit   = serializers.CharField(source='product.get_unit_display', read_only=True)
+    reason_display = serializers.CharField(source='get_reason_display',       read_only=True)
+    branch_name    = serializers.CharField(source='branch.name',              read_only=True)
+    warehouse_name = serializers.CharField(source='warehouse.name',           read_only=True)
+    worker_name    = serializers.SerializerMethodField()
+    location_type  = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = WastageRecord
+        fields = (
+            'id',
+            'product', 'product_name', 'product_unit',
+            'location_type',
+            'branch', 'branch_name',
+            'warehouse', 'warehouse_name',
+            'reason', 'reason_display',
+            'quantity', 'note', 'date',
+            'worker_name', 'created_on',
+        )
+
+    def get_worker_name(self, obj):
+        if obj.worker_id:
+            return obj.worker.user.get_full_name() or obj.worker.user.username
+        return None
+
+    def get_location_type(self, obj):
+        return 'branch' if obj.branch_id else 'warehouse'
+
+
+class WastageRecordCreateSerializer(serializers.ModelSerializer):
+    """Isrof yaratish uchun serializer. Yaratilganda StockMovement(OUT) avtomatik."""
+
+    class Meta:
+        model  = WastageRecord
+        fields = ('product', 'branch', 'warehouse', 'quantity', 'reason', 'note', 'date')
+        extra_kwargs = {
+            'product': {
+                'error_messages': {
+                    'required'      : "Mahsulot tanlanishi shart.",
+                    'does_not_exist': "Bunday mahsulot topilmadi.",
+                    'incorrect_type': "Mahsulot ID butun son bo'lishi kerak.",
+                }
+            },
+            'quantity': {
+                'error_messages': {
+                    'required': "Miqdor kiritilishi shart.",
+                    'invalid' : "To'g'ri raqam kiritilishi shart.",
+                }
+            },
+            'date': {
+                'error_messages': {
+                    'required': "Sana kiritilishi shart.",
+                    'invalid' : "To'g'ri sana formatini kiriting (YYYY-MM-DD).",
+                }
+            },
+        }
+
+    def validate_product(self, value):
+        store = self.context.get('store')
+        if store and value.store != store:
+            raise serializers.ValidationError(
+                "Bu mahsulot sizning do'koningizga tegishli emas."
+            )
+        return value
+
+    def validate_branch(self, value):
+        store = self.context.get('store')
+        if store and value and value.store != store:
+            raise serializers.ValidationError(
+                "Bu filial sizning do'koningizga tegishli emas."
+            )
+        return value
+
+    def validate_warehouse(self, value):
+        store = self.context.get('store')
+        if store and value and value.store != store:
+            raise serializers.ValidationError(
+                "Bu ombor sizning do'koningizga tegishli emas."
+            )
+        return value
+
+    def validate_quantity(self, value):
+        if value <= 0:
+            raise serializers.ValidationError(
+                "Miqdor 0 dan katta bo'lishi shart."
+            )
+        return value
+
+    def validate(self, data):
+        branch    = data.get('branch')
+        warehouse = data.get('warehouse')
+
+        # branch XOR warehouse
+        if branch and warehouse:
+            raise serializers.ValidationError(
+                "Filial va ombor bir vaqtda ko'rsatilishi mumkin emas. Faqat bittasini tanlang."
+            )
+        if not branch and not warehouse:
+            raise serializers.ValidationError(
+                "Filial yoki ombor ko'rsatilishi shart."
+            )
+
+        # Qoldiq yetarliligini tekshirish
+        product  = data.get('product')
+        quantity = data.get('quantity', 0)
+        if product:
+            stock_qs = Stock.objects.filter(product=product)
+            if branch:
+                stock_qs = stock_qs.filter(branch=branch)
+            else:
+                stock_qs = stock_qs.filter(warehouse=warehouse)
+            stock       = stock_qs.first()
+            current_qty = stock.quantity if stock else 0
+            if current_qty < quantity:
+                location_name = branch.name if branch else warehouse.name
+                raise serializers.ValidationError(
+                    f"Qoldiq yetarli emas: '{location_name}' da '{product.name}' "
+                    f"uchun {current_qty} dona bor, {quantity} so'ralmoqda."
+                )
+
+        return data
+
+
+# ============================================================
+# INVENTARIZATSIYA (STOCK AUDIT) SERIALIZERLARI  B8
+# ============================================================
+
+class StockAuditItemSerializer(serializers.ModelSerializer):
+    """Inventarizatsiya satri — nested ko'rinish."""
+    product_name = serializers.CharField(source='product.name',             read_only=True)
+    product_unit = serializers.CharField(source='product.get_unit_display', read_only=True)
+    difference   = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = StockAuditItem
+        fields = (
+            'id', 'product', 'product_name', 'product_unit',
+            'expected_qty', 'actual_qty', 'difference',
+        )
+
+    def get_difference(self, obj):
+        """actual_qty - expected_qty. Musbat = oshiqcha, manfiy = kamomad."""
+        return obj.actual_qty - obj.expected_qty
+
+
+class StockAuditListSerializer(serializers.ModelSerializer):
+    """Inventarizatsiya ro'yxati uchun qisqa serializer."""
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    worker_name    = serializers.SerializerMethodField()
+    location_type  = serializers.SerializerMethodField()
+    location_name  = serializers.SerializerMethodField()
+    items_count    = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = StockAudit
+        fields = (
+            'id', 'status', 'status_display',
+            'location_type', 'location_name',
+            'items_count', 'worker_name',
+            'created_on', 'confirmed_on',
+        )
+
+    def get_worker_name(self, obj):
+        if obj.worker_id:
+            return obj.worker.user.get_full_name() or obj.worker.user.username
+        return None
+
+    def get_location_type(self, obj):
+        return 'branch' if obj.branch_id else 'warehouse'
+
+    def get_location_name(self, obj):
+        if obj.branch_id:
+            return obj.branch.name
+        return obj.warehouse.name if obj.warehouse_id else None
+
+    def get_items_count(self, obj):
+        return obj.items.count()
+
+
+class StockAuditDetailSerializer(serializers.ModelSerializer):
+    """Inventarizatsiya tafsiloti — nested StockAuditItem'lar bilan."""
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    branch_name    = serializers.CharField(source='branch.name',        read_only=True)
+    warehouse_name = serializers.CharField(source='warehouse.name',     read_only=True)
+    worker_name    = serializers.SerializerMethodField()
+    location_type  = serializers.SerializerMethodField()
+    items          = StockAuditItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model  = StockAudit
+        fields = (
+            'id', 'status', 'status_display',
+            'location_type',
+            'branch', 'branch_name',
+            'warehouse', 'warehouse_name',
+            'note', 'worker_name',
+            'created_on', 'confirmed_on',
+            'items',
+        )
+
+    def get_worker_name(self, obj):
+        if obj.worker_id:
+            return obj.worker.user.get_full_name() or obj.worker.user.username
+        return None
+
+    def get_location_type(self, obj):
+        return 'branch' if obj.branch_id else 'warehouse'
+
+
+class StockAuditCreateSerializer(serializers.ModelSerializer):
+    """
+    Inventarizatsiya yaratish.
+    Yaratilganda tanlangan joy (branch | warehouse) dagi barcha mahsulotlar
+    uchun StockAuditItem'lar avtomatik yaratiladi.
+    expected_qty = joriy Stock.quantity.
+    actual_qty   = expected_qty (xodim keyinroq PATCH bilan o'zgartiradi).
+    """
+
+    class Meta:
+        model  = StockAudit
+        fields = ('branch', 'warehouse', 'note')
+        extra_kwargs = {
+            'branch': {
+                'error_messages': {
+                    'does_not_exist': "Bunday filial topilmadi.",
+                    'incorrect_type': "Filial ID butun son bo'lishi kerak.",
+                }
+            },
+            'warehouse': {
+                'error_messages': {
+                    'does_not_exist': "Bunday ombor topilmadi.",
+                    'incorrect_type': "Ombor ID butun son bo'lishi kerak.",
+                }
+            },
+        }
+
+    def validate_branch(self, value):
+        store = self.context.get('store')
+        if store and value and value.store != store:
+            raise serializers.ValidationError(
+                "Bu filial sizning do'koningizga tegishli emas."
+            )
+        return value
+
+    def validate_warehouse(self, value):
+        store = self.context.get('store')
+        if store and value and value.store != store:
+            raise serializers.ValidationError(
+                "Bu ombor sizning do'koningizga tegishli emas."
+            )
+        return value
+
+    def validate(self, data):
+        branch    = data.get('branch')
+        warehouse = data.get('warehouse')
+
+        # branch XOR warehouse
+        if branch and warehouse:
+            raise serializers.ValidationError(
+                "Filial va ombor bir vaqtda ko'rsatilishi mumkin emas. Faqat bittasini tanlang."
+            )
+        if not branch and not warehouse:
+            raise serializers.ValidationError(
+                "Filial yoki ombor ko'rsatilishi shart."
+            )
+
+        # Mavjud DRAFT auditni tekshirish (UniqueConstraint bilan bir xil, lekin tushunarliroq xato)
+        if branch and StockAudit.objects.filter(branch=branch, status=AuditStatus.DRAFT).exists():
+            raise serializers.ValidationError(
+                f"'{branch.name}' filialida allaqachon faol (draft) inventarizatsiya mavjud."
+            )
+        if warehouse and StockAudit.objects.filter(warehouse=warehouse, status=AuditStatus.DRAFT).exists():
+            raise serializers.ValidationError(
+                f"'{warehouse.name}' omborida allaqachon faol (draft) inventarizatsiya mavjud."
+            )
+
+        return data
+
+
+class StockAuditItemUpdateSerializer(serializers.ModelSerializer):
+    """
+    Inventarizatsiya satri yangilash — faqat actual_qty.
+    Faqat DRAFT holatdagi inventarizatsiya satrini yangilash mumkin.
+    """
+
+    class Meta:
+        model  = StockAuditItem
+        fields = ('actual_qty',)
+        extra_kwargs = {
+            'actual_qty': {
+                'error_messages': {
+                    'required': "Haqiqiy miqdor kiritilishi shart.",
+                    'invalid' : "To'g'ri raqam kiritilishi shart.",
+                }
+            }
+        }
+
+    def validate_actual_qty(self, value):
+        if value < 0:
+            raise serializers.ValidationError(
+                "Miqdor manfiy bo'lishi mumkin emas."
+            )
+        return value
+
+    def validate(self, data):
+        # Auditning draft holatini tekshirish
+        if self.instance and self.instance.audit.status != AuditStatus.DRAFT:
+            raise serializers.ValidationError(
+                "Faqat 'draft' inventarizatsiya satrini yangilash mumkin."
+            )
+        return data

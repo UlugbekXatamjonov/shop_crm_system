@@ -6,12 +6,15 @@ from .models import (
     ExchangeRate,
     Product,
     Stock,
+    StockAudit,
+    StockAuditItem,
     StockBatch,
     StockMovement,
     SubCategory,
     Transfer,
     TransferItem,
     Warehouse,
+    WastageRecord,
 )
 
 
@@ -117,3 +120,48 @@ class StockBatchAdmin(admin.ModelAdmin):
         'store', 'received_at',
     )
     ordering        = ['received_at', 'id']
+
+
+@admin.register(WastageRecord)
+class WastageRecordAdmin(admin.ModelAdmin):
+    """
+    Isrof yozuvlari — faqat ko'rish (immutable log).
+    """
+    list_display    = (
+        'id', 'product', 'store',
+        'branch', 'warehouse',
+        'quantity', 'reason', 'date',
+        'worker', 'created_on',
+    )
+    list_filter     = ('reason', 'store', 'branch', 'warehouse')
+    search_fields   = ('product__name',)
+    readonly_fields = (
+        'product', 'branch', 'warehouse', 'store',
+        'worker', 'smena', 'quantity', 'reason', 'note',
+        'date', 'created_on',
+    )
+    ordering        = ['-date', '-created_on']
+
+
+class StockAuditItemInline(admin.TabularInline):
+    model           = StockAuditItem
+    extra           = 0
+    readonly_fields = ('product', 'expected_qty', 'actual_qty')
+    can_delete      = False
+
+
+@admin.register(StockAudit)
+class StockAuditAdmin(admin.ModelAdmin):
+    """
+    Inventarizatsiya — tafsilotlar bilan ko'rish.
+    Tasdiqlangan (confirmed) auditlar readonly.
+    """
+    list_display    = (
+        'id', 'store', 'status',
+        'branch', 'warehouse',
+        'worker', 'created_on', 'confirmed_on',
+    )
+    list_filter     = ('status', 'store', 'branch', 'warehouse')
+    search_fields   = ('id', 'note')
+    readonly_fields = ('status', 'confirmed_on', 'created_on', 'worker', 'store')
+    inlines         = [StockAuditItemInline]
