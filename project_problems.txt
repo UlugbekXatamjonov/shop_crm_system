@@ -3,19 +3,9 @@
 
 ------ Qilish kerak ---------
 
+Stoke qaysi holat uchun qayerda kerak ?
+
+
 
 ------ Tugadi ---------
-barcha delete larni soft delete dan oddiy delete ga o'tkazish kerak.
-subcategory statusi edit bo'lmayapdi → SubCategoryUpdateSerializer ga status qo'shildi.
-kategoriya statusi edit bo'lmayapdi → CategoryUpdateSerializer ga status qo'shildi.
-warehousda yangi ombor qo'shib bo'lmayapdi → WarehouseCreateSerializer ga is_active qo'shildi, validate_name tuzatildi (faol/nofaol farqlaydi).
-Costomers groups da biro maydon edit bo'lmasa ham "yangilandi" deyapdi, qolgan viewlarni ham ko'rib qo'yish kerak.  
-Mijozga qaysi sotuvdan qancha qarzi borligini ham qo'shish kerak, BIZDA BU XUSUSIYAT BORMIN ?
-valyuta kursidan manba ni olib tashlash
-store ditailga do'konning settings ma'lumotlarinni ham qo'shish, va ochiq smenalarni ham qo'shish
-workerda email edit bo'lmayapdi
-xodim qo'shganda do'kon avtomatik olinishi kk
-filial listga adress va ishchilar soni qo'shildi
-StockBatch.batch_code — store ID formatiga o'tkazildi (S{id}-YY-MM-DD-seq)
-
 
