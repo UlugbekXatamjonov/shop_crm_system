@@ -8,6 +8,7 @@ Modellar:
   WorkerRole   — Sobit hodim rollari (TextChoices)
   Worker       — Do'kon hodimi
   AuditLog     — Tizim amallari jurnali
+  WorkerKPI    — Xodim oylik KPI ko'rsatkichlari (B9)
 
 Ruxsat tizimi:
   - Rollar sobit: owner, manager, seller
@@ -397,3 +398,93 @@ class AuditLog(models.Model):
     def __str__(self) -> str:
         actor_name = str(self.actor) if self.actor else "Tizim"
         return f"{actor_name} | {self.get_action_display()} | {self.target_model} #{self.target_id}"
+
+
+# ============================================================
+# WORKER KPI (BOSQICH 9)
+# ============================================================
+
+class WorkerKPI(models.Model):
+    """
+    Xodimning oylik KPI (ishlash ko'rsatkichlari) yozuvi.
+
+    Avtomatik yangilanish:
+      Sale yaratilganda       → sales_count   += 1, sales_amount   += net_price
+      SaleReturn confirmed    → returns_count += 1, returns_amount += total_amount
+
+    Manager maqsad belgilaydi:
+      PATCH /api/v1/kpi/{id}/set-target/ → target_amount, bonus_amount
+
+    Hisoblangan maydonlar (property):
+      net_sales_amount = sales_amount - returns_amount
+      target_reached   = net_sales_amount >= target_amount (agar target > 0)
+
+    StoreSettings.kpi_enabled = False bo'lsa — yozuvlar yaratilmaydi (skip).
+    """
+    worker         = models.ForeignKey(
+        'Worker',
+        on_delete=models.CASCADE,
+        related_name='kpi_records',
+        verbose_name='Xodim',
+    )
+    store          = models.ForeignKey(
+        'store.Store',
+        on_delete=models.CASCADE,
+        related_name='kpi_records',
+        verbose_name="Do'kon",
+    )
+    month          = models.PositiveSmallIntegerField(
+        verbose_name='Oy (1-12)',
+    )
+    year           = models.PositiveSmallIntegerField(
+        verbose_name='Yil',
+    )
+    sales_count    = models.PositiveIntegerField(
+        default=0,
+        verbose_name='Sotuvlar soni',
+    )
+    sales_amount   = models.DecimalField(
+        max_digits=15, decimal_places=2,
+        default=0,
+        verbose_name='Sotuvlar summasi (chegirma keyin)',
+    )
+    returns_count  = models.PositiveIntegerField(
+        default=0,
+        verbose_name='Qaytarishlar soni',
+    )
+    returns_amount = models.DecimalField(
+        max_digits=15, decimal_places=2,
+        default=0,
+        verbose_name='Qaytarishlar summasi',
+    )
+    target_amount  = models.DecimalField(
+        max_digits=15, decimal_places=2,
+        default=0,
+        verbose_name='Oylik maqsad (manager belgilaydi)',
+    )
+    bonus_amount   = models.DecimalField(
+        max_digits=15, decimal_places=2,
+        default=0,
+        verbose_name='Bonus summasi (maqsad bajarilsa)',
+    )
+
+    class Meta:
+        verbose_name        = 'Xodim KPI'
+        verbose_name_plural = 'Xodim KPI lar'
+        ordering            = ['-year', '-month']
+        unique_together     = [('worker', 'month', 'year')]
+
+    @property
+    def net_sales_amount(self):
+        """Sof sotuv = sotuvlar - qaytarishlar."""
+        return self.sales_amount - self.returns_amount
+
+    @property
+    def target_reached(self):
+        """Maqsadga yetildimi? (faqat target > 0 bo'lganda hisoblanadi)."""
+        if self.target_amount > 0:
+            return self.net_sales_amount >= self.target_amount
+        return False
+
+    def __str__(self) -> str:
+        return f"{self.worker} — KPI {self.year}/{self.month:02d}"

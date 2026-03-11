@@ -27,7 +27,7 @@ from rest_framework.filters import SearchFilter
 from rest_framework_simplejwt.tokens import RefreshToken
 from django_filters.rest_framework import DjangoFilterBackend
 
-from .models import CustomUser, Worker, AuditLog, WorkerStatus
+from .models import CustomUser, Worker, WorkerKPI, AuditLog, WorkerStatus
 from .permissions import IsManagerOrAbove, IsOwner
 from .serializers import (
     UserRegistrationSerializer,
@@ -43,6 +43,8 @@ from .serializers import (
     WorkerCreateSerializer,
     WorkerUpdateSerializer,
     WorkerSelfUpdateSerializer,
+    WorkerKPISerializer,
+    WorkerKPISetTargetSerializer,
 )
 
 
@@ -495,6 +497,116 @@ class WorkerViewSet(viewsets.ModelViewSet):
 
         return Response(
             {'message': "Hodim muvaffaqiyatli o'chirildi."},
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=['get'], url_path='kpi')
+    def kpi(self, request, pk=None):
+        """
+        Bitta xodimning KPI tarixini ko'rish.
+
+        GET /api/v1/workers/{id}/kpi/
+        GET /api/v1/workers/{id}/kpi/?month=3&year=2026
+
+        Faqat manager+ ruxsati kerak.
+        """
+        worker = self.get_object()
+        qs     = WorkerKPI.objects.filter(worker=worker)
+
+        month = request.query_params.get('month')
+        year  = request.query_params.get('year')
+        if month:
+            qs = qs.filter(month=month)
+        if year:
+            qs = qs.filter(year=year)
+
+        return Response(WorkerKPISerializer(qs, many=True).data)
+
+
+# ============================================================
+# WORKER KPI VIEWSET  B9
+# ============================================================
+
+class WorkerKPIViewSet(viewsets.ModelViewSet):
+    """
+    Barcha xodimlarning KPI ko'rsatkichlari.
+
+    Endpointlar:
+      GET    /api/v1/kpi/                      — ro'yxat (manager+)
+      GET    /api/v1/kpi/{id}/                 — tafsilot
+      PATCH  /api/v1/kpi/{id}/set-target/      — maqsad va bonus belgilash
+
+    Filtrlash:
+      ?month=3      — oy bo'yicha
+      ?year=2026    — yil bo'yicha
+      ?worker=<id>  — xodim bo'yicha
+
+    Muhim:
+      KPI yozuvlari avtomatik yaratiladi (Sale yoki SaleReturn paytida).
+      Manager faqat target_amount va bonus_amount ni o'zgartiradi.
+      Boshqa maydonlar faqat o'qish (immutable).
+    """
+    http_method_names = ['get', 'patch']
+
+    def get_permissions(self):
+        return [IsAuthenticated(), IsManagerOrAbove()]
+
+    def get_serializer_class(self):
+        if self.action == 'set_target':
+            return WorkerKPISetTargetSerializer
+        return WorkerKPISerializer
+
+    def get_queryset(self):
+        worker = getattr(self.request.user, 'worker', None)
+        if not worker or not worker.store:
+            return WorkerKPI.objects.none()
+        qs = (
+            WorkerKPI.objects
+            .filter(store=worker.store)
+            .select_related('worker__user')
+        )
+        month     = self.request.query_params.get('month')
+        year      = self.request.query_params.get('year')
+        worker_id = self.request.query_params.get('worker')
+        if month:
+            qs = qs.filter(month=month)
+        if year:
+            qs = qs.filter(year=year)
+        if worker_id:
+            qs = qs.filter(worker_id=worker_id)
+        return qs
+
+    @action(detail=True, methods=['patch'], url_path='set-target')
+    def set_target(self, request, pk=None):
+        """
+        Xodimga oylik maqsad va bonus belgilash.
+
+        PATCH /api/v1/kpi/{id}/set-target/
+        Body: {"target_amount": 5000000, "bonus_amount": 500000}
+
+        Faqat manager+ ruxsati kerak.
+        """
+        kpi        = self.get_object()
+        serializer = WorkerKPISetTargetSerializer(kpi, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditLog.Action.UPDATE,
+            target_model='WorkerKPI',
+            target_id=kpi.id,
+            description=(
+                f"KPI maqsad belgilandi: {kpi.worker} — "
+                f"{kpi.year}/{kpi.month:02d}, maqsad={kpi.target_amount}"
+            ),
+        )
+
+        return Response(
+            {
+                'message': "KPI maqsad va bonus muvaffaqiyatli yangilandi.",
+                'data': WorkerKPISerializer(kpi).data,
+            },
             status=status.HTTP_200_OK,
         )
 
