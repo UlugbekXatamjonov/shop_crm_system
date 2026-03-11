@@ -75,8 +75,11 @@ urlpatterns = [
     # Warehouse CRUD: /api/v1/warehouse/categories/, /products/, /stocks/, /movements/
     path('api/v1/warehouse/', include('warehouse.api_urls')),
 
-    # Trade CRUD: /api/v1/customer-groups/, /api/v1/customers/, /api/v1/sales/
+    # Trade CRUD: /api/v1/customer-groups/, /api/v1/customers/, /api/v1/sales/, /api/v1/sale-returns/
     path('api/v1/', include('trade.api_urls')),
+
+    # Expense CRUD: /api/v1/expense-categories/, /api/v1/expenses/
+    path('api/v1/', include('expense.api_urls')),
 
     # --- API Dokumentatsiya ---
     path('swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),

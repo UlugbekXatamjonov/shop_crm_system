@@ -3,13 +3,16 @@
 TRADE APP — Modellar
 ============================================================
 Modellar:
-  CustomerStatus  — Mijoz holati (TextChoices): active | inactive
-  PaymentType     — To'lov turi (TextChoices): cash | card | mixed | debt
-  SaleStatus      — Sotuv holati (TextChoices): completed | cancelled
-  CustomerGroup   — Mijoz guruhi (chegirma % bilan)
-  Customer        — Mijoz (nasiya qoldig'i, guruh, do'kon)
-  Sale            — Sotuv (savdo yozuvi, atomic transaction bilan yaratiladi)
-  SaleItem        — Sotuv elementi (mahsulot, miqdor, narx)
+  CustomerStatus    — Mijoz holati (TextChoices): active | inactive
+  PaymentType       — To'lov turi (TextChoices): cash | card | mixed | debt
+  SaleStatus        — Sotuv holati (TextChoices): completed | cancelled
+  SaleReturnStatus  — Qaytarish holati (TextChoices): pending | confirmed | cancelled
+  CustomerGroup     — Mijoz guruhi (chegirma % bilan)
+  Customer          — Mijoz (nasiya qoldig'i, guruh, do'kon)
+  Sale              — Sotuv (savdo yozuvi, atomic transaction bilan yaratiladi)
+  SaleItem          — Sotuv elementi (mahsulot, miqdor, narx)
+  SaleReturn        — Qaytarish (BOSQICH 5, confirmed → StockMovement(IN) avtomatik)
+  SaleReturnItem    — Qaytarish elementi (mahsulot, miqdor, narx)
 
 Multi-tenant: barcha modellar store(FK) orqali ajratilgan.
 
@@ -17,9 +20,7 @@ Bog'liqliklar:
   Sale.smena(FK → store.Smena)          — BOSQICH 3
   SaleItem.product(FK → warehouse.Product) — BOSQICH 1
   Sale/SaleItem → StockMovement(OUT) avtomatik — trade/views.py da
-
-Keyingi bosqichlarda:
-  SaleReturn(FK → Sale)  — BOSQICH 5
+  SaleReturn.confirmed → StockMovement(IN) avtomatik — trade/views.py da
 """
 
 from django.db import models
@@ -299,6 +300,144 @@ class SaleItem(models.Model):
     class Meta:
         verbose_name        = 'Sotuv elementi'
         verbose_name_plural = 'Sotuv elementlari'
+
+    def __str__(self) -> str:
+        return f"{self.product.name} × {self.quantity} = {self.total_price}"
+
+
+# ============================================================
+# QAYTARISH
+# ============================================================
+
+class SaleReturnStatus(models.TextChoices):
+    PENDING   = 'pending',   'Kutilmoqda'
+    CONFIRMED = 'confirmed', 'Tasdiqlangan'
+    CANCELLED = 'cancelled', 'Bekor qilingan'
+
+
+class SaleReturn(models.Model):
+    """
+    Sotuv qaytarish yozuvi.
+
+    Holat o'tishi:
+      pending   → confirmed  (manager tomonidan)
+      pending   → cancelled  (manager tomonidan)
+      confirmed → o'zgartirib bo'lmaydi (immutable)
+      cancelled → o'zgartirib bo'lmaydi (immutable)
+
+    ⚠️ Tasdiqlash (PATCH .../confirm/) faqat @transaction.atomic bilan:
+       Har bir SaleReturnItem uchun StockMovement(IN) + Stock yangilanadi.
+    ⚠️ sale(FK) ixtiyoriy — kassada chek yo'q bo'lsa ham qaytariladi.
+    ⚠️ Customer.debt_balance qayta hisoblanadi (nasiya bo'lsa kamaytiriladi).
+    """
+    sale       = models.ForeignKey(
+        Sale,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='returns',
+        verbose_name='Asl sotuv',
+    )
+    branch     = models.ForeignKey(
+        'store.Branch',
+        on_delete=models.PROTECT,
+        related_name='sale_returns',
+        verbose_name='Filial',
+    )
+    store      = models.ForeignKey(
+        'store.Store',
+        on_delete=models.PROTECT,
+        related_name='sale_returns',
+        verbose_name="Do'kon",
+    )
+    worker     = models.ForeignKey(
+        'accaunt.Worker',
+        on_delete=models.PROTECT,
+        related_name='sale_returns',
+        verbose_name='Xodim',
+    )
+    customer   = models.ForeignKey(
+        Customer,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='sale_returns',
+        verbose_name='Mijoz',
+    )
+    smena      = models.ForeignKey(
+        'store.Smena',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='sale_returns',
+        verbose_name='Smena',
+    )
+    reason     = models.TextField(
+        blank=True,
+        verbose_name='Qaytarish sababi',
+    )
+    total_amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+        verbose_name='Jami qaytarilgan summa',
+    )
+    status     = models.CharField(
+        max_length=10,
+        choices=SaleReturnStatus.choices,
+        default=SaleReturnStatus.PENDING,
+        verbose_name='Holat',
+    )
+    created_on = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Yaratilgan vaqti',
+    )
+
+    class Meta:
+        verbose_name        = 'Qaytarish'
+        verbose_name_plural = 'Qaytarishlar'
+        ordering            = ['-created_on']
+
+    def __str__(self) -> str:
+        return f"Qaytarish #{self.pk} — {self.branch.name} | {self.total_amount} so'm"
+
+
+class SaleReturnItem(models.Model):
+    """
+    Qaytarish tarkibidagi bitta mahsulot.
+    O'zgartirilmaydi (immutable).
+    """
+    sale_return = models.ForeignKey(
+        SaleReturn,
+        on_delete=models.CASCADE,
+        related_name='items',
+        verbose_name='Qaytarish',
+    )
+    product     = models.ForeignKey(
+        'warehouse.Product',
+        on_delete=models.PROTECT,
+        related_name='return_items',
+        verbose_name='Mahsulot',
+    )
+    quantity    = models.DecimalField(
+        max_digits=10,
+        decimal_places=3,
+        verbose_name='Miqdori',
+    )
+    unit_price  = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        verbose_name='Birlik narxi',
+    )
+    total_price = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        verbose_name='Jami (miqdor × narx)',
+    )
+
+    class Meta:
+        verbose_name        = 'Qaytarish elementi'
+        verbose_name_plural = 'Qaytarish elementlari'
 
     def __str__(self) -> str:
         return f"{self.product.name} × {self.quantity} = {self.total_price}"

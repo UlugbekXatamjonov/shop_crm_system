@@ -6,6 +6,7 @@ ViewSet'lar:
   CustomerGroupViewSet — Mijoz guruhlari CRUD
   CustomerViewSet      — Mijozlar CRUD (soft delete)
   SaleViewSet          — Sotuvlar (create + cancel, list, retrieve)
+  SaleReturnViewSet    — Qaytarishlar (create, confirm, cancel, list, retrieve)
 
 Sale yaratish (POST /sales/) — @transaction.atomic:
   1. StoreSettings validatsiya (allow_cash/card/debt, allow_discount, shift_enabled)
@@ -21,6 +22,18 @@ Sale bekor qilish (PATCH /sales/{id}/cancel/) — @transaction.atomic:
   3. Customer.debt_balance kamaytirish (nasiya bo'lsa)
   4. sale.status = 'cancelled'
   5. AuditLog yozish
+
+SaleReturn yaratish (POST /sale-returns/) — pending holat:
+  1. sale_return_enabled tekshiruvi (StoreSettings)
+  2. Branch + customer + sale store validatsiya
+  3. SaleReturn + SaleReturnItem saqlash (status=pending)
+  4. AuditLog yozish
+
+SaleReturn tasdiqlash (PATCH /sale-returns/{id}/confirm/) — @transaction.atomic:
+  1. Faqat 'pending' qaytarish tasdiqlanadi
+  2. Har bir SaleReturnItem uchun StockMovement(IN) + Stock yangilash
+  3. SaleReturn.status = 'confirmed'
+  4. AuditLog yozish
 """
 
 from decimal import Decimal
@@ -52,6 +65,9 @@ from .models import (
     PaymentType,
     Sale,
     SaleItem,
+    SaleReturn,
+    SaleReturnItem,
+    SaleReturnStatus,
     SaleStatus,
 )
 from .serializers import (
@@ -64,6 +80,9 @@ from .serializers import (
     SaleCreateSerializer,
     SaleDetailSerializer,
     SaleListSerializer,
+    SaleReturnCreateSerializer,
+    SaleReturnDetailSerializer,
+    SaleReturnListSerializer,
 )
 
 
@@ -780,6 +799,283 @@ class SaleViewSet(viewsets.ModelViewSet):
                 'message': 'Sotuv bekor qilindi.',
                 'data': SaleDetailSerializer(
                     sale,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+# ============================================================
+# QAYTARISH VIEWSET (BOSQICH 5)
+# ============================================================
+
+class SaleReturnViewSet(viewsets.ModelViewSet):
+    """
+    Sotuv qaytarishlarini boshqarish.
+
+    Endpointlar:
+      GET    /api/v1/sale-returns/              — ro'yxat
+      POST   /api/v1/sale-returns/              — yangi qaytarish (pending)
+      GET    /api/v1/sale-returns/{id}/         — to'liq ma'lumot
+      PATCH  /api/v1/sale-returns/{id}/confirm/ — tasdiqlash (manager+)
+      PATCH  /api/v1/sale-returns/{id}/cancel/  — bekor qilish (manager+)
+      [PUT, DELETE YO'Q — qaytarishlar o'chirilmaydi]
+    """
+    http_method_names = ['get', 'post', 'patch']
+
+    def get_permissions(self):
+        if self.action in ('confirm', 'cancel', 'destroy'):
+            return [IsAuthenticated(), IsManagerOrAbove()]
+        return [IsAuthenticated(), CanAccess('sotuv')]
+
+    def get_queryset(self):
+        worker = self.request.user.worker
+        qs = SaleReturn.objects.filter(
+            store=worker.store,
+        ).select_related(
+            'branch', 'worker__user', 'customer', 'sale', 'smena',
+        ).prefetch_related('items__product')
+
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        branch_filter = self.request.query_params.get('branch')
+        if branch_filter:
+            qs = qs.filter(branch_id=branch_filter)
+
+        smena_filter = self.request.query_params.get('smena')
+        if smena_filter:
+            qs = qs.filter(smena_id=smena_filter)
+
+        return qs
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return SaleReturnListSerializer
+        if self.action == 'create':
+            return SaleReturnCreateSerializer
+        return SaleReturnDetailSerializer
+
+    # ----------------------------------------------------------
+    # CREATE — yangi qaytarish (pending)
+    # ----------------------------------------------------------
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        """
+        POST /api/v1/sale-returns/ — yangi qaytarish yaratish.
+        Holat: pending. Tasdiqlash uchun /confirm/ kerak.
+        """
+        worker   = request.user.worker
+        settings = get_store_settings(worker.store_id)
+
+        # StoreSettings: qaytarish yoqilganligini tekshirish
+        if not settings.sale_return_enabled:
+            raise ValidationError({
+                'detail': "Qaytarish funksiyasi bu do'konda o'chirib qo'yilgan."
+            })
+
+        serializer = SaleReturnCreateSerializer(
+            data=request.data,
+            context={'request': request},
+        )
+        serializer.is_valid(raise_exception=True)
+        data     = serializer.validated_data
+        items    = data.pop('items')
+        branch   = data['branch']
+        customer = data.get('customer')
+        sale_obj = data.get('sale')
+        reason   = data.get('reason', '')
+
+        # Ochiq smena (ixtiyoriy)
+        current_smena = None
+        if settings.shift_enabled:
+            current_smena = Smena.objects.filter(
+                branch=branch,
+                status=SmenaStatus.OPEN,
+            ).first()
+
+        # Jami hisoblash
+        total_amount = sum(
+            item['quantity'] * item['unit_price']
+            for item in items
+        )
+
+        # SaleReturn yaratish
+        sale_return = SaleReturn.objects.create(
+            sale         = sale_obj,
+            branch       = branch,
+            store        = worker.store,
+            worker       = worker,
+            customer     = customer,
+            smena        = current_smena,
+            reason       = reason,
+            total_amount = total_amount,
+            status       = SaleReturnStatus.PENDING,
+        )
+
+        # SaleReturnItem larni yaratish
+        for item_data in items:
+            product    = item_data['product']
+            quantity   = item_data['quantity']
+            unit_price = item_data['unit_price']
+            SaleReturnItem.objects.create(
+                sale_return = sale_return,
+                product     = product,
+                quantity    = quantity,
+                unit_price  = unit_price,
+                total_price = quantity * unit_price,
+            )
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditLog.Action.CREATE,
+            target_model='SaleReturn',
+            target_id=sale_return.id,
+            description=(
+                f"Qaytarish yaratildi: #{sale_return.id}, "
+                f"filial='{branch.name}', jami={total_amount}"
+            ),
+        )
+
+        sale_return.refresh_from_db()
+        return Response(
+            {
+                'message': 'Qaytarish muvaffaqiyatli yaratildi. Tasdiqlash kutilmoqda.',
+                'data': SaleReturnDetailSerializer(
+                    sale_return,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    # ----------------------------------------------------------
+    # CONFIRM — tasdiqlash (@transaction.atomic)
+    # ----------------------------------------------------------
+
+    @action(methods=['patch'], detail=True, url_path='confirm')
+    @transaction.atomic
+    def confirm(self, request, pk=None):
+        """
+        PATCH /api/v1/sale-returns/{id}/confirm/
+        Faqat manager+ tasdiqlaydi.
+
+        Jarayon:
+          1. Faqat 'pending' qaytarish tasdiqlanadi
+          2. Har bir element uchun StockMovement(IN) + Stock yangilash
+          3. SaleReturn.status = 'confirmed'
+          4. AuditLog
+        """
+        sale_return = self.get_object()
+        worker      = request.user.worker
+
+        if sale_return.status != SaleReturnStatus.PENDING:
+            raise ValidationError({
+                'detail': (
+                    "Faqat kutilayotgan qaytarishni tasdiqlash mumkin. "
+                    f"Hozirgi holat: {sale_return.get_status_display()}."
+                )
+            })
+
+        branch = sale_return.branch
+
+        for item in sale_return.items.select_related('product').all():
+            product  = item.product
+            quantity = item.quantity
+
+            # StockMovement(IN) — mahsulot omborga qaytdi
+            StockMovement.objects.create(
+                product       = product,
+                branch        = branch,
+                movement_type = MovementType.IN,
+                quantity      = quantity,
+                unit_cost     = item.unit_price,
+                worker        = worker,
+                note          = f"Qaytarish #{sale_return.id} tasdiqlandi",
+            )
+
+            # Stock yangilash
+            Stock.objects.select_for_update().get_or_create(
+                product=product,
+                branch=branch,
+                defaults={'quantity': Decimal('0')},
+            )
+            Stock.objects.filter(
+                product=product,
+                branch=branch,
+            ).update(
+                quantity   = F('quantity') + quantity,
+                updated_on = timezone.now(),
+            )
+
+        sale_return.status = SaleReturnStatus.CONFIRMED
+        sale_return.save(update_fields=['status'])
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditLog.Action.UPDATE,
+            target_model='SaleReturn',
+            target_id=sale_return.id,
+            description=(
+                f"Qaytarish tasdiqlandi: #{sale_return.id}, "
+                f"filial='{branch.name}'"
+            ),
+        )
+
+        sale_return.refresh_from_db()
+        return Response(
+            {
+                'message': 'Qaytarish tasdiqlandi.',
+                'data': SaleReturnDetailSerializer(
+                    sale_return,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    # ----------------------------------------------------------
+    # CANCEL — bekor qilish
+    # ----------------------------------------------------------
+
+    @action(methods=['patch'], detail=True, url_path='cancel')
+    @transaction.atomic
+    def cancel(self, request, pk=None):
+        """
+        PATCH /api/v1/sale-returns/{id}/cancel/
+        Faqat manager+ bekor qiladi.
+        Faqat 'pending' qaytarish bekor qilinadi.
+        """
+        sale_return = self.get_object()
+
+        if sale_return.status != SaleReturnStatus.PENDING:
+            raise ValidationError({
+                'detail': (
+                    "Faqat kutilayotgan qaytarishni bekor qilish mumkin. "
+                    f"Hozirgi holat: {sale_return.get_status_display()}."
+                )
+            })
+
+        sale_return.status = SaleReturnStatus.CANCELLED
+        sale_return.save(update_fields=['status'])
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditLog.Action.UPDATE,
+            target_model='SaleReturn',
+            target_id=sale_return.id,
+            description=f"Qaytarish bekor qilindi: #{sale_return.id}",
+        )
+
+        sale_return.refresh_from_db()
+        return Response(
+            {
+                'message': 'Qaytarish bekor qilindi.',
+                'data': SaleReturnDetailSerializer(
+                    sale_return,
                     context=self.get_serializer_context(),
                 ).data,
             },

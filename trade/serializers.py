@@ -3,17 +3,22 @@
 TRADE APP — Serializerlar
 ============================================================
 Serializerlar:
-  CustomerGroupListSerializer   — GET /customer-groups/
-  CustomerGroupCreateSerializer — POST/PATCH /customer-groups/
-  CustomerListSerializer        — GET /customers/
-  CustomerDetailSerializer      — GET /customers/{id}/
-  CustomerCreateSerializer      — POST /customers/
-  CustomerUpdateSerializer      — PATCH /customers/{id}/
-  SaleItemListSerializer        — SaleDetail ichida nested
-  SaleItemInputSerializer       — SaleCreate uchun input
-  SaleListSerializer            — GET /sales/
-  SaleDetailSerializer          — GET /sales/{id}/  +  cancel/close javobida
-  SaleCreateSerializer          — POST /sales/ uchun input validatsiya
+  CustomerGroupListSerializer     — GET /customer-groups/
+  CustomerGroupCreateSerializer   — POST/PATCH /customer-groups/
+  CustomerListSerializer          — GET /customers/
+  CustomerDetailSerializer        — GET /customers/{id}/
+  CustomerCreateSerializer        — POST /customers/
+  CustomerUpdateSerializer        — PATCH /customers/{id}/
+  SaleItemListSerializer          — SaleDetail ichida nested
+  SaleItemInputSerializer         — SaleCreate uchun input
+  SaleListSerializer              — GET /sales/
+  SaleDetailSerializer            — GET /sales/{id}/  +  cancel/close javobida
+  SaleCreateSerializer            — POST /sales/ uchun input validatsiya
+  SaleReturnItemInputSerializer   — SaleReturnCreate uchun bitta element
+  SaleReturnItemListSerializer    — SaleReturnDetail ichida nested
+  SaleReturnListSerializer        — GET /sale-returns/
+  SaleReturnDetailSerializer      — GET /sale-returns/{id}/
+  SaleReturnCreateSerializer      — POST /sale-returns/ uchun input validatsiya
 """
 
 from decimal import Decimal
@@ -31,6 +36,9 @@ from .models import (
     PaymentType,
     Sale,
     SaleItem,
+    SaleReturn,
+    SaleReturnItem,
+    SaleReturnStatus,
     SaleStatus,
 )
 
@@ -446,3 +454,179 @@ class SaleCreateSerializer(serializers.Serializer):
                 "Kamida bitta mahsulot bo'lishi shart."
             )
         return value
+
+
+# ============================================================
+# QAYTARISH SERIALIZERLARI (BOSQICH 5)
+# ============================================================
+
+class SaleReturnItemInputSerializer(serializers.Serializer):
+    """SaleReturnCreate ichida har bir element uchun."""
+    product    = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
+    quantity   = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=3,
+        error_messages={
+            'required': "Miqdor kiritilishi shart.",
+            'invalid':  "To'g'ri miqdor kiritilishi shart.",
+        },
+    )
+    unit_price = serializers.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        error_messages={
+            'required': "Birlik narxi kiritilishi shart.",
+            'invalid':  "To'g'ri narx kiritilishi shart.",
+        },
+    )
+
+    def validate_quantity(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Miqdor musbat bo'lishi shart.")
+        return value
+
+    def validate_unit_price(self, value):
+        if value < 0:
+            raise serializers.ValidationError("Narx manfiy bo'lishi mumkin emas.")
+        return value
+
+
+class SaleReturnItemListSerializer(serializers.ModelSerializer):
+    """SaleReturnDetail ichida nested elementlar."""
+    product_id   = serializers.IntegerField(source='product.id',   read_only=True)
+    product_name = serializers.CharField(source='product.name',    read_only=True)
+
+    class Meta:
+        model  = SaleReturnItem
+        fields = ('id', 'product_id', 'product_name', 'quantity', 'unit_price', 'total_price')
+
+
+class SaleReturnListSerializer(serializers.ModelSerializer):
+    """GET /api/v1/sale-returns/ — ro'yxat."""
+    branch_name   = serializers.CharField(source='branch.name',   read_only=True)
+    worker_name   = serializers.SerializerMethodField()
+    customer_name = serializers.CharField(source='customer.name', read_only=True, allow_null=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    sale_id       = serializers.IntegerField(source='sale.id',    read_only=True, allow_null=True)
+
+    class Meta:
+        model  = SaleReturn
+        fields = (
+            'id', 'sale_id',
+            'branch_name', 'worker_name', 'customer_name',
+            'total_amount', 'status', 'status_display', 'created_on',
+        )
+
+    def get_worker_name(self, obj):
+        user = obj.worker.user
+        full_name = f"{user.first_name} {user.last_name}".strip()
+        return full_name or user.username
+
+
+class SaleReturnDetailSerializer(serializers.ModelSerializer):
+    """GET /api/v1/sale-returns/{id}/"""
+    branch_id      = serializers.IntegerField(source='branch.id',   read_only=True)
+    branch_name    = serializers.CharField(source='branch.name',    read_only=True)
+    worker_id      = serializers.IntegerField(source='worker.id',   read_only=True)
+    worker_name    = serializers.SerializerMethodField()
+    customer_id    = serializers.IntegerField(source='customer.id', read_only=True, allow_null=True)
+    customer_name  = serializers.CharField(source='customer.name',  read_only=True, allow_null=True)
+    smena_id       = serializers.IntegerField(source='smena.id',    read_only=True, allow_null=True)
+    sale_id        = serializers.IntegerField(source='sale.id',     read_only=True, allow_null=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    items          = SaleReturnItemListSerializer(many=True, read_only=True)
+
+    class Meta:
+        model  = SaleReturn
+        fields = (
+            'id', 'sale_id',
+            'branch_id', 'branch_name',
+            'worker_id', 'worker_name',
+            'customer_id', 'customer_name',
+            'smena_id',
+            'reason',
+            'total_amount',
+            'status', 'status_display',
+            'created_on',
+            'items',
+        )
+
+    def get_worker_name(self, obj):
+        user = obj.worker.user
+        full_name = f"{user.first_name} {user.last_name}".strip()
+        return full_name or user.username
+
+
+class SaleReturnCreateSerializer(serializers.Serializer):
+    """
+    POST /api/v1/sale-returns/ — yangi qaytarish yaratish.
+
+    sale   — ixtiyoriy (chek yo'q bo'lsa ham qaytariladi)
+    branch — majburiy (worker.branch default bo'ladi; ixtiyoriy yuborish mumkin)
+    items  — kamida 1 ta element
+    """
+    sale     = serializers.PrimaryKeyRelatedField(
+        queryset=Sale.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    customer = serializers.PrimaryKeyRelatedField(
+        queryset=Customer.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    branch   = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    reason   = serializers.CharField(required=False, allow_blank=True, default='')
+    items    = SaleReturnItemInputSerializer(many=True)
+
+    def validate_items(self, value):
+        if not value:
+            raise serializers.ValidationError("Kamida bitta mahsulot bo'lishi shart.")
+        return value
+
+    def validate(self, data):
+        request = self.context.get('request')
+        worker  = getattr(request.user, 'worker', None)
+        store   = getattr(worker, 'store', None)
+
+        # Branch validatsiya — berilmasa worker.branch ishlatiladi
+        branch = data.get('branch')
+        if branch is None:
+            branch = getattr(worker, 'branch', None)
+        if branch is None:
+            raise serializers.ValidationError(
+                {'branch': "Filial ko'rsatilishi shart."}
+            )
+        if branch.store_id != store.id:
+            raise serializers.ValidationError(
+                {'branch': "Bu filial sizning do'koningizga tegishli emas."}
+            )
+        data['branch'] = branch
+
+        # Sale validatsiya — boshqa do'kon savdosiga bog'lab bo'lmaydi
+        sale = data.get('sale')
+        if sale and sale.store_id != store.id:
+            raise serializers.ValidationError(
+                {'sale': "Bu sotuv sizning do'koningizga tegishli emas."}
+            )
+
+        # Customer validatsiya
+        customer = data.get('customer')
+        if customer and customer.store_id != store.id:
+            raise serializers.ValidationError(
+                {'customer': "Bu mijoz sizning do'koningizga tegishli emas."}
+            )
+
+        # Mahsulot store tekshiruvi
+        for item in data.get('items', []):
+            product = item['product']
+            if product.store_id != store.id:
+                raise serializers.ValidationError(
+                    {'items': f"'{product.name}' mahsuloti sizning do'koningizga tegishli emas."}
+                )
+
+        return data

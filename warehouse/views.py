@@ -29,7 +29,7 @@ StockMovement:
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Sum
 from django.http import HttpResponse
 from django.utils import timezone
 
@@ -1101,6 +1101,19 @@ class StockMovementViewSet(viewsets.ModelViewSet):
                     movement     = instance,
                     store        = store,
                 )
+                # ── AVCO: purchase_price o'rtacha tannarx bilan yangilash ──
+                # Barcha aktiv partiyalar bo'yicha weighted average hisoblanadi
+                result = (
+                    StockBatch.objects
+                    .filter(product=instance.product, qty_left__gt=0)
+                    .aggregate(
+                        total_value=Sum(F('unit_cost') * F('qty_left')),
+                        total_qty=Sum('qty_left'),
+                    )
+                )
+                if result['total_qty']:
+                    avg = result['total_value'] / result['total_qty']
+                    Product.objects.filter(pk=instance.product_id).update(purchase_price=avg)
         else:
             Stock.objects.filter(pk=stock.pk).update(
                 quantity=F('quantity') - instance.quantity,
