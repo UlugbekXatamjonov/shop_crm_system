@@ -13,6 +13,8 @@ ViewSet'lar:
   StockMovementViewSet — Kirim/chiqim harakatlarini boshqarish (branch|warehouse, FIFO)
   TransferViewSet      — Guruhlab ko'chirish (BOSQICH 1.6, FIFO propagatsiya)
   StockBatchViewSet    — FIFO partiyalar (read-only, BOSQICH 1.7)
+  WastageRecordViewSet — Isrof yozuvlari (B7, POST → StockMovement(OUT) avtomatik)
+  StockAuditViewSet    — Inventarizatsiya (B8, confirm → StockMovement(IN|OUT) avtomatik)
 
 Ruxsatlar:
   list/retrieve → CanAccess('mahsulotlar') yoki CanAccess('ombor')
@@ -42,19 +44,25 @@ from rest_framework.response import Response
 from accaunt.models import AuditLog
 from accaunt.permissions import CanAccess, IsManagerOrAbove
 
+from config.cache_utils import get_store_settings
+
 from .models import (
+    AuditStatus,
     Category,
     Currency,
     ExchangeRate,
     MovementType,
     Product,
     Stock,
+    StockAudit,
+    StockAuditItem,
     StockBatch,
     StockMovement,
     SubCategory,
     Transfer,
     TransferStatus,
     Warehouse,
+    WastageRecord,
 )
 from .serializers import (
     CategoryCreateSerializer,
@@ -74,6 +82,10 @@ from .serializers import (
     ProductDetailSerializer,
     ProductListSerializer,
     ProductUpdateSerializer,
+    StockAuditCreateSerializer,
+    StockAuditDetailSerializer,
+    StockAuditItemUpdateSerializer,
+    StockAuditListSerializer,
     StockBatchSerializer,
     StockCreateSerializer,
     StockDetailSerializer,
@@ -86,6 +98,9 @@ from .serializers import (
     TransferCreateSerializer,
     TransferDetailSerializer,
     TransferListSerializer,
+    WastageRecordCreateSerializer,
+    WastageRecordDetailSerializer,
+    WastageRecordListSerializer,
     WarehouseCreateSerializer,
     WarehouseDetailSerializer,
     WarehouseListSerializer,
@@ -1518,3 +1533,562 @@ class StockBatchViewSet(viewsets.ReadOnlyModelViewSet):
         if product_id:
             qs = qs.filter(product_id=product_id)
         return qs
+
+
+# ============================================================
+# ISROF (WASTAGE) VIEWSET  B7
+# ============================================================
+
+class WastageRecordViewSet(viewsets.ModelViewSet):
+    """
+    Isrof yozuvlarini boshqarish.
+
+    Endpointlar:
+      GET    /api/v1/warehouse/wastages/        — ro'yxat
+      POST   /api/v1/warehouse/wastages/        — yangi isrof yozuvi
+      GET    /api/v1/warehouse/wastages/{id}/   — tafsilotlar
+
+    Muhim:
+      Yaratilganda AVTOMATIK StockMovement(OUT) va Stock kamayadi (FIFO).
+      Isrof yozuvlari o'zgartirilmaydi va o'chirilmaydi (immutable log).
+
+    Filtrlash:
+      ?branch=<id>     — filial bo'yicha
+      ?warehouse=<id>  — ombor bo'yicha
+      ?product=<id>    — mahsulot bo'yicha
+      ?date=YYYY-MM-DD — sana bo'yicha
+
+    Ruxsatlar:
+      list/retrieve → CanAccess('ombor')
+      create        → IsManagerOrAbove
+    """
+    http_method_names = ['get', 'post']
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated(), CanAccess('ombor')]
+        return [IsAuthenticated(), IsManagerOrAbove()]
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return WastageRecordListSerializer
+        if self.action == 'create':
+            return WastageRecordCreateSerializer
+        return WastageRecordDetailSerializer
+
+    def get_queryset(self):
+        worker = getattr(self.request.user, 'worker', None)
+        if not worker or not worker.store:
+            return WastageRecord.objects.none()
+        qs = (
+            WastageRecord.objects
+            .filter(store=worker.store)
+            .select_related('product', 'branch', 'warehouse', 'worker__user')
+        )
+        branch_id    = self.request.query_params.get('branch')
+        warehouse_id = self.request.query_params.get('warehouse')
+        product_id   = self.request.query_params.get('product')
+        date_str     = self.request.query_params.get('date')
+        if branch_id:
+            qs = qs.filter(branch_id=branch_id)
+        if warehouse_id:
+            qs = qs.filter(warehouse_id=warehouse_id)
+        if product_id:
+            qs = qs.filter(product_id=product_id)
+        if date_str:
+            qs = qs.filter(date=date_str)
+        return qs
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        worker = getattr(self.request.user, 'worker', None)
+        if worker:
+            context['store'] = worker.store
+        return context
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        worker   = getattr(self.request.user, 'worker', None)
+        store    = getattr(worker, 'store', None)
+        settings = get_store_settings(store.id) if store else None
+
+        # StoreSettings: isrof yoqilganligini tekshirish
+        if settings and not settings.wastage_enabled:
+            raise ValidationError({
+                'detail': "Isrof funksiyasi bu do'konda o'chirib qo'yilgan."
+            })
+
+        instance = serializer.save(store=store, worker=worker)
+
+        # ── Stock: FIFO yechish (select_for_update + F()) ──────────────────
+        if instance.branch_id:
+            stock, _ = Stock.objects.select_for_update().get_or_create(
+                product=instance.product,
+                branch=instance.branch,
+                warehouse=None,
+                defaults={'quantity': 0},
+            )
+        else:
+            stock, _ = Stock.objects.select_for_update().get_or_create(
+                product=instance.product,
+                branch=None,
+                warehouse=instance.warehouse,
+                defaults={'quantity': 0},
+            )
+
+        Stock.objects.filter(pk=stock.pk).update(
+            quantity=F('quantity') - instance.quantity,
+            updated_on=timezone.now(),
+        )
+
+        # ── StockMovement(OUT) — immutable log ─────────────────────────────
+        movement = StockMovement.objects.create(
+            product       = instance.product,
+            branch        = instance.branch,
+            warehouse     = instance.warehouse,
+            movement_type = MovementType.OUT,
+            quantity      = instance.quantity,
+            note          = f"Isrof: {instance.get_reason_display()}. {instance.note}".strip('. '),
+            worker        = worker,
+        )
+
+        # ── FIFO: OUT harakati uchun partiyalardan yechib olish ────────────
+        if store:
+            loc_kwargs = {
+                'branch':    instance.branch,
+                'warehouse': instance.warehouse,
+            }
+            deductions, total_cost = fifo_deduct(
+                instance.product, loc_kwargs, instance.quantity
+            )
+            if instance.quantity > 0 and deductions:
+                avg_cost = total_cost / instance.quantity
+                StockMovement.objects.filter(pk=movement.pk).update(unit_cost=avg_cost)
+
+        AuditLog.objects.create(
+            actor=self.request.user,
+            action=AuditLog.Action.CREATE,
+            target_model='WastageRecord',
+            target_id=instance.id,
+            description=(
+                f"Isrof yozildi: '{instance.product.name}' × {instance.quantity} "
+                f"({instance.get_reason_display()})"
+            ),
+        )
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(
+            {
+                'message': "Isrof muvaffaqiyatli qayd etildi.",
+                'data': WastageRecordDetailSerializer(
+                    serializer.instance,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+# ============================================================
+# INVENTARIZATSIYA (STOCK AUDIT) VIEWSET  B8
+# ============================================================
+
+class StockAuditViewSet(viewsets.ModelViewSet):
+    """
+    Inventarizatsiyani boshqarish.
+
+    Endpointlar:
+      GET    /api/v1/warehouse/audits/                        — ro'yxat
+      POST   /api/v1/warehouse/audits/                        — yangi inventarizatsiya (draft)
+      GET    /api/v1/warehouse/audits/{id}/                   — tafsilotlar (nested items bilan)
+      POST   /api/v1/warehouse/audits/{id}/confirm/           — tasdiqlash (StockMovement avtomatik)
+      POST   /api/v1/warehouse/audits/{id}/cancel/            — bekor qilish (faqat draft)
+      PATCH  /api/v1/warehouse/audits/{id}/items/{item_id}/   — satr actual_qty yangilash
+
+    Holat o'tishi:
+      draft → confirmed: har bir satr uchun diff asosida StockMovement(IN|OUT) yaratiladi.
+      draft → cancelled: hech narsa o'zgarmaydi.
+
+    Ruxsatlar:
+      list/retrieve/update_item → CanAccess('ombor')
+      create/confirm/cancel     → IsManagerOrAbove
+
+    Filtrlash:
+      ?status=draft|confirmed|cancelled
+      ?branch=<id>
+      ?warehouse=<id>
+    """
+    http_method_names = ['get', 'post', 'patch']
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve', 'update_item'):
+            return [IsAuthenticated(), CanAccess('ombor')]
+        return [IsAuthenticated(), IsManagerOrAbove()]
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return StockAuditListSerializer
+        if self.action == 'create':
+            return StockAuditCreateSerializer
+        return StockAuditDetailSerializer
+
+    def get_queryset(self):
+        worker = getattr(self.request.user, 'worker', None)
+        if not worker or not worker.store:
+            return StockAudit.objects.none()
+        qs = (
+            StockAudit.objects
+            .filter(store=worker.store)
+            .select_related('branch', 'warehouse', 'worker__user')
+            .prefetch_related('items__product')
+        )
+        status_filter = self.request.query_params.get('status')
+        branch_id     = self.request.query_params.get('branch')
+        warehouse_id  = self.request.query_params.get('warehouse')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        if branch_id:
+            qs = qs.filter(branch_id=branch_id)
+        if warehouse_id:
+            qs = qs.filter(warehouse_id=warehouse_id)
+        return qs
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        worker = getattr(self.request.user, 'worker', None)
+        if worker:
+            context['store'] = worker.store
+        return context
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        worker   = getattr(self.request.user, 'worker', None)
+        store    = getattr(worker, 'store', None)
+        settings = get_store_settings(store.id) if store else None
+
+        # StoreSettings: inventarizatsiya yoqilganligini tekshirish
+        if settings and not settings.stock_audit_enabled:
+            raise ValidationError({
+                'detail': "Inventarizatsiya funksiyasi bu do'konda o'chirib qo'yilgan."
+            })
+
+        audit = serializer.save(store=store, worker=worker)
+
+        # ── StockAuditItem'larni avtomatik yaratish ────────────────────────
+        # Tanlangan joy (branch|warehouse) dagi barcha Stock qatorlari uchun
+        branch    = audit.branch
+        warehouse = audit.warehouse
+
+        if branch:
+            stocks = Stock.objects.filter(
+                branch=branch, warehouse__isnull=True
+            ).select_related('product')
+        else:
+            stocks = Stock.objects.filter(
+                warehouse=warehouse, branch__isnull=True
+            ).select_related('product')
+
+        items_to_create = []
+        for stock in stocks:
+            items_to_create.append(
+                StockAuditItem(
+                    audit        = audit,
+                    product      = stock.product,
+                    expected_qty = stock.quantity,
+                    actual_qty   = stock.quantity,   # xodim keyinroq o'zgartiradi
+                )
+            )
+
+        if items_to_create:
+            StockAuditItem.objects.bulk_create(items_to_create)
+
+        location_name = branch.name if branch else warehouse.name
+        AuditLog.objects.create(
+            actor=self.request.user,
+            action=AuditLog.Action.CREATE,
+            target_model='StockAudit',
+            target_id=audit.id,
+            description=(
+                f"Inventarizatsiya yaratildi (draft): '{location_name}', "
+                f"{len(items_to_create)} ta mahsulot"
+            ),
+        )
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(
+            {
+                'message': "Inventarizatsiya muvaffaqiyatli yaratildi. Satrlarni to'ldirib, /confirm/ bilan tasdiqlang.",
+                'data': StockAuditDetailSerializer(
+                    serializer.instance,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=['post'], url_path='confirm')
+    @transaction.atomic
+    def confirm(self, request, pk=None):
+        """
+        Inventarizatsiyani tasdiqlash.
+
+        Jarayon:
+          1. Status draft ekanligini tekshirish
+          2. Har bir satr uchun diff = actual_qty - expected_qty
+             diff > 0 → StockMovement(IN,  qty=diff,     note='Inventarizatsiya: oshiqcha')
+             diff < 0 → StockMovement(OUT, qty=abs(diff), note='Inventarizatsiya: kamomad')
+             diff == 0 → skip
+          3. OUT harakatlar uchun qoldiq yetarliligini avvaldan tekshirish
+          4. Stock'larni yangilash + FIFO deduct (OUT uchun)
+          5. StockAudit.status = confirmed, confirmed_on = now()
+          6. AuditLog
+        """
+        audit = self.get_object()
+
+        if audit.status != AuditStatus.DRAFT:
+            return Response(
+                {
+                    'error': (
+                        f"Faqat 'draft' inventarizatsiyani tasdiqlash mumkin. "
+                        f"Hozirgi holat: '{audit.get_status_display()}'."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        items = list(audit.items.select_related('product').all())
+        if not items:
+            return Response(
+                {'error': "Inventarizatsiya bo'sh — hech qanday mahsulot yo'q."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        branch    = audit.branch
+        warehouse = audit.warehouse
+        worker    = getattr(request.user, 'worker', None)
+        store     = getattr(worker, 'store', None)
+
+        # ── QADAM 1: OUT bo'ladigan satrlar uchun qoldiq tekshirish ─────────
+        errors = []
+        for item in items:
+            diff = item.actual_qty - item.expected_qty
+            if diff < 0:
+                abs_diff = abs(diff)
+                if branch:
+                    stock, _ = Stock.objects.select_for_update().get_or_create(
+                        product=item.product, branch=branch, warehouse=None,
+                        defaults={'quantity': 0},
+                    )
+                else:
+                    stock, _ = Stock.objects.select_for_update().get_or_create(
+                        product=item.product, branch=None, warehouse=warehouse,
+                        defaults={'quantity': 0},
+                    )
+                if stock.quantity < abs_diff:
+                    errors.append(
+                        f"'{item.product.name}': qoldiq yetarli emas "
+                        f"({stock.quantity} bor, {abs_diff} chiqim kerak)."
+                    )
+
+        if errors:
+            return Response(
+                {'errors': errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # ── QADAM 2: Har bir satr uchun harakat va stock yangilash ──────────
+        for item in items:
+            diff = item.actual_qty - item.expected_qty
+            if diff == 0:
+                continue
+
+            movement_type = MovementType.IN if diff > 0 else MovementType.OUT
+            qty           = abs(diff)
+            note_text     = (
+                'Inventarizatsiya: oshiqcha' if diff > 0 else 'Inventarizatsiya: kamomad'
+            )
+
+            movement = StockMovement.objects.create(
+                product       = item.product,
+                branch        = branch,
+                warehouse     = warehouse,
+                movement_type = movement_type,
+                quantity      = qty,
+                unit_cost     = item.product.purchase_price,
+                note          = note_text,
+                worker        = worker,
+            )
+
+            # Stock yangilash (F() — atomic)
+            if branch:
+                stock, _ = Stock.objects.select_for_update().get_or_create(
+                    product=item.product, branch=branch, warehouse=None,
+                    defaults={'quantity': 0},
+                )
+            else:
+                stock, _ = Stock.objects.select_for_update().get_or_create(
+                    product=item.product, branch=None, warehouse=warehouse,
+                    defaults={'quantity': 0},
+                )
+
+            if movement_type == MovementType.IN:
+                Stock.objects.filter(pk=stock.pk).update(
+                    quantity=F('quantity') + qty,
+                    updated_on=timezone.now(),
+                )
+                # FIFO: IN partiya yaratish
+                if store:
+                    from .utils import generate_batch_code
+                    batch_code = generate_batch_code(store)
+                    StockBatch.objects.create(
+                        batch_code   = batch_code,
+                        product      = item.product,
+                        branch       = branch,
+                        warehouse    = warehouse,
+                        unit_cost    = item.product.purchase_price or 0,
+                        qty_received = qty,
+                        qty_left     = qty,
+                        movement     = movement,
+                        store        = store,
+                    )
+            else:
+                Stock.objects.filter(pk=stock.pk).update(
+                    quantity=F('quantity') - qty,
+                    updated_on=timezone.now(),
+                )
+                # FIFO: OUT partiyalardan yechib olish
+                if store:
+                    loc_kwargs = {'branch': branch, 'warehouse': warehouse}
+                    deductions, total_cost = fifo_deduct(item.product, loc_kwargs, qty)
+                    if qty > 0 and deductions:
+                        avg_cost = total_cost / qty
+                        StockMovement.objects.filter(pk=movement.pk).update(unit_cost=avg_cost)
+
+        # ── QADAM 3: Audit holati yangilash ─────────────────────────────────
+        audit.status       = AuditStatus.CONFIRMED
+        audit.confirmed_on = timezone.now()
+        audit.save(update_fields=['status', 'confirmed_on'])
+
+        location_name = branch.name if branch else warehouse.name
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditLog.Action.UPDATE,
+            target_model='StockAudit',
+            target_id=audit.id,
+            description=(
+                f"Inventarizatsiya tasdiqlandi: '{location_name}', "
+                f"{len(items)} ta mahsulot tekshirildi"
+            ),
+        )
+
+        return Response(
+            {
+                'message': "Inventarizatsiya tasdiqlandi.",
+                'data': StockAuditDetailSerializer(
+                    audit,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=['post'], url_path='cancel')
+    def cancel(self, request, pk=None):
+        """
+        Inventarizatsiyani bekor qilish.
+        Faqat 'draft' holatdagi inventarizatsiyani bekor qilish mumkin.
+        Stock o'zgarmaydi.
+        """
+        audit = self.get_object()
+
+        if audit.status != AuditStatus.DRAFT:
+            return Response(
+                {
+                    'error': (
+                        f"Faqat 'draft' inventarizatsiyani bekor qilish mumkin. "
+                        f"Hozirgi holat: '{audit.get_status_display()}'."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        audit.status = AuditStatus.CANCELLED
+        audit.save(update_fields=['status'])
+
+        location_name = audit.branch.name if audit.branch_id else audit.warehouse.name
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditLog.Action.DELETE,
+            target_model='StockAudit',
+            target_id=audit.id,
+            description=f"Inventarizatsiya bekor qilindi: '{location_name}'",
+        )
+
+        return Response(
+            {
+                'message': "Inventarizatsiya bekor qilindi.",
+                'data': StockAuditDetailSerializer(
+                    audit,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=True,
+        methods=['patch'],
+        url_path=r'items/(?P<item_id>[^/.]+)',
+    )
+    def update_item(self, request, pk=None, item_id=None):
+        """
+        Inventarizatsiya satrini yangilash — actual_qty ni kiritish.
+
+        PATCH /api/v1/warehouse/audits/{id}/items/{item_id}/
+        Body: { "actual_qty": 12.500 }
+
+        Faqat DRAFT holatdagi inventarizatsiya satrini yangilash mumkin.
+        """
+        audit = self.get_object()
+
+        if audit.status != AuditStatus.DRAFT:
+            return Response(
+                {
+                    'error': (
+                        f"Faqat 'draft' inventarizatsiya satrini yangilash mumkin. "
+                        f"Audit holati: '{audit.get_status_display()}'."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            item = audit.items.get(pk=item_id)
+        except StockAuditItem.DoesNotExist:
+            return Response(
+                {'error': "Bunday inventarizatsiya satri topilmadi."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = StockAuditItemUpdateSerializer(
+            item,
+            data=request.data,
+            partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        from .serializers import StockAuditItemSerializer
+        return Response(
+            {
+                'message': "Inventarizatsiya satri yangilandi.",
+                'data': StockAuditItemSerializer(item).data,
+            },
+            status=status.HTTP_200_OK,
+        )

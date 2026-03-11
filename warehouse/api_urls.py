@@ -57,6 +57,17 @@ Router avtomatik quyidagi URL'larni yaratadi:
 
   GET    /api/v1/warehouse/batches/              — FIFO partiyalar ro'yxati (?product=<id>)
   GET    /api/v1/warehouse/batches/{id}/         — partiya tafsilotlari
+
+  GET    /api/v1/warehouse/wastages/             — isrof ro'yxati (?branch=, ?warehouse=, ?product=, ?date=)
+  POST   /api/v1/warehouse/wastages/             — yangi isrof yozuvi (StockMovement(OUT) avtomatik)
+  GET    /api/v1/warehouse/wastages/{id}/        — isrof tafsilotlari
+
+  GET    /api/v1/warehouse/audits/               — inventarizatsiyalar ro'yxati (?status=, ?branch=, ?warehouse=)
+  POST   /api/v1/warehouse/audits/               — yangi inventarizatsiya (draft, items avtomatik)
+  GET    /api/v1/warehouse/audits/{id}/          — tafsilotlar (nested items bilan)
+  POST   /api/v1/warehouse/audits/{id}/confirm/  — tasdiqlash (StockMovement avtomatik)
+  POST   /api/v1/warehouse/audits/{id}/cancel/   — bekor qilish (faqat draft)
+  PATCH  /api/v1/warehouse/audits/{id}/items/{item_id}/ — satr actual_qty yangilash
 """
 
 from rest_framework.routers import DefaultRouter
@@ -66,11 +77,13 @@ from .views import (
     CurrencyViewSet,
     ExchangeRateViewSet,
     ProductViewSet,
+    StockAuditViewSet,
     StockBatchViewSet,
     StockMovementViewSet,
     StockViewSet,
     SubCategoryViewSet,
     TransferViewSet,
+    WastageRecordViewSet,
     WarehouseViewSet,
 )
 
@@ -85,5 +98,7 @@ router.register(r'stocks',         StockViewSet,         basename='stock')
 router.register(r'movements',      StockMovementViewSet, basename='movement')
 router.register(r'transfers',      TransferViewSet,      basename='transfer')
 router.register(r'batches',        StockBatchViewSet,    basename='batch')
+router.register(r'wastages',       WastageRecordViewSet, basename='wastage')
+router.register(r'audits',         StockAuditViewSet,    basename='audit')
 
 urlpatterns = router.urls

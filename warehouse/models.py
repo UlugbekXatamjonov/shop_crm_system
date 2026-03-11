@@ -4,9 +4,11 @@ WAREHOUSE APP — Modellar
 ============================================================
 Modellar:
   ProductUnit     — Mahsulot o'lchov birliklari (TextChoices)
-  ActiveStatus   — Mahsulot/kategoriya holati (TextChoices)
+  ActiveStatus    — Mahsulot/kategoriya holati (TextChoices)
   MovementType    — Kirim/chiqim turi (TextChoices)
   TransferStatus  — Transfer holati (TextChoices)
+  WastageReason   — Isrof sababi (TextChoices): expired|damaged|stolen|other
+  AuditStatus     — Inventarizatsiya holati (TextChoices): draft|confirmed|cancelled
   Category        — Mahsulot kategoriyasi
   SubCategory     — Mahsulot subkategoriyasi (ixtiyoriy, StoreSettings.subcategory_enabled)
   Currency        — Valyuta (UZS, USD, EUR, RUB, ...)
@@ -18,6 +20,9 @@ Modellar:
   Transfer        — Tovar ko'chirish (Filial↔Ombor↔Filial, guruhlab)
   TransferItem    — Transfer satri (1 Transfer → N mahsulot)
   StockBatch      — FIFO partiya (har bir IN harakati uchun, qty_left kamayadi)
+  WastageRecord   — Isrof/chiqindi (B7, yaratilganda StockMovement(OUT) avtomatik)
+  StockAudit      — Inventarizatsiya sarlavhasi (B8, draft→confirmed→StockMovement avtomatik)
+  StockAuditItem  — Inventarizatsiya satri (expected_qty vs actual_qty)
 
 Muhim farq:
   Branch (Filial)   — sotuv nuqtasi (kassa, sotuvchi).
@@ -39,7 +44,7 @@ FIFO (StockBatch):
 """
 
 from django.db import models
-from django.db.models import Q, CheckConstraint
+from django.db.models import Q, CheckConstraint, UniqueConstraint
 
 from store.models import Branch, Store
 
@@ -72,6 +77,19 @@ class MovementType(models.TextChoices):
 
 class TransferStatus(models.TextChoices):
     PENDING   = 'pending',   'Kutilmoqda'
+    CONFIRMED = 'confirmed', 'Tasdiqlangan'
+    CANCELLED = 'cancelled', 'Bekor qilingan'
+
+
+class WastageReason(models.TextChoices):
+    EXPIRED  = 'expired',  'Muddati o\'tgan'
+    DAMAGED  = 'damaged',  'Shikastlangan'
+    STOLEN   = 'stolen',   'O\'g\'irlangan'
+    OTHER    = 'other',    'Boshqa'
+
+
+class AuditStatus(models.TextChoices):
+    DRAFT     = 'draft',     'Qoralama'
     CONFIRMED = 'confirmed', 'Tasdiqlangan'
     CANCELLED = 'cancelled', 'Bekor qilingan'
 
@@ -856,3 +874,247 @@ class StockBatch(models.Model):
     def __str__(self) -> str:
         location = self.branch.name if self.branch_id else self.warehouse.name
         return f"{self.batch_code}: {self.product.name} @ {location} — qoldiq: {self.qty_left}"
+
+
+# ============================================================
+# ISROF / CHIQINDI (BOSQICH 7)
+# ============================================================
+
+class WastageRecord(models.Model):
+    """
+    Isrof / chiqindi yozuvi.
+
+    ⚠️ Yaratilganda AVTOMATIK StockMovement(OUT) + Stock kamayadi.
+    ⚠️ O'chirib bo'lmaydi — xatolikni tuzatish uchun yangi kirim (IN) yarating.
+
+    Constraint:
+      branch YOKI warehouse — aynan bittasi (Stock constraint kabi).
+    """
+    product   = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name='wastages',
+        verbose_name='Mahsulot',
+    )
+    branch    = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        null=True, blank=True,
+        related_name='wastages',
+        verbose_name='Filial',
+    )
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.PROTECT,
+        null=True, blank=True,
+        related_name='wastages',
+        verbose_name='Ombor',
+    )
+    store     = models.ForeignKey(
+        'store.Store',
+        on_delete=models.PROTECT,
+        related_name='wastages',
+        verbose_name="Do'kon",
+    )
+    worker    = models.ForeignKey(
+        'accaunt.Worker',
+        on_delete=models.PROTECT,
+        related_name='wastages',
+        verbose_name='Xodim',
+    )
+    smena     = models.ForeignKey(
+        'store.Smena',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='wastages',
+        verbose_name='Smena',
+    )
+    quantity  = models.DecimalField(
+        max_digits=14,
+        decimal_places=3,
+        verbose_name='Miqdori',
+    )
+    reason    = models.CharField(
+        max_length=10,
+        choices=WastageReason.choices,
+        default=WastageReason.OTHER,
+        verbose_name='Sababi',
+    )
+    note      = models.TextField(
+        blank=True,
+        verbose_name='Izoh',
+    )
+    date      = models.DateField(
+        verbose_name='Sana',
+    )
+    created_on = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Yaratilgan vaqti',
+    )
+
+    class Meta:
+        verbose_name        = 'Isrof yozuvi'
+        verbose_name_plural = 'Isrof yozuvlari'
+        ordering            = ['-date', '-created_on']
+        constraints         = [
+            CheckConstraint(
+                check=(
+                    Q(branch__isnull=False, warehouse__isnull=True) |
+                    Q(branch__isnull=True,  warehouse__isnull=False)
+                ),
+                name='wastage_branch_xor_warehouse',
+            )
+        ]
+
+    def __str__(self) -> str:
+        location = self.branch.name if self.branch_id else self.warehouse.name
+        return (
+            f"Isrof #{self.pk}: {self.product.name} × {self.quantity}"
+            f" @ {location} ({self.get_reason_display()})"
+        )
+
+
+# ============================================================
+# INVENTARIZATSIYA (BOSQICH 8)
+# ============================================================
+
+class StockAudit(models.Model):
+    """
+    Inventarizatsiya sarlavhasi.
+
+    Holat o'tishi:
+      draft     → confirmed  → StockMovement(IN|OUT) avtomatik (farq asosida)
+      draft     → cancelled  → hech narsa o'zgarmaydi
+      confirmed → immutable
+      cancelled → immutable
+
+    Constraint:
+      branch YOKI warehouse — aynan bittasi.
+      Bir joyda faqat 1 ta DRAFT audit (UniqueConstraint).
+    """
+    branch       = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        null=True, blank=True,
+        related_name='audits',
+        verbose_name='Filial',
+    )
+    warehouse    = models.ForeignKey(
+        Warehouse,
+        on_delete=models.PROTECT,
+        null=True, blank=True,
+        related_name='audits',
+        verbose_name='Ombor',
+    )
+    store        = models.ForeignKey(
+        'store.Store',
+        on_delete=models.PROTECT,
+        related_name='audits',
+        verbose_name="Do'kon",
+    )
+    worker       = models.ForeignKey(
+        'accaunt.Worker',
+        on_delete=models.PROTECT,
+        related_name='audits',
+        verbose_name='Inventarizatsiya o\'tkazdi',
+    )
+    status       = models.CharField(
+        max_length=10,
+        choices=AuditStatus.choices,
+        default=AuditStatus.DRAFT,
+        verbose_name='Holat',
+    )
+    note         = models.TextField(
+        blank=True,
+        verbose_name='Izoh',
+    )
+    created_on   = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Yaratilgan vaqti',
+    )
+    confirmed_on = models.DateTimeField(
+        null=True, blank=True,
+        verbose_name='Tasdiqlangan vaqti',
+    )
+
+    class Meta:
+        verbose_name        = 'Inventarizatsiya'
+        verbose_name_plural = 'Inventarizatsiyalar'
+        ordering            = ['-created_on']
+        constraints         = [
+            CheckConstraint(
+                check=(
+                    Q(branch__isnull=False, warehouse__isnull=True) |
+                    Q(branch__isnull=True,  warehouse__isnull=False)
+                ),
+                name='audit_branch_xor_warehouse',
+            ),
+            # Bir joyda faqat 1 ta DRAFT bo'lishi mumkin
+            UniqueConstraint(
+                fields=['branch', 'status'],
+                condition=Q(status='draft', branch__isnull=False),
+                name='unique_draft_audit_branch',
+            ),
+            UniqueConstraint(
+                fields=['warehouse', 'status'],
+                condition=Q(status='draft', warehouse__isnull=False),
+                name='unique_draft_audit_warehouse',
+            ),
+        ]
+
+    def __str__(self) -> str:
+        location = self.branch.name if self.branch_id else self.warehouse.name
+        return f"Inventarizatsiya #{self.pk}: {location} — {self.get_status_display()}"
+
+
+class StockAuditItem(models.Model):
+    """
+    Inventarizatsiya satri — bitta mahsulot.
+
+    expected_qty — tizim ma'lumotiga ko'ra (yaratishda Stock.quantity dan olinadi)
+    actual_qty   — xodim hisoblagan miqdor (qo'lda kiritiladi)
+    difference   — actual_qty - expected_qty (property, computed)
+
+    Tasdiqlashda (StockAudit.confirm()):
+      difference > 0 → StockMovement(IN,  note='Inventarizatsiya: oshiqcha')
+      difference < 0 → StockMovement(OUT, note='Inventarizatsiya: kamomad')
+      difference == 0 → harakat yo'q
+    """
+    audit        = models.ForeignKey(
+        StockAudit,
+        on_delete=models.CASCADE,
+        related_name='items',
+        verbose_name='Inventarizatsiya',
+    )
+    product      = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name='audit_items',
+        verbose_name='Mahsulot',
+    )
+    expected_qty = models.DecimalField(
+        max_digits=14,
+        decimal_places=3,
+        verbose_name='Kutilgan miqdor (tizim)',
+    )
+    actual_qty   = models.DecimalField(
+        max_digits=14,
+        decimal_places=3,
+        verbose_name='Haqiqiy miqdor (xodim)',
+    )
+
+    class Meta:
+        verbose_name        = 'Inventarizatsiya satri'
+        verbose_name_plural = 'Inventarizatsiya satrlari'
+        unique_together     = [('audit', 'product')]
+
+    @property
+    def difference(self):
+        """actual_qty - expected_qty. Musbat = oshiqcha, manfiy = kamomad."""
+        return self.actual_qty - self.expected_qty
+
+    def __str__(self) -> str:
+        return (
+            f"{self.product.name}: kutilgan={self.expected_qty},"
+            f" haqiqiy={self.actual_qty}, farq={self.difference}"
+        )
