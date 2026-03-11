@@ -616,27 +616,36 @@ class SmenaViewSet(viewsets.ModelViewSet):
     def _build_report(self, smena: Smena) -> dict:
         """
         X/Z report ma'lumotlarini quriladi.
-        Lazy import ishlatiladi — trade.models dan circular import oldini olish uchun.
+        Lazy import ishlatiladi — circular import oldini olish uchun.
 
-        ⚠️ BOSQICH 6 da: Expense modeli qo'shilgandan keyin
-              expenses_total to'ldiriladi.
+        Qaytarilgan ma'lumotlar:
+          sales_count, sales_total, by_payment
+          returns_count, returns_total, net_sales_total
+          expenses_total, expenses_by_category
+          wastage_count
+          by_worker        — xodim bo'yicha savdo ko'rsatkichlari
+          net_income       — naqd tushumdan xarajatlar ayrilgandan keyingi qoldiq
+          period, cash_start, cash_end
         """
-        # Lazy import — trade → store circular import ni oldini oladi
-        from django.db.models import Sum, Count
-        from trade.models import Sale, SaleStatus, PaymentType
+        # Lazy imports — circular import oldini olish uchun
+        from django.db.models import Sum, Count, Value
+        from django.db.models.functions import Coalesce
+        from trade.models import Sale, SaleStatus, PaymentType, SaleReturn, SaleReturnStatus
+        from expense.models import Expense
+        from warehouse.models import WastageRecord
 
+        # ── Sotuvlar (completed) ───────────────────────────────────────────────
         completed_sales = Sale.objects.filter(
             smena=smena,
             status=SaleStatus.COMPLETED,
         )
 
-        # Umumiy ko'rsatkichlar
-        agg = completed_sales.aggregate(
-            total=Sum('total_price'),
+        sale_agg = completed_sales.aggregate(
+            total=Coalesce(Sum('total_price'), Value(0, output_field=Sum('total_price').output_field)),
             count=Count('id'),
         )
-        sales_total = agg['total'] or 0
-        sales_count = agg['count'] or 0
+        sales_total = sale_agg['total'] or 0
+        sales_count = sale_agg['count'] or 0
 
         # To'lov turi bo'yicha
         def _sum_by_payment(ptype):
@@ -654,6 +663,81 @@ class SmenaViewSet(viewsets.ModelViewSet):
             'debt':  _sum_by_payment(PaymentType.DEBT),
         }
 
+        # ── Qaytarishlar (confirmed) ───────────────────────────────────────────
+        confirmed_returns = SaleReturn.objects.filter(
+            smena=smena,
+            status=SaleReturnStatus.CONFIRMED,
+        )
+        return_agg = confirmed_returns.aggregate(
+            total=Sum('total_amount'),
+            count=Count('id'),
+        )
+        returns_total = return_agg['total'] or 0
+        returns_count = return_agg['count'] or 0
+        net_sales_total = sales_total - returns_total
+
+        # ── Xarajatlar ────────────────────────────────────────────────────────
+        expenses_qs = Expense.objects.filter(smena=smena)
+        expenses_total = expenses_qs.aggregate(
+            total=Sum('amount')
+        )['total'] or 0
+
+        # Kategoriya bo'yicha xarajatlar
+        expenses_by_category = list(
+            expenses_qs
+            .values('category__name')
+            .annotate(total=Sum('amount'), count=Count('id'))
+            .order_by('-total')
+        )
+        expenses_by_category = [
+            {
+                'category': row['category__name'],
+                'total':    str(row['total']),
+                'count':    row['count'],
+            }
+            for row in expenses_by_category
+        ]
+
+        # ── Isroflar ──────────────────────────────────────────────────────────
+        wastage_agg = WastageRecord.objects.filter(smena=smena).aggregate(
+            count=Count('id'),
+        )
+        wastage_count = wastage_agg['count'] or 0
+
+        # ── Xodim bo'yicha savdo ───────────────────────────────────────────────
+        by_worker_rows = (
+            completed_sales
+            .values(
+                'worker__id',
+                'worker__user__first_name',
+                'worker__user__last_name',
+            )
+            .annotate(
+                sales_count=Count('id'),
+                sales_total=Sum('total_price'),
+            )
+            .order_by('-sales_total')
+        )
+        by_worker = [
+            {
+                'worker_id':  row['worker__id'],
+                'name': (
+                    f"{row['worker__user__first_name']} "
+                    f"{row['worker__user__last_name']}".strip()
+                ),
+                'sales_count': row['sales_count'],
+                'sales_total': str(row['sales_total'] or '0.00'),
+            }
+            for row in by_worker_rows
+        ]
+
+        # ── Naqd qoldiq ───────────────────────────────────────────────────────
+        # Naqd tushum (cash + mixed) - naqd xarajatlar
+        cash_income_raw = completed_sales.filter(
+            payment_type__in=[PaymentType.CASH, PaymentType.MIXED]
+        ).aggregate(s=Sum('paid_amount'))['s'] or 0
+        net_income = cash_income_raw - expenses_total
+
         return {
             'period': {
                 'start': smena.start_time.strftime('%Y-%m-%d | %H:%M'),
@@ -662,12 +746,23 @@ class SmenaViewSet(viewsets.ModelViewSet):
                     if smena.end_time else None
                 ),
             },
-            'sales_count':    sales_count,
-            'sales_total':    str(sales_total),
-            'by_payment':     by_payment,
-            # --- BOSQICH 6 da to'ldiriladi ---
-            'expenses_total': '0.00',
-            # --- Naqd hisobi ---
+            # Sotuvlar
+            'sales_count':     sales_count,
+            'sales_total':     str(sales_total),
+            'by_payment':      by_payment,
+            # Qaytarishlar
+            'returns_count':   returns_count,
+            'returns_total':   str(returns_total),
+            'net_sales_total': str(net_sales_total),
+            # Xarajatlar
+            'expenses_total':       str(expenses_total),
+            'expenses_by_category': expenses_by_category,
+            # Isroflar
+            'wastage_count': wastage_count,
+            # Xodimlar
+            'by_worker': by_worker,
+            # Naqd hisobi
+            'net_income':  str(net_income),
             'cash_start': str(smena.cash_start),
             'cash_end': (
                 str(smena.cash_end)

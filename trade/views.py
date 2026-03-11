@@ -87,6 +87,53 @@ from .serializers import (
 
 
 # ============================================================
+# KPI HELPER
+# ============================================================
+
+def _update_worker_kpi(worker, sale_delta=0, sale_amount=0,
+                       return_delta=0, return_amount=0):
+    """
+    Xodimning joriy oy KPI yozuvini atomik yangilash.
+
+    Circular import oldini olish uchun lazy import ishlatiladi.
+    StoreSettings.kpi_enabled=False bo'lsa — hech narsa qilmaydi.
+
+    Args:
+        worker      — accaunt.Worker instance
+        sale_delta  — qo'shiladigan sotuvlar soni (int)
+        sale_amount — qo'shiladigan sotuvlar summasi (Decimal)
+        return_delta  — qo'shiladigan qaytarishlar soni (int)
+        return_amount — qo'shiladigan qaytarishlar summasi (Decimal)
+    """
+    from accaunt.models import WorkerKPI  # lazy import
+
+    settings_obj = get_store_settings(worker.store_id)
+    if not getattr(settings_obj, 'kpi_enabled', False):
+        return
+
+    today = timezone.localdate()
+    kpi, _ = WorkerKPI.objects.get_or_create(
+        worker=worker,
+        month=today.month,
+        year=today.year,
+        defaults={'store_id': worker.store_id},
+    )
+
+    update_kwargs = {}
+    if sale_delta:
+        update_kwargs['sales_count']  = F('sales_count')  + sale_delta
+    if sale_amount:
+        update_kwargs['sales_amount'] = F('sales_amount') + sale_amount
+    if return_delta:
+        update_kwargs['returns_count']  = F('returns_count')  + return_delta
+    if return_amount:
+        update_kwargs['returns_amount'] = F('returns_amount') + return_amount
+
+    if update_kwargs:
+        WorkerKPI.objects.filter(pk=kpi.pk).update(**update_kwargs)
+
+
+# ============================================================
 # MIJOZ GURUHI VIEWSET
 # ============================================================
 
@@ -699,6 +746,11 @@ class SaleViewSet(viewsets.ModelViewSet):
             ),
         )
 
+        # --------------------------------------------------
+        # 14. WorkerKPI yangilash
+        # --------------------------------------------------
+        _update_worker_kpi(worker, sale_delta=1, sale_amount=net_price)
+
         # SaleItem va boshqa related ma'lumotlar uchun qayta yuklash
         sale.refresh_from_db()
         return Response(
@@ -1023,6 +1075,13 @@ class SaleReturnViewSet(viewsets.ModelViewSet):
                 f"Qaytarish tasdiqlandi: #{sale_return.id}, "
                 f"filial='{branch.name}'"
             ),
+        )
+
+        # WorkerKPI yangilash (qaytarish tasdiqlanganda)
+        _update_worker_kpi(
+            sale_return.worker,
+            return_delta=1,
+            return_amount=sale_return.total_amount,
         )
 
         sale_return.refresh_from_db()

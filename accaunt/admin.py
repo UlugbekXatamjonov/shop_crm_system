@@ -11,7 +11,7 @@ Ro'yxatga olingan modellar:
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import CustomUser, Worker, AuditLog
+from .models import CustomUser, Worker, WorkerKPI, AuditLog
 
 
 # ============================================================
@@ -103,3 +103,30 @@ class AuditLogAdmin(admin.ModelAdmin):
     def has_change_permission(self, request, obj=None) -> bool:
         """Log yozuvlarini o'zgartirish mumkin emas."""
         return False
+
+
+# ============================================================
+# WORKER KPI ADMIN
+# ============================================================
+
+@admin.register(WorkerKPI)
+class WorkerKPIAdmin(admin.ModelAdmin):
+    """
+    Xodim KPI yozuvlari.
+    sales_count, sales_amount, returns_count, returns_amount — faqat o'qish (avtomatik).
+    target_amount, bonus_amount — manager tahrirlaydi.
+    """
+    list_display    = (
+        'worker', 'store', 'month', 'year',
+        'sales_count', 'sales_amount',
+        'returns_count', 'returns_amount',
+        'target_amount', 'bonus_amount',
+    )
+    list_filter     = ('store', 'year', 'month')
+    search_fields   = ('worker__user__first_name', 'worker__user__last_name', 'worker__user__username')
+    ordering        = ('-year', '-month', 'worker')
+    readonly_fields = (
+        'worker', 'store', 'month', 'year',
+        'sales_count', 'sales_amount',
+        'returns_count', 'returns_amount',
+    )

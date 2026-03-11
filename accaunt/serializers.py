@@ -30,7 +30,7 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 
-from .models import CustomUser, Worker, WorkerRole, ALL_PERMISSIONS, ROLE_PERMISSIONS, phone_regex
+from .models import CustomUser, Worker, WorkerKPI, WorkerRole, ALL_PERMISSIONS, ROLE_PERMISSIONS, phone_regex
 from .utils import Util
 
 
@@ -994,3 +994,77 @@ class WorkerSelfUpdateSerializer(serializers.Serializer):
             user.save(update_fields=['password'])
 
         return instance
+
+
+# ============================================================
+# WORKER KPI SERIALIZERLARI  B9
+# ============================================================
+
+class WorkerKPISerializer(serializers.ModelSerializer):
+    """
+    WorkerKPI ro'yxat va tafsilot uchun serializer.
+    net_sales_amount va target_reached — hisoblangan maydonlar (property).
+    """
+    worker_name      = serializers.SerializerMethodField()
+    net_sales_amount = serializers.SerializerMethodField()
+    target_reached   = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = WorkerKPI
+        fields = (
+            'id', 'worker', 'worker_name',
+            'month', 'year',
+            'sales_count', 'sales_amount',
+            'returns_count', 'returns_amount',
+            'net_sales_amount',
+            'target_amount', 'bonus_amount', 'target_reached',
+        )
+        read_only_fields = (
+            'id', 'worker',
+            'sales_count', 'sales_amount',
+            'returns_count', 'returns_amount',
+        )
+
+    def get_worker_name(self, obj):
+        if obj.worker_id:
+            return obj.worker.user.get_full_name() or obj.worker.user.username
+        return None
+
+    def get_net_sales_amount(self, obj):
+        return str(obj.net_sales_amount)
+
+    def get_target_reached(self, obj):
+        return obj.target_reached
+
+
+class WorkerKPISetTargetSerializer(serializers.ModelSerializer):
+    """
+    Manager tomonidan oylik maqsad va bonus belgilash.
+    PATCH /api/v1/kpi/{id}/set-target/
+    """
+
+    class Meta:
+        model  = WorkerKPI
+        fields = ('target_amount', 'bonus_amount')
+        extra_kwargs = {
+            'target_amount': {
+                'error_messages': {
+                    'invalid': "To'g'ri raqam kiritilishi shart.",
+                }
+            },
+            'bonus_amount': {
+                'error_messages': {
+                    'invalid': "To'g'ri raqam kiritilishi shart.",
+                }
+            },
+        }
+
+    def validate_target_amount(self, value):
+        if value < 0:
+            raise serializers.ValidationError("Maqsad summasi manfiy bo'lishi mumkin emas.")
+        return value
+
+    def validate_bonus_amount(self, value):
+        if value < 0:
+            raise serializers.ValidationError("Bonus summasi manfiy bo'lishi mumkin emas.")
+        return value
