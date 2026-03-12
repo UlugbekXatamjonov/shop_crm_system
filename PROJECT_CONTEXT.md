@@ -1,5 +1,41 @@
 # CLAUDE UCHUN ESLATMA — Yangi chatda bu faylni o'qi va davom et
 
+## 📅 12.03.2026 SESSION — QILINGAN ISHLAR
+
+### 1. Stock by-product endpoint ✅ (`warehouse` app da)
+- `warehouse/serializers.py`: `StockLocationSerializer`, `StockByProductSerializer` qo'shildi
+- `warehouse/views.py`: `StockViewSet` ga `by_product` action qo'shildi
+- `get_serializer_class` da `by_product` uchun `StockByProductSerializer` qaytarish
+
+**Endpoint:**
+- `GET /api/v1/warehouse/stocks/by-product/` — mahsulot bo'yicha guruhlangan qoldiqlar
+
+**Javob formati:**
+```json
+[
+  {
+    "product_id": 3,
+    "product_name": "Pepsi",
+    "product_unit": "Kilogram",
+    "total_quantity": "190.000",
+    "locations": [
+      {"stock_id": 6, "location_type": "branch", "location_id": 1, "location_name": "Baraka filial 1", "quantity": "70.000", "updated_on": "2026-03-12 | 10:43"},
+      {"stock_id": 5, "location_type": "warehouse", "location_id": 2, "location_name": "2-ombor", "quantity": "120.000", "updated_on": "2026-03-12 | 10:43"}
+    ]
+  }
+]
+```
+
+### 2. Rivojlanish rejasi yangilandi
+- **V1 tartibi:** B12 PriceList → B13 Supplier → B15 Celery → B16 Export → B17 Dashboard → B19 QR+AuditLog → B20 Subscription
+- **V2 (keyinroq):** B11 Telegram | B11.5 SMS | B14 OFD | B18 Offline sync
+
+### 3. #start va #saqla buyruqlari yaratildi
+- `.claude/commands/start.md` — sessiya boshlash (5 ta ish)
+- `.claude/commands/saqla.md` — sessiya yakunlash (4 ta ish)
+
+---
+
 ## 📅 11.03.2026 SESSION — QILINGAN ISHLAR
 
 ### 1. AVCO: Product.purchase_price avtomatik yangilanishi ✅
@@ -211,7 +247,7 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 |-------------|-------------------|--------------------------------------------------------|
 | `accaunt`   | ✅ Tugallangan    | CustomUser, Worker, AuditLog, JWT auth — password reset, WorkerList/Detail da store+branch |
 | `store`     | ✅ Tugallangan    | Store, Branch CRUD (hard delete, multi-tenant, workers in detail, Uzbek errors) |
-| `warehouse` | ✅ Tugallangan    | Category, SubCategory, Product(+image, +barcode EAN-13, +subcategory, +price_currency, **+AVCO purchase_price**), Currency, ExchangeRate, Warehouse, Stock, StockMovement, Transfer+TransferItem, StockBatch(FIFO) — BOSQICH 1 ✅ |
+| `warehouse` | ✅ Tugallangan    | Category, SubCategory, Product(+image, +barcode EAN-13, +subcategory, +price_currency, **+AVCO purchase_price**), Currency, ExchangeRate, Warehouse, Stock(**+by-product endpoint**), StockMovement, Transfer+TransferItem, StockBatch(FIFO) — BOSQICH 1 ✅ |
 | `trade`     | ✅ Tugallangan   | BOSQICH 4 ✅ + **BOSQICH 5 ✅** — Sale, SaleItem, **SaleReturn**(pending→confirmed→StockMovement(IN), cancel), CustomerGroup, Customer |
 | `expense`   | ✅ Tugallangan  | **BOSQICH 6 ✅** — ExpenseCategory(soft delete), Expense(+receipt_image, +smena, hard delete) |
 | `StoreSettings` | ✅ Tugallangan  | BOSQICH 2 ✅ — 10 guruh, 30+ maydon, signal+Redis kesh |

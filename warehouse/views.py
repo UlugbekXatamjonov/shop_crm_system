@@ -87,6 +87,7 @@ from .serializers import (
     StockAuditItemUpdateSerializer,
     StockAuditListSerializer,
     StockBatchSerializer,
+    StockByProductSerializer,
     StockCreateSerializer,
     StockDetailSerializer,
     StockListSerializer,
@@ -906,6 +907,8 @@ class StockViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action == 'list':
             return StockListSerializer
+        if self.action == 'by_product':
+            return StockByProductSerializer
         if self.action == 'create':
             return StockCreateSerializer
         if self.action in ('update', 'partial_update'):
@@ -971,6 +974,58 @@ class StockViewSet(viewsets.ModelViewSet):
             description=f"Ombor qoldig'i o'chirildi: '{name}'",
         )
         instance.delete()
+
+    @action(detail=False, methods=['get'], url_path='by-product')
+    def by_product(self, request):
+        """
+        Mahsulot bo'yicha guruhlangan qoldiqlar.
+
+        GET /api/v1/warehouse/stocks/by-product/
+
+        Har bir mahsulot — bitta obyekt.
+        Joylashuvlar (filial/ombor) 'locations' ichida nested ko'rinishda.
+        """
+        from itertools import groupby
+        from operator import attrgetter
+
+        qs = (
+            self.get_queryset()
+            .order_by('product__name', 'product_id')
+        )
+
+        result = []
+        for _product_id, stock_group in groupby(qs, key=attrgetter('product_id')):
+            stocks = list(stock_group)
+            first  = stocks[0]
+            total  = sum(s.quantity for s in stocks)
+
+            locations = [
+                {
+                    'stock_id'     : s.id,
+                    'location_type': 'branch' if s.branch_id else 'warehouse',
+                    'location_id'  : s.branch_id or s.warehouse_id,
+                    'location_name': (
+                        s.branch.name if s.branch_id
+                        else (s.warehouse.name if s.warehouse_id else None)
+                    ),
+                    'quantity'  : str(s.quantity),
+                    'updated_on': (
+                        s.updated_on.strftime('%Y-%m-%d | %H:%M')
+                        if s.updated_on else None
+                    ),
+                }
+                for s in stocks
+            ]
+
+            result.append({
+                'product_id'    : first.product.id,
+                'product_name'  : first.product.name,
+                'product_unit'  : first.product.get_unit_display(),
+                'total_quantity': str(total),
+                'locations'     : locations,
+            })
+
+        return Response(result)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)

@@ -676,6 +676,28 @@ class StockDetailSerializer(serializers.ModelSerializer):
         return 'branch' if obj.branch_id else 'warehouse'
 
 
+class StockLocationSerializer(serializers.Serializer):
+    """by-product endpointi uchun — bitta joylashuv."""
+    stock_id      = serializers.IntegerField()
+    location_type = serializers.CharField()
+    location_id   = serializers.IntegerField()
+    location_name = serializers.CharField()
+    quantity      = serializers.DecimalField(max_digits=14, decimal_places=3)
+    updated_on    = serializers.CharField()
+
+
+class StockByProductSerializer(serializers.Serializer):
+    """
+    GET /api/v1/warehouse/stocks/by-product/
+    Har bir mahsulot — bitta obyekt, joylashuvlar nested 'locations' da.
+    """
+    product_id     = serializers.IntegerField()
+    product_name   = serializers.CharField()
+    product_unit   = serializers.CharField()
+    total_quantity = serializers.DecimalField(max_digits=14, decimal_places=3)
+    locations      = StockLocationSerializer(many=True)
+
+
 class StockCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Stock
