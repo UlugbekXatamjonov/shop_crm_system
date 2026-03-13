@@ -18,22 +18,54 @@
 
 ### 3. Transfer xato matnlari — o'zbekchaga o'zgartirildi ✅
 **Fayl:** `warehouse/serializers.py`
-
-**Asosiy bug tuzatildi:** `TransferItemWriteSerializer(many=True)` nested serializer da
-`__init__` paytida context bind bo'lmagan → `queryset=Product.objects.none()` → barcha product IDlar rad etilardi.
-- **Tuzatish:** `queryset=Product.objects.all()` + `validate_product()` metodi (context validation paytida mavjud)
-
-**Xato matnlari:**
-- `from_branch` / `to_branch`: `queryset=Branch.objects.all()` + `validate_from/to_branch()` — nom ko'rsatadi
-- `from_warehouse` / `to_warehouse`: `queryset=Warehouse.objects.all()` + `validate_from/to_warehouse()` — nom ko'rsatadi
-- Noto'g'ri ID: `"Filial topilmadi (ID: 99)."`
-- Boshqa do'kon obyekti: `'"Toshkent filiali" sizning do\'koningizga tegishli emas.'`
+- `TransferItemWriteSerializer` bug fix: `queryset=Product.objects.all()` + `validate_product()` metodi
+- `from_branch/to_branch/from_warehouse/to_warehouse` uchun o'zbek xato matnlari
 
 ### 4. StockListSerializer — `product_id` qo'shildi ✅
 **Fayl:** `warehouse/serializers.py`
 - `StockListSerializer` ga `product_id = IntegerField(source='product.id')` qo'shildi
-- Sabab: Foydalanuvchilar Stock `id` ni Product `id` bilan chalkashtirardi
-- Tezlikka ta'sir yo'q (`select_related('product')` allaqachon bor)
+
+### 5. B13 — Supplier (Yetkazib beruvchi) ✅ (`warehouse` app da)
+
+**Yangi modellar (`warehouse/models.py`):**
+- `SupplierPaymentType` (TextChoices): cash | card | transfer
+- `Supplier` — soft delete, `debt_balance`, `unique_together(store, name)`
+- `SupplierPayment` — immutable, to'lov tarixi, yaratilganda `debt_balance` kamayadi
+- `StockMovement.supplier` — ixtiyoriy FK (IN harakatda supplier ko'rsatilsa `debt_balance` oshadi)
+
+**`warehouse/migrations/0014_supplier.py`** — Supplier, SupplierPayment, StockMovement.supplier
+
+**Serializers (`warehouse/serializers.py`):**
+- `SupplierListSerializer`, `SupplierDetailSerializer`
+- `SupplierCreateSerializer` (nom unique validatsiya), `SupplierUpdateSerializer`
+- `SupplierPaymentSerializer` (create + list, amount > 0 validatsiya)
+- `MovementListSerializer/DetailSerializer` ga `supplier_name` qo'shildi
+- `MovementCreateSerializer` ga `supplier` maydoni + `validate_supplier()` qo'shildi
+
+**Views (`warehouse/views.py`):**
+- `SupplierViewSet` — CRUD + soft delete, `?status=` filter
+- `SupplierPaymentViewSet` — create/list (immutable), `?supplier=`, `?smena=` filter
+- `StockMovementViewSet.perform_create()` — IN + supplier → `debt_balance += quantity * unit_cost`
+
+**Admin (`warehouse/admin.py`):**
+- `SupplierAdmin` (inline: SupplierPaymentInline), `SupplierPaymentAdmin` (readonly)
+- `StockMovementAdmin.list_display` ga `supplier` qo'shildi
+
+**URL (`warehouse/api_urls.py`):**
+```
+GET  POST   /api/v1/warehouse/suppliers/            (?status=)
+GET  PATCH  DELETE /api/v1/warehouse/suppliers/{id}/
+GET  POST   /api/v1/warehouse/supplier-payments/    (?supplier=, ?smena=)
+```
+
+**Debt logikasi:**
+- `StockMovement(IN, supplier=X)` → `debt_balance += quantity * unit_cost`
+- `SupplierPayment` yaratilganda → `debt_balance -= amount`
+
+### Rivojlanish rejasi (yangilandi)
+- **V1 tartibi:** B15 Celery → B16 Export → B17 Dashboard → B19 QR+AuditLog → B20 Subscription
+- **V2 (keyinroq):** B11 Telegram | B11.5 SMS | B14 OFD | B18 Offline sync
+- **B12 PriceList** — skip (hozircha `sale_price` yetarli)
 
 ---
 
@@ -290,14 +322,14 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 | `StoreSettings` | ✅ Tugallangan  | BOSQICH 2 ✅ — 10 guruh, 30+ maydon, signal+Redis kesh |
 | `Smena`     | ✅ Tugallangan   | BOSQICH 3 ✅ — SmenaStatus+Smena model, SmenaViewSet (open/close/x-report), migration 0005 |
 | `SaleReturn` | ✅ Tugallangan  | BOSQICH 5 ✅ — trade app da, migration 0003             |
-| `WastageRecord` | ❌ Boshlanmagan | BOSQICH 7 — warehouse app da                        |
-| `StockAudit` | ❌ Boshlanmagan | BOSQICH 8 — warehouse app da                           |
-| `WorkerKPI` | ❌ Boshlanmagan  | BOSQICH 9 — accaunt app da                             |
-| `Z/X-report` | ❌ Boshlanmagan | BOSQICH 10 — trade app da                              |
-| `Telegram bot` | ❌ Boshlanmagan | BOSQICH 11 — config/telegram.py yoki alohida          |
-| `SMS xabar`  | ❌ Boshlanmagan  | BOSQICH 11.5 — Eskiz/PlayMobile API, worker/owner ga SMS |
-| `PriceList` | ❌ Boshlanmagan  | BOSQICH 12 — trade app da                              |
-| `Supplier`  | ❌ Boshlanmagan  | BOSQICH 13 — v2, keyingi versiyada                     |
+| `WastageRecord` | ✅ Tugallangan | BOSQICH 7 — warehouse app da                        |
+| `StockAudit` | ✅ Tugallangan | BOSQICH 8 — warehouse app da                           |
+| `WorkerKPI` | ✅ Tugallangan  | BOSQICH 9 — accaunt app da                             |
+| `Z/X-report` | ✅ Tugallangan | BOSQICH 10 — store app da                              |
+| `PriceList` | ⏭ Skip         | BOSQICH 12 — hozircha sale_price yetarli               |
+| `Supplier`  | ✅ Tugallangan  | BOSQICH 13 — warehouse app da (debt_balance + to'lov tarixi) |
+| `Telegram bot` | ❌ Boshlanmagan | BOSQICH 11 — V2, keyingi versiya                   |
+| `SMS xabar`  | ❌ Boshlanmagan  | BOSQICH 11.5 — V2, Eskiz/PlayMobile API              |
 | `OFD`       | ❌ Boshlanmagan  | BOSQICH 14 — v2, keyingi versiyada (Uzbekistonda MAJBURIY 2026) |
 | `Offline sync` | ❌ Boshlanmagan | BOSQICH 18 — idempotency + sync queue                |
 | `subscription` | ❌ Boshlanmagan  | BOSQICH 20 — SubscriptionPlan, Subscription (trial/active/expired), Coupon, CouponUsage, SubscriptionPayment, Middleware, Celery eslatma |

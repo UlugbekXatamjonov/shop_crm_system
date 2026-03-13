@@ -11,6 +11,8 @@ from .models import (
     StockBatch,
     StockMovement,
     SubCategory,
+    Supplier,
+    SupplierPayment,
     Transfer,
     TransferItem,
     Warehouse,
@@ -72,8 +74,8 @@ class StockAdmin(admin.ModelAdmin):
 
 @admin.register(StockMovement)
 class StockMovementAdmin(admin.ModelAdmin):
-    # StockMovement: product, branch|warehouse, movement_type, quantity, unit_cost, worker, created_on
-    list_display    = ('product', 'movement_type', 'quantity', 'unit_cost', 'branch', 'warehouse', 'worker', 'created_on')
+    # StockMovement: product, branch|warehouse, movement_type, quantity, unit_cost, supplier, worker, created_on
+    list_display    = ('product', 'movement_type', 'quantity', 'unit_cost', 'supplier', 'branch', 'warehouse', 'worker', 'created_on')
     list_filter     = ('movement_type', 'branch', 'warehouse')
     search_fields   = ('product__name',)
     readonly_fields = ('created_on',)
@@ -165,3 +167,38 @@ class StockAuditAdmin(admin.ModelAdmin):
     search_fields   = ('id', 'note')
     readonly_fields = ('status', 'confirmed_on', 'created_on', 'worker', 'store')
     inlines         = [StockAuditItemInline]
+
+
+class SupplierPaymentInline(admin.TabularInline):
+    """Yetkazib beruvchi tafsilotida to'lovlar inline ko'rinishi."""
+    model           = SupplierPayment
+    extra           = 0
+    readonly_fields = ('amount', 'payment_type', 'note', 'smena', 'worker', 'created_on')
+    can_delete      = False
+
+
+@admin.register(Supplier)
+class SupplierAdmin(admin.ModelAdmin):
+    """
+    Yetkazib beruvchilar — to'lovlar inline bilan ko'rish.
+    Soft delete: status='inactive' ga o'tkazish.
+    """
+    list_display    = ('name', 'phone', 'company', 'debt_balance', 'status', 'store', 'created_on')
+    list_filter     = ('status', 'store')
+    search_fields   = ('name', 'phone', 'company')
+    readonly_fields = ('debt_balance', 'created_on', 'updated_on')
+    inlines         = [SupplierPaymentInline]
+
+
+@admin.register(SupplierPayment)
+class SupplierPaymentAdmin(admin.ModelAdmin):
+    """
+    Yetkazib beruvchiga to'lovlar — faqat ko'rish (immutable log).
+    """
+    list_display    = ('id', 'supplier', 'amount', 'payment_type', 'worker', 'smena', 'created_on')
+    list_filter     = ('payment_type', 'supplier__store')
+    search_fields   = ('supplier__name',)
+    readonly_fields = (
+        'supplier', 'amount', 'payment_type',
+        'note', 'smena', 'worker', 'created_on',
+    )

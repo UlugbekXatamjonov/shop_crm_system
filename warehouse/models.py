@@ -3,26 +3,29 @@
 WAREHOUSE APP — Modellar
 ============================================================
 Modellar:
-  ProductUnit     — Mahsulot o'lchov birliklari (TextChoices)
-  ActiveStatus    — Mahsulot/kategoriya holati (TextChoices)
-  MovementType    — Kirim/chiqim turi (TextChoices)
-  TransferStatus  — Transfer holati (TextChoices)
-  WastageReason   — Isrof sababi (TextChoices): expired|damaged|stolen|other
-  AuditStatus     — Inventarizatsiya holati (TextChoices): draft|confirmed|cancelled
-  Category        — Mahsulot kategoriyasi
-  SubCategory     — Mahsulot subkategoriyasi (ixtiyoriy, StoreSettings.subcategory_enabled)
-  Currency        — Valyuta (UZS, USD, EUR, RUB, ...)
-  ExchangeRate    — Valyuta kursi (CBU dan kunlik, Celery task)
-  Product         — Mahsulot (nom, kategoriya, subkat, birlik, narx, shtrix-kod, valyuta)
-  Warehouse       — Ombor (Anbar) — alohida saqlash joyi (Branch != Warehouse)
-  Stock           — Filial YOKI Ombor bo'yicha qoldiq (Product + Branch|Warehouse + miqdor)
-  StockMovement   — Kirim/chiqim tarixi (immutable log) + unit_cost (tannarx)
-  Transfer        — Tovar ko'chirish (Filial↔Ombor↔Filial, guruhlab)
-  TransferItem    — Transfer satri (1 Transfer → N mahsulot)
-  StockBatch      — FIFO partiya (har bir IN harakati uchun, qty_left kamayadi)
-  WastageRecord   — Isrof/chiqindi (B7, yaratilganda StockMovement(OUT) avtomatik)
-  StockAudit      — Inventarizatsiya sarlavhasi (B8, draft→confirmed→StockMovement avtomatik)
-  StockAuditItem  — Inventarizatsiya satri (expected_qty vs actual_qty)
+  ProductUnit          — Mahsulot o'lchov birliklari (TextChoices)
+  ActiveStatus         — Mahsulot/kategoriya holati (TextChoices)
+  MovementType         — Kirim/chiqim turi (TextChoices)
+  TransferStatus       — Transfer holati (TextChoices)
+  WastageReason        — Isrof sababi (TextChoices): expired|damaged|stolen|other
+  AuditStatus          — Inventarizatsiya holati (TextChoices): draft|confirmed|cancelled
+  SupplierPaymentType  — Yetkazib beruvchi to'lov turi (TextChoices): cash|card|transfer
+  Category             — Mahsulot kategoriyasi
+  SubCategory          — Mahsulot subkategoriyasi (ixtiyoriy, StoreSettings.subcategory_enabled)
+  Currency             — Valyuta (UZS, USD, EUR, RUB, ...)
+  ExchangeRate         — Valyuta kursi (CBU dan kunlik, Celery task)
+  Product              — Mahsulot (nom, kategoriya, subkat, birlik, narx, shtrix-kod, valyuta)
+  Warehouse            — Ombor (Anbar) — alohida saqlash joyi (Branch != Warehouse)
+  Stock                — Filial YOKI Ombor bo'yicha qoldiq (Product + Branch|Warehouse + miqdor)
+  StockMovement        — Kirim/chiqim tarixi (immutable log) + unit_cost (tannarx)
+  Transfer             — Tovar ko'chirish (Filial↔Ombor↔Filial, guruhlab)
+  TransferItem         — Transfer satri (1 Transfer → N mahsulot)
+  StockBatch           — FIFO partiya (har bir IN harakati uchun, qty_left kamayadi)
+  WastageRecord        — Isrof/chiqindi (B7, yaratilganda StockMovement(OUT) avtomatik)
+  StockAudit           — Inventarizatsiya sarlavhasi (B8, draft→confirmed→StockMovement avtomatik)
+  StockAuditItem       — Inventarizatsiya satri (expected_qty vs actual_qty)
+  Supplier             — Yetkazib beruvchi (B13, qarz balansi, soft delete)
+  SupplierPayment      — Yetkazib beruvchiga to'lov tarixi (B13, immutable)
 
 Muhim farq:
   Branch (Filial)   — sotuv nuqtasi (kassa, sotuvchi).
@@ -92,6 +95,12 @@ class AuditStatus(models.TextChoices):
     DRAFT     = 'draft',     'Qoralama'
     CONFIRMED = 'confirmed', 'Tasdiqlangan'
     CANCELLED = 'cancelled', 'Bekor qilingan'
+
+
+class SupplierPaymentType(models.TextChoices):
+    CASH     = 'cash',     'Naqd'
+    CARD     = 'card',     'Karta'
+    TRANSFER = 'transfer', "Bank o'tkazmasi"
 
 
 # ============================================================
@@ -578,6 +587,14 @@ class StockMovement(models.Model):
         blank=True,
         related_name='movements',
         verbose_name="Hodim"
+    )
+    supplier      = models.ForeignKey(
+        'Supplier',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='stock_movements',
+        verbose_name="Yetkazib beruvchi"
     )
     created_on    = models.DateTimeField(
         auto_now_add=True,
@@ -1117,4 +1134,143 @@ class StockAuditItem(models.Model):
         return (
             f"{self.product.name}: kutilgan={self.expected_qty},"
             f" haqiqiy={self.actual_qty}, farq={self.difference}"
+        )
+
+
+# ============================================================
+# YETKAZIB BERUVCHI (BOSQICH 13)
+# ============================================================
+
+class Supplier(models.Model):
+    """
+    Yetkazib beruvchi.
+
+    Har bir yetkazib beruvchi bitta do'konga tegishli (multi-tenant).
+    Soft delete — o'chirish o'rniga status='inactive' ga o'tkaziladi.
+
+    debt_balance — qancha qarz qolganligi (kirim + SupplierPayment orqali boshqariladi):
+      StockMovement(IN, supplier=X) yaratilganda → debt_balance += quantity * unit_cost
+      SupplierPayment yaratilganda               → debt_balance -= amount
+
+    unique_together: bir do'konda bir xil nomli yetkazib beruvchi bo'lmaydi.
+    """
+    store        = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name='suppliers',
+        verbose_name="Do'koni"
+    )
+    name         = models.CharField(
+        max_length=200,
+        verbose_name="Nomi"
+    )
+    phone        = models.CharField(
+        max_length=20,
+        blank=True,
+        verbose_name="Telefon"
+    )
+    company      = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name="Kompaniya"
+    )
+    address      = models.TextField(
+        blank=True,
+        verbose_name="Manzil"
+    )
+    debt_balance = models.DecimalField(
+        max_digits=20,
+        decimal_places=2,
+        default=0,
+        verbose_name="Qarz balansi"
+    )
+    note         = models.TextField(
+        blank=True,
+        verbose_name="Izoh"
+    )
+    status       = models.CharField(
+        max_length=10,
+        choices=ActiveStatus.choices,
+        default=ActiveStatus.ACTIVE,
+        verbose_name="Holati"
+    )
+    created_on   = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Yaratilgan vaqti"
+    )
+    updated_on   = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Yangilangan vaqti"
+    )
+
+    class Meta:
+        verbose_name        = 'Yetkazib beruvchi'
+        verbose_name_plural = 'Yetkazib beruvchilar'
+        ordering            = ['name']
+        unique_together     = [('store', 'name')]
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.store.name})"
+
+
+class SupplierPayment(models.Model):
+    """
+    Yetkazib beruvchiga to'lov tarixi.
+
+    ⚠️ Immutable — yaratilgandan keyin o'zgartirib yoki o'chirib bo'lmaydi.
+    ⚠️ Yaratilganda AVTOMATIK Supplier.debt_balance kamayadi.
+
+    Xatolik tuzatish: yangi teskari to'lov (debet yozuvi) yarating.
+    """
+    supplier     = models.ForeignKey(
+        Supplier,
+        on_delete=models.CASCADE,
+        related_name='payments',
+        verbose_name="Yetkazib beruvchi"
+    )
+    amount       = models.DecimalField(
+        max_digits=20,
+        decimal_places=2,
+        verbose_name="To'lov miqdori"
+    )
+    payment_type = models.CharField(
+        max_length=10,
+        choices=SupplierPaymentType.choices,
+        default=SupplierPaymentType.CASH,
+        verbose_name="To'lov turi"
+    )
+    note         = models.TextField(
+        blank=True,
+        verbose_name="Izoh"
+    )
+    smena        = models.ForeignKey(
+        'store.Smena',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='supplier_payments',
+        verbose_name="Smena"
+    )
+    worker       = models.ForeignKey(
+        'accaunt.Worker',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='supplier_payments',
+        verbose_name="Hodim"
+    )
+    created_on   = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Yaratilgan vaqti"
+    )
+
+    class Meta:
+        verbose_name        = "Yetkazib beruvchi to'lovi"
+        verbose_name_plural = "Yetkazib beruvchi to'lovlari"
+        ordering            = ['-created_on']
+
+    def __str__(self) -> str:
+        return (
+            f"To'lov #{self.pk}: {self.supplier.name} — "
+            f"{self.amount} ({self.get_payment_type_display()})"
         )

@@ -3,18 +3,20 @@
 WAREHOUSE APP — View'lar
 ============================================================
 ViewSet'lar:
-  CategoryViewSet      — Kategoriyalarni boshqarish
-  SubCategoryViewSet   — Subkategoriyalarni boshqarish (BOSQICH 1.1)
-  CurrencyViewSet      — Valyutalarni boshqarish (BOSQICH 1.3)
-  ExchangeRateViewSet  — Valyuta kurslarini boshqarish (BOSQICH 1.3)
-  ProductViewSet       — Mahsulotlarni boshqarish + barcode_image action (BOSQICH 1.2)
-  WarehouseViewSet     — Omborlarni boshqarish (BOSQICH 6)
-  StockViewSet         — Ombor qoldiqlarini boshqarish (branch|warehouse)
-  StockMovementViewSet — Kirim/chiqim harakatlarini boshqarish (branch|warehouse, FIFO)
-  TransferViewSet      — Guruhlab ko'chirish (BOSQICH 1.6, FIFO propagatsiya)
-  StockBatchViewSet    — FIFO partiyalar (read-only, BOSQICH 1.7)
-  WastageRecordViewSet — Isrof yozuvlari (B7, POST → StockMovement(OUT) avtomatik)
-  StockAuditViewSet    — Inventarizatsiya (B8, confirm → StockMovement(IN|OUT) avtomatik)
+  CategoryViewSet       — Kategoriyalarni boshqarish
+  SubCategoryViewSet    — Subkategoriyalarni boshqarish (BOSQICH 1.1)
+  CurrencyViewSet       — Valyutalarni boshqarish (BOSQICH 1.3)
+  ExchangeRateViewSet   — Valyuta kurslarini boshqarish (BOSQICH 1.3)
+  ProductViewSet        — Mahsulotlarni boshqarish + barcode_image action (BOSQICH 1.2)
+  WarehouseViewSet      — Omborlarni boshqarish (BOSQICH 6)
+  StockViewSet          — Ombor qoldiqlarini boshqarish (branch|warehouse)
+  StockMovementViewSet  — Kirim/chiqim harakatlarini boshqarish (branch|warehouse, FIFO)
+  TransferViewSet       — Guruhlab ko'chirish (BOSQICH 1.6, FIFO propagatsiya)
+  StockBatchViewSet     — FIFO partiyalar (read-only, BOSQICH 1.7)
+  WastageRecordViewSet  — Isrof yozuvlari (B7, POST → StockMovement(OUT) avtomatik)
+  StockAuditViewSet     — Inventarizatsiya (B8, confirm → StockMovement(IN|OUT) avtomatik)
+  SupplierViewSet       — Yetkazib beruvchilar (B13, soft delete, debt_balance)
+  SupplierPaymentViewSet— Yetkazib beruvchiga to'lovlar (B13, immutable)
 
 Ruxsatlar:
   list/retrieve → CanAccess('mahsulotlar') yoki CanAccess('ombor')
@@ -59,6 +61,8 @@ from .models import (
     StockBatch,
     StockMovement,
     SubCategory,
+    Supplier,
+    SupplierPayment,
     Transfer,
     TransferStatus,
     Warehouse,
@@ -96,6 +100,11 @@ from .serializers import (
     SubCategoryDetailSerializer,
     SubCategoryListSerializer,
     SubCategoryUpdateSerializer,
+    SupplierCreateSerializer,
+    SupplierDetailSerializer,
+    SupplierListSerializer,
+    SupplierPaymentSerializer,
+    SupplierUpdateSerializer,
     TransferCreateSerializer,
     TransferDetailSerializer,
     TransferListSerializer,
@@ -1130,10 +1139,12 @@ class StockMovementViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_create(self, serializer):
-        worker    = getattr(self.request.user, 'worker', None)
-        store     = getattr(worker, 'store', None)
-        unit_cost = serializer.validated_data.get('unit_cost')
-        instance  = serializer.save(worker=worker)
+        worker      = getattr(self.request.user, 'worker', None)
+        store       = getattr(worker, 'store', None)
+        unit_cost   = serializer.validated_data.get('unit_cost')
+        supplier_id = serializer.validated_data.get('supplier')
+        supplier_id = supplier_id.pk if supplier_id else None
+        instance    = serializer.save(worker=worker)
 
         # Stock qoldig'ini yangilash (branch YOKI warehouse)
         # get_or_create + F() expression — parallel so'rovlarda race condition yo'q
@@ -1184,6 +1195,14 @@ class StockMovementViewSet(viewsets.ModelViewSet):
                 if result['total_qty']:
                     avg = result['total_value'] / result['total_qty']
                     Product.objects.filter(pk=instance.product_id).update(purchase_price=avg)
+
+            # ── B13: Supplier debt_balance yangilash ──
+            # IN harakatda supplier ko'rsatilgan bo'lsa, qarz oshadi
+            if supplier_id and unit_cost is not None:
+                total_cost = instance.quantity * unit_cost
+                Supplier.objects.filter(pk=supplier_id).update(
+                    debt_balance=F('debt_balance') + total_cost
+                )
         else:
             Stock.objects.filter(pk=stock.pk).update(
                 quantity=F('quantity') - instance.quantity,
@@ -2146,4 +2165,216 @@ class StockAuditViewSet(viewsets.ModelViewSet):
                 'data': StockAuditItemSerializer(item).data,
             },
             status=status.HTTP_200_OK,
+        )
+
+
+# ============================================================
+# YETKAZIB BERUVCHI VIEWSET  B13
+# ============================================================
+
+class SupplierViewSet(viewsets.ModelViewSet):
+    """
+    Yetkazib beruvchilarni boshqarish.
+
+    Endpointlar:
+      GET    /api/v1/warehouse/suppliers/       — ro'yxat
+      POST   /api/v1/warehouse/suppliers/       — yangi yetkazib beruvchi (manager+)
+      GET    /api/v1/warehouse/suppliers/{id}/  — tafsilotlar
+      PATCH  /api/v1/warehouse/suppliers/{id}/  — yangilash (manager+)
+      DELETE /api/v1/warehouse/suppliers/{id}/  — o'chirish (manager+, soft delete)
+
+    Soft delete: status='inactive' ga o'tkaziladi (debt tarixi saqlanadi).
+    """
+    http_method_names = ['get', 'post', 'patch', 'delete']
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated(), CanAccess('ombor')]
+        return [IsAuthenticated(), IsManagerOrAbove()]
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return SupplierListSerializer
+        if self.action == 'create':
+            return SupplierCreateSerializer
+        if self.action in ('update', 'partial_update'):
+            return SupplierUpdateSerializer
+        return SupplierDetailSerializer
+
+    def get_queryset(self):
+        worker = getattr(self.request.user, 'worker', None)
+        if not worker or not worker.store:
+            return Supplier.objects.none()
+        qs = Supplier.objects.filter(store=worker.store)
+        # ?status= filter (hamma holatlarni ko'rish uchun)
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        else:
+            qs = qs.filter(status='active')
+        return qs
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        worker  = getattr(self.request.user, 'worker', None)
+        if worker:
+            context['store'] = worker.store
+        return context
+
+    def perform_create(self, serializer):
+        worker   = self.request.user.worker
+        instance = serializer.save(store=worker.store)
+        AuditLog.objects.create(
+            actor=self.request.user,
+            action=AuditLog.Action.CREATE,
+            target_model='Supplier',
+            target_id=instance.id,
+            description=f"Yetkazib beruvchi yaratildi: '{instance.name}'",
+        )
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        AuditLog.objects.create(
+            actor=self.request.user,
+            action=AuditLog.Action.UPDATE,
+            target_model='Supplier',
+            target_id=instance.id,
+            description=f"Yetkazib beruvchi yangilandi: '{instance.name}'",
+        )
+
+    def perform_destroy(self, instance):
+        """Soft delete — status='inactive' ga o'tkazish."""
+        instance.status = 'inactive'
+        instance.save(update_fields=['status'])
+        AuditLog.objects.create(
+            actor=self.request.user,
+            action=AuditLog.Action.DELETE,
+            target_model='Supplier',
+            target_id=instance.id,
+            description=f"Yetkazib beruvchi o'chirildi (soft): '{instance.name}'",
+        )
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(
+            {
+                'message': "Yetkazib beruvchi muvaffaqiyatli yaratildi.",
+                'data': SupplierDetailSerializer(
+                    serializer.instance,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    def update(self, request, *args, **kwargs):
+        kwargs['partial'] = True
+        instance   = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(
+            {
+                'message': "Yetkazib beruvchi muvaffaqiyatli yangilandi.",
+                'data': SupplierDetailSerializer(
+                    serializer.instance,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response(
+            {'message': f"'{instance.name}' o'chirildi."},
+            status=status.HTTP_200_OK,
+        )
+
+
+# ============================================================
+# YETKAZIB BERUVCHI TO'LOV VIEWSET  B13
+# ============================================================
+
+class SupplierPaymentViewSet(viewsets.ModelViewSet):
+    """
+    Yetkazib beruvchiga to'lovlar.
+
+    Endpointlar:
+      GET  /api/v1/warehouse/supplier-payments/       — ro'yxat (?supplier=, ?smena=)
+      POST /api/v1/warehouse/supplier-payments/       — to'lov (manager+)
+
+    Immutable: UPDATE va DELETE yo'q.
+    To'lov yaratilganda Supplier.debt_balance AVTOMATIK kamayadi.
+    """
+    http_method_names = ['get', 'post']
+
+    def get_permissions(self):
+        if self.action == 'list':
+            return [IsAuthenticated(), CanAccess('ombor')]
+        return [IsAuthenticated(), IsManagerOrAbove()]
+
+    def get_serializer_class(self):
+        return SupplierPaymentSerializer
+
+    def get_queryset(self):
+        worker = getattr(self.request.user, 'worker', None)
+        if not worker or not worker.store:
+            return SupplierPayment.objects.none()
+        qs = (
+            SupplierPayment.objects
+            .filter(supplier__store=worker.store)
+            .select_related('supplier', 'worker__user', 'smena')
+        )
+        supplier_id = self.request.query_params.get('supplier')
+        if supplier_id:
+            qs = qs.filter(supplier_id=supplier_id)
+        smena_id = self.request.query_params.get('smena')
+        if smena_id:
+            qs = qs.filter(smena_id=smena_id)
+        return qs
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        worker  = getattr(self.request.user, 'worker', None)
+        if worker:
+            context['store'] = worker.store
+        return context
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        worker   = getattr(self.request.user, 'worker', None)
+        instance = serializer.save(worker=worker)
+
+        # Supplier.debt_balance avtomatik kamaytirish
+        Supplier.objects.filter(pk=instance.supplier_id).update(
+            debt_balance=F('debt_balance') - instance.amount
+        )
+        AuditLog.objects.create(
+            actor=self.request.user,
+            action=AuditLog.Action.CREATE,
+            target_model='SupplierPayment',
+            target_id=instance.id,
+            description=(
+                f"To'lov: '{instance.supplier.name}' — "
+                f"{instance.amount} ({instance.get_payment_type_display()})"
+            ),
+        )
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(
+            {
+                'message': "To'lov muvaffaqiyatli qayd etildi.",
+                'data': SupplierPaymentSerializer(
+                    serializer.instance,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_201_CREATED,
         )

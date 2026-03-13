@@ -21,6 +21,8 @@ Tartib:
   10. StockBatch serializers   (FIFO partiyalar)
   11. WastageRecord serializers (B7 — isrof)
   12. StockAudit serializers    (B8 — inventarizatsiya)
+  13. Supplier serializers      (B13 — yetkazib beruvchi)
+  14. SupplierPayment serializers (B13 — to'lov tarixi)
 """
 
 from rest_framework import serializers
@@ -40,6 +42,9 @@ from .models import (
     StockBatch,
     StockMovement,
     SubCategory,
+    Supplier,
+    SupplierPayment,
+    SupplierPaymentType,
     Transfer,
     TransferItem,
     TransferStatus,
@@ -811,12 +816,13 @@ class StockUpdateSerializer(serializers.ModelSerializer):
 # ============================================================
 
 class MovementListSerializer(serializers.ModelSerializer):
-    product_name        = serializers.CharField(source='product.name', read_only=True)
-    product_unit        = serializers.CharField(source='product.get_unit_display', read_only=True)
+    product_name          = serializers.CharField(source='product.name', read_only=True)
+    product_unit          = serializers.CharField(source='product.get_unit_display', read_only=True)
     movement_type_display = serializers.CharField(source='get_movement_type_display', read_only=True)
-    worker_name         = serializers.SerializerMethodField()
-    location_type       = serializers.SerializerMethodField()
-    location_name       = serializers.SerializerMethodField()
+    worker_name           = serializers.SerializerMethodField()
+    location_type         = serializers.SerializerMethodField()
+    location_name         = serializers.SerializerMethodField()
+    supplier_name         = serializers.CharField(source='supplier.name', read_only=True)
 
     class Meta:
         model  = StockMovement
@@ -824,7 +830,8 @@ class MovementListSerializer(serializers.ModelSerializer):
             'id', 'product_name', 'product_unit',
             'location_type', 'location_name',
             'movement_type', 'movement_type_display',
-            'quantity', 'unit_cost', 'worker_name', 'created_on',
+            'quantity', 'unit_cost',
+            'supplier_name', 'worker_name', 'created_on',
         )
 
     def get_worker_name(self, obj):
@@ -852,6 +859,8 @@ class MovementDetailSerializer(serializers.ModelSerializer):
     warehouse_name        = serializers.CharField(source='warehouse.name', read_only=True)
     worker_name           = serializers.SerializerMethodField()
     location_type         = serializers.SerializerMethodField()
+    supplier_id           = serializers.IntegerField(source='supplier.id', read_only=True)
+    supplier_name         = serializers.CharField(source='supplier.name', read_only=True)
 
     class Meta:
         model  = StockMovement
@@ -863,6 +872,7 @@ class MovementDetailSerializer(serializers.ModelSerializer):
             'warehouse_id', 'warehouse_name',
             'movement_type', 'movement_type_display',
             'quantity', 'unit_cost', 'note',
+            'supplier_id', 'supplier_name',
             'worker_name', 'created_on',
         )
 
@@ -887,7 +897,7 @@ class MovementCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = StockMovement
-        fields = ('product', 'branch', 'warehouse', 'movement_type', 'quantity', 'unit_cost', 'note')
+        fields = ('product', 'branch', 'warehouse', 'movement_type', 'quantity', 'unit_cost', 'note', 'supplier')
         extra_kwargs = {
             'product': {
                 'error_messages': {
@@ -938,6 +948,14 @@ class MovementCreateSerializer(serializers.ModelSerializer):
         if value <= 0:
             raise serializers.ValidationError(
                 "Miqdor 0 dan katta bo'lishi shart."
+            )
+        return value
+
+    def validate_supplier(self, value):
+        store = self.context.get('store')
+        if store and value and value.store != store:
+            raise serializers.ValidationError(
+                "Bu yetkazib beruvchi sizning do'koningizga tegishli emas."
             )
         return value
 
@@ -1679,3 +1697,140 @@ class StockAuditItemUpdateSerializer(serializers.ModelSerializer):
                 "Faqat 'draft' inventarizatsiya satrini yangilash mumkin."
             )
         return data
+
+
+# ============================================================
+# YETKAZIB BERUVCHI SERIALIZERLARI  B13
+# ============================================================
+
+class SupplierListSerializer(serializers.ModelSerializer):
+    """Yetkazib beruvchilar ro'yxati — qisqa ko'rinish."""
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model  = Supplier
+        fields = (
+            'id', 'name', 'phone', 'company',
+            'debt_balance', 'status', 'status_display',
+        )
+
+
+class SupplierDetailSerializer(serializers.ModelSerializer):
+    """Yetkazib beruvchi tafsiloti — to'liq ma'lumot."""
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    store_name     = serializers.CharField(source='store.name', read_only=True)
+
+    class Meta:
+        model  = Supplier
+        fields = (
+            'id', 'name', 'phone', 'company', 'address',
+            'debt_balance', 'note',
+            'status', 'status_display',
+            'store_name', 'created_on', 'updated_on',
+        )
+
+
+class SupplierCreateSerializer(serializers.ModelSerializer):
+    """Yangi yetkazib beruvchi yaratish."""
+
+    class Meta:
+        model  = Supplier
+        fields = ('name', 'phone', 'company', 'address', 'note')
+        extra_kwargs = {
+            'name': {
+                'error_messages': {
+                    'required': "Yetkazib beruvchi nomi kiritilishi shart.",
+                    'blank'   : "Yetkazib beruvchi nomi bo'sh bo'lishi mumkin emas.",
+                }
+            }
+        }
+
+    def validate_name(self, value):
+        store = self.context.get('store')
+        if store and Supplier.objects.filter(store=store, name=value).exists():
+            raise serializers.ValidationError(
+                "Bunday nomli yetkazib beruvchi mavjud. Iltimos boshqa nom tanlang !"
+            )
+        return value
+
+
+class SupplierUpdateSerializer(serializers.ModelSerializer):
+    """Yetkazib beruvchini yangilash."""
+
+    class Meta:
+        model  = Supplier
+        fields = ('name', 'phone', 'company', 'address', 'note')
+
+    def validate_name(self, value):
+        store = self.context.get('store')
+        qs    = Supplier.objects.filter(store=store, name=value)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                "Bunday nomli yetkazib beruvchi mavjud. Iltimos boshqa nom tanlang !"
+            )
+        return value
+
+
+# ============================================================
+# YETKAZIB BERUVCHI TO'LOV SERIALIZERLARI  B13
+# ============================================================
+
+class SupplierPaymentSerializer(serializers.ModelSerializer):
+    """
+    Yetkazib beruvchiga to'lov — yaratish va ro'yxat uchun.
+    Immutable: o'chirish va yangilash yo'q.
+    """
+    supplier_name        = serializers.CharField(source='supplier.name', read_only=True)
+    payment_type_display = serializers.CharField(source='get_payment_type_display', read_only=True)
+    worker_name          = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = SupplierPayment
+        fields = (
+            'id', 'supplier', 'supplier_name',
+            'amount', 'payment_type', 'payment_type_display',
+            'note', 'smena',
+            'worker_name', 'created_on',
+        )
+        extra_kwargs = {
+            'supplier': {
+                'error_messages': {
+                    'required'      : "Yetkazib beruvchi tanlanishi shart.",
+                    'does_not_exist': "Bunday yetkazib beruvchi topilmadi.",
+                }
+            },
+            'amount': {
+                'error_messages': {
+                    'required': "To'lov miqdori kiritilishi shart.",
+                    'invalid' : "To'g'ri raqam kiritilishi shart.",
+                }
+            },
+            'payment_type': {
+                'error_messages': {
+                    'required'      : "To'lov turi tanlanishi shart.",
+                    'invalid_choice': "To'lov turi noto'g'ri. 'cash', 'card' yoki 'transfer' bo'lishi kerak.",
+                }
+            },
+        }
+
+    def get_worker_name(self, obj):
+        if obj.worker_id:
+            return obj.worker.user.get_full_name() or obj.worker.user.username
+        return None
+
+    def validate_supplier(self, value):
+        store = self.context.get('store')
+        if store and value.store != store:
+            raise serializers.ValidationError(
+                "Bu yetkazib beruvchi sizning do'koningizga tegishli emas."
+            )
+        return value
+
+    def validate_amount(self, value):
+        if value <= 0:
+            raise serializers.ValidationError(
+                "To'lov miqdori 0 dan katta bo'lishi shart."
+            )
+        return value

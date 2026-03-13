@@ -68,6 +68,15 @@ Router avtomatik quyidagi URL'larni yaratadi:
   POST   /api/v1/warehouse/audits/{id}/confirm/  — tasdiqlash (StockMovement avtomatik)
   POST   /api/v1/warehouse/audits/{id}/cancel/   — bekor qilish (faqat draft)
   PATCH  /api/v1/warehouse/audits/{id}/items/{item_id}/ — satr actual_qty yangilash
+
+  GET    /api/v1/warehouse/suppliers/            — yetkazib beruvchilar ro'yxati (?status=)
+  POST   /api/v1/warehouse/suppliers/            — yangi yetkazib beruvchi (manager+)
+  GET    /api/v1/warehouse/suppliers/{id}/       — tafsilotlar
+  PATCH  /api/v1/warehouse/suppliers/{id}/       — yangilash (manager+)
+  DELETE /api/v1/warehouse/suppliers/{id}/       — nofaol qilish (manager+, soft delete)
+
+  GET    /api/v1/warehouse/supplier-payments/    — to'lovlar ro'yxati (?supplier=, ?smena=)
+  POST   /api/v1/warehouse/supplier-payments/    — to'lov yaratish (manager+, debt_balance avtomatik)
 """
 
 from rest_framework.routers import DefaultRouter
@@ -82,6 +91,8 @@ from .views import (
     StockMovementViewSet,
     StockViewSet,
     SubCategoryViewSet,
+    SupplierPaymentViewSet,
+    SupplierViewSet,
     TransferViewSet,
     WastageRecordViewSet,
     WarehouseViewSet,
@@ -98,7 +109,9 @@ router.register(r'stocks',         StockViewSet,         basename='stock')
 router.register(r'movements',      StockMovementViewSet, basename='movement')
 router.register(r'transfers',      TransferViewSet,      basename='transfer')
 router.register(r'batches',        StockBatchViewSet,    basename='batch')
-router.register(r'wastages',       WastageRecordViewSet, basename='wastage')
-router.register(r'audits',         StockAuditViewSet,    basename='audit')
+router.register(r'wastages',           WastageRecordViewSet,   basename='wastage')
+router.register(r'audits',            StockAuditViewSet,      basename='audit')
+router.register(r'suppliers',         SupplierViewSet,        basename='supplier')
+router.register(r'supplier-payments', SupplierPaymentViewSet, basename='supplier-payment')
 
 urlpatterns = router.urls
