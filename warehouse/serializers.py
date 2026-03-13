@@ -401,6 +401,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     currency_symbol  = serializers.CharField(source='price_currency.symbol', read_only=True)
     store_name       = serializers.CharField(source='store.name', read_only=True)
     stock_total      = serializers.SerializerMethodField()
+    barcode_image_url = serializers.SerializerMethodField()
 
     class Meta:
         model  = Product
@@ -411,7 +412,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             'unit', 'unit_display',
             'purchase_price', 'sale_price',
             'currency_id', 'currency_code', 'currency_symbol',
-            'barcode', 'image',
+            'barcode', 'barcode_image_url', 'image',
             'store_name', 'status', 'status_display',
             'stock_total', 'created_on',
         )
@@ -420,6 +421,15 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         from django.db.models import Sum
         result = obj.stocks.aggregate(total=Sum('quantity'))
         return result['total'] or 0
+
+    def get_barcode_image_url(self, obj):
+        if not obj.barcode:
+            return None
+        request = self.context.get('request')
+        url = f'/api/v1/warehouse/products/{obj.id}/barcode/'
+        if request:
+            return request.build_absolute_uri(url)
+        return url
 
 
 class ProductCreateSerializer(serializers.ModelSerializer):
@@ -629,6 +639,7 @@ class WarehouseUpdateSerializer(serializers.ModelSerializer):
 # ============================================================
 
 class StockListSerializer(serializers.ModelSerializer):
+    product_id    = serializers.IntegerField(source='product.id', read_only=True)
     product_name  = serializers.CharField(source='product.name', read_only=True)
     product_unit  = serializers.CharField(source='product.get_unit_display', read_only=True)
     location_type = serializers.SerializerMethodField()
@@ -637,7 +648,7 @@ class StockListSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Stock
         fields = (
-            'id', 'product_name', 'product_unit',
+            'id', 'product_id', 'product_name', 'product_unit',
             'location_type', 'location_name',
             'quantity', 'updated_on',
         )
@@ -981,16 +992,41 @@ class TransferItemReadSerializer(serializers.ModelSerializer):
 
 
 class TransferItemWriteSerializer(serializers.Serializer):
-    """Transfer satri — yozish uchun (create da items[] ichida)."""
-    product  = serializers.PrimaryKeyRelatedField(queryset=Product.objects.none())
-    quantity = serializers.DecimalField(max_digits=14, decimal_places=3)
+    """
+    Transfer satri — yozish uchun (create da items[] ichida).
+
+    MUHIM: Bu serializer TransferCreateSerializer ichida nested (many=True)
+    ishlatiladi. DRF da nested serializer __init__ paytida context hali
+    bind bo'lmagan bo'ladi — shuning uchun queryset=all() + validate_product
+    usuli ishlatiladi (context faqat validation paytida mavjud).
+    """
+    product  = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.all(),
+        error_messages={
+            'does_not_exist': "Mahsulot topilmadi (ID: {pk_value}).",
+            'incorrect_type': "Mahsulot ID butun son bo'lishi kerak.",
+            'required'      : "Mahsulot ID kiritilishi shart.",
+            'null'          : "Mahsulot bo'sh bo'lishi mumkin emas.",
+        }
+    )
+    quantity = serializers.DecimalField(
+        max_digits=14,
+        decimal_places=3,
+        error_messages={
+            'required': "Miqdor kiritilishi shart.",
+            'invalid' : "Miqdor raqam bo'lishi kerak.",
+        }
+    )
     note     = serializers.CharField(required=False, allow_blank=True, default='')
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def validate_product(self, value):
+        """Do'kon tegishliligi tekshiruvi — context validation paytida mavjud."""
         store = self.context.get('store')
-        if store:
-            self.fields['product'].queryset = Product.objects.filter(store=store)
+        if store and value.store_id != store.id:
+            raise serializers.ValidationError(
+                f"Mahsulot topilmadi (ID: {value.pk}). Faqat o'z do'konidagi mahsulotlarni tanlang."
+            )
+        return value
 
     def validate_quantity(self, value):
         if value <= 0:
@@ -1113,40 +1149,79 @@ class TransferCreateSerializer(serializers.Serializer):
       - bir transfer ichida bir xil mahsulot takrorlanmasligi
     """
     from_branch    = serializers.PrimaryKeyRelatedField(
-        queryset=Branch.objects.none(),
+        queryset=Branch.objects.all(),
         required=False,
         allow_null=True,
         default=None,
+        error_messages={
+            'does_not_exist': "Filial topilmadi (ID: {pk_value}).",
+            'incorrect_type': "Filial ID butun son bo'lishi kerak.",
+        }
     )
     from_warehouse = serializers.PrimaryKeyRelatedField(
-        queryset=Warehouse.objects.none(),
+        queryset=Warehouse.objects.all(),
         required=False,
         allow_null=True,
         default=None,
+        error_messages={
+            'does_not_exist': "Ombor topilmadi (ID: {pk_value}).",
+            'incorrect_type': "Ombor ID butun son bo'lishi kerak.",
+        }
     )
     to_branch      = serializers.PrimaryKeyRelatedField(
-        queryset=Branch.objects.none(),
+        queryset=Branch.objects.all(),
         required=False,
         allow_null=True,
         default=None,
+        error_messages={
+            'does_not_exist': "Filial topilmadi (ID: {pk_value}).",
+            'incorrect_type': "Filial ID butun son bo'lishi kerak.",
+        }
     )
     to_warehouse   = serializers.PrimaryKeyRelatedField(
-        queryset=Warehouse.objects.none(),
+        queryset=Warehouse.objects.all(),
         required=False,
         allow_null=True,
         default=None,
+        error_messages={
+            'does_not_exist': "Ombor topilmadi (ID: {pk_value}).",
+            'incorrect_type': "Ombor ID butun son bo'lishi kerak.",
+        }
     )
     note  = serializers.CharField(required=False, allow_blank=True, default='')
     items = TransferItemWriteSerializer(many=True)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def validate_from_branch(self, value):
         store = self.context.get('store')
-        if store:
-            self.fields['from_branch'].queryset    = Branch.objects.filter(store=store)
-            self.fields['to_branch'].queryset      = Branch.objects.filter(store=store)
-            self.fields['from_warehouse'].queryset = Warehouse.objects.filter(store=store)
-            self.fields['to_warehouse'].queryset   = Warehouse.objects.filter(store=store)
+        if value and store and value.store_id != store.id:
+            raise serializers.ValidationError(
+                f'"{value.name}" Filiali sizning do\'koningizga tegishli emas.'
+            )
+        return value
+
+    def validate_from_warehouse(self, value):
+        store = self.context.get('store')
+        if value and store and value.store_id != store.id:
+            raise serializers.ValidationError(
+                f'"{value.name}" Ombori sizning do\'koningizga tegishli emas.'
+            )
+        return value
+
+    def validate_to_branch(self, value):
+        store = self.context.get('store')
+        if value and store and value.store_id != store.id:
+            raise serializers.ValidationError(
+                f'"{value.name}" Filiali sizning do\'koningizga tegishli emas.'
+            )
+        return value
+
+    def validate_to_warehouse(self, value):
+        store = self.context.get('store')
+        if value and store and value.store_id != store.id:
+            raise serializers.ValidationError(
+                f'"{value.name}" Ombori sizning do\'koningizga tegishli emas.'
+            )
+        return value
 
     def validate_items(self, value):
         if not value:

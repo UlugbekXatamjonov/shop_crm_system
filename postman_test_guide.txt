@@ -66,7 +66,250 @@ Misol:
 
 
 ============================================================
-  2-BOSQICH — PRODUCTS (MAHSULOTLAR)
+  2-BOSQICH — CATEGORY (KATEGORIYALAR)
+  Ruxsat: list/retrieve → seller+  |  create/update/delete → manager+
+  Base URL: /api/v1/warehouse/categories/
+============================================================
+
+--- Kategoriya yaratish ---
+POST /api/v1/warehouse/categories/
+Header: Authorization: Bearer <token>
+Body (JSON):
+  name         [str]  MAJBURIY — max 200 belgi, do'kon ichida unikal
+  description  [str]  ixtiyoriy
+
+Misol:
+{
+    "name": "Ichimliklar",
+    "description": "Sovuq va issiq ichimliklar"
+}
+
+Javob (201):
+{
+    "message": "Kategoriya muvaffaqiyatli yaratildi.",
+    "data": {
+        "id": 1,
+        "name": "Ichimliklar",
+        "description": "Sovuq va issiq ichimliklar",
+        "store_name": "Baraka Do'koni",
+        "status": "active",
+        "status_display": "Faol",
+        "product_count": 0,
+        "subcategory_count": 0,
+        "created_on": "2026-03-13 | 09:00"
+    }
+}
+
+Xato hollari:
+  400 — "Kategoriya nomi kiritilishi shart."
+  400 — "Bunday nomli Kategoriya mavjud. Iltimos boshqa nom tanlang !"
+  400 — "Kategoriya nomi 200 belgidan oshmasligi kerak."
+
+-------------------------------------------
+
+--- Kategoriyalar ro'yxati ---
+GET /api/v1/warehouse/categories/
+
+Javob (200) — massiv:
+[
+    {
+        "id": 1,
+        "name": "Ichimliklar",
+        "status": "active",
+        "status_display": "Faol",
+        "product_count": 5,
+        "subcategory_count": 2
+    },
+    ...
+]
+
+-------------------------------------------
+
+--- Kategoriya detail ---
+GET /api/v1/warehouse/categories/{id}/
+
+Javob (200):
+{
+    "id": 1,
+    "name": "Ichimliklar",
+    "description": "Sovuq va issiq ichimliklar",
+    "store_name": "Baraka Do'koni",
+    "status": "active",
+    "status_display": "Faol",
+    "product_count": 5,
+    "subcategory_count": 2,
+    "created_on": "2026-03-13 | 09:00"
+}
+
+-------------------------------------------
+
+--- Kategoriya yangilash ---
+PATCH /api/v1/warehouse/categories/{id}/
+Body (JSON) — faqat o'zgartirilgan maydonlar:
+  name         [str]  ixtiyoriy
+  description  [str]  ixtiyoriy
+  status       [str]  ixtiyoriy — "active" | "inactive"
+
+Misol:
+{
+    "name": "Ichimliklar (yangilangan)",
+    "status": "inactive"
+}
+
+Javob (200):
+{
+    "message": "Kategoriya muvaffaqiyatli yangilandi.",
+    "data": { ...CategoryDetail... }
+}
+
+Xato hollari:
+  400 — "Yangilash uchun kamida bitta maydon yuborilishi kerak."
+  400 — "Bunday nomli Kategoriya mavjud. Iltimos boshqa nom tanlang !"
+  400 — "'noto'g'ri' noto'g'ri holat. Mavjud: active, inactive."
+
+-------------------------------------------
+
+--- Kategoriya o'chirish ---
+DELETE /api/v1/warehouse/categories/{id}/
+  * Hard delete — bazadan butunlay o'chadi
+  * Ruxsat: manager+
+
+Javob (200):
+{
+    "message": "Kategoriya muvaffaqiyatli o'chirildi."
+}
+
+
+============================================================
+  3-BOSQICH — SUBCATEGORY (SUBKATEGORIYALAR)
+  Ruxsat: list/retrieve → seller+  |  create/update/delete → manager+
+  Base URL: /api/v1/warehouse/subcategories/
+  Eslatma: StoreSettings.subcategory_enabled=True bo'lganda frontend ko'rsatadi
+============================================================
+
+--- Subkategoriya yaratish ---
+POST /api/v1/warehouse/subcategories/
+Header: Authorization: Bearer <token>
+Body (JSON):
+  name         [str]  MAJBURIY — max 200 belgi
+  category     [int]  MAJBURIY — Category ID (o'z do'koniga tegishli bo'lsin)
+  description  [str]  ixtiyoriy
+
+  * Unikalligi: (store + category + name) kombinatsiyasi unikal bo'lishi kerak
+
+Misol:
+{
+    "name": "Gazlangan",
+    "category": 1,
+    "description": "Gazlangan sovuq ichimliklar"
+}
+
+Javob (201):
+{
+    "message": "Subkategoriya muvaffaqiyatli yaratildi.",
+    "data": {
+        "id": 1,
+        "name": "Gazlangan",
+        "description": "Gazlangan sovuq ichimliklar",
+        "category_id": 1,
+        "category_name": "Ichimliklar",
+        "store_name": "Baraka Do'koni",
+        "status": "active",
+        "status_display": "Faol",
+        "product_count": 0,
+        "created_on": "2026-03-13 | 09:05"
+    }
+}
+
+Xato hollari:
+  400 — "Subkategoriya nomi kiritilishi shart."
+  400 — "Kategoriya tanlanishi shart."
+  400 — "Bunday kategoriya topilmadi."
+  400 — "Ushbu kategoriya sizning do'koningizga tegishli emas."
+  400 — "Bunday nomli SubKategoriya mavjud. Iltimos boshqa nom tanlang !"
+
+-------------------------------------------
+
+--- Subkategoriyalar ro'yxati ---
+GET /api/v1/warehouse/subcategories/
+Filter: ?category=1  — Kategoriya ID bo'yicha filter
+
+Javob (200) — massiv:
+[
+    {
+        "id": 1,
+        "name": "Gazlangan",
+        "category_id": 1,
+        "category_name": "Ichimliklar",
+        "status": "active",
+        "status_display": "Faol",
+        "product_count": 3
+    },
+    ...
+]
+
+-------------------------------------------
+
+--- Subkategoriya detail ---
+GET /api/v1/warehouse/subcategories/{id}/
+
+Javob (200):
+{
+    "id": 1,
+    "name": "Gazlangan",
+    "description": "Gazlangan sovuq ichimliklar",
+    "category_id": 1,
+    "category_name": "Ichimliklar",
+    "store_name": "Baraka Do'koni",
+    "status": "active",
+    "status_display": "Faol",
+    "product_count": 3,
+    "created_on": "2026-03-13 | 09:05"
+}
+
+-------------------------------------------
+
+--- Subkategoriya yangilash ---
+PATCH /api/v1/warehouse/subcategories/{id}/
+Body (JSON) — faqat o'zgartirilgan maydonlar:
+  name         [str]  ixtiyoriy
+  description  [str]  ixtiyoriy
+  category     [int]  ixtiyoriy — boshqa kategoriyaga ko'chirish
+  status       [str]  ixtiyoriy — "active" | "inactive"
+
+Misol:
+{
+    "name": "Gazlangan (yangi)",
+    "status": "inactive"
+}
+
+Javob (200):
+{
+    "message": "Subkategoriya muvaffaqiyatli yangilandi.",
+    "data": { ...SubCategoryDetail... }
+}
+
+Xato hollari:
+  400 — "Yangilash uchun kamida bitta maydon yuborilishi kerak."
+  400 — "Bunday nomli SubKategoriya mavjud. Iltimos boshqa nom tanlang !"
+  400 — "Ushbu kategoriya sizning do'koningizga tegishli emas."
+  400 — "'noto'g'ri' noto'g'ri holat. Mavjud: active, inactive."
+
+-------------------------------------------
+
+--- Subkategoriya o'chirish ---
+DELETE /api/v1/warehouse/subcategories/{id}/
+  * Hard delete — bazadan butunlay o'chadi
+  * Ruxsat: manager+
+
+Javob (200):
+{
+    "message": "Subkategoriya muvaffaqiyatli o'chirildi."
+}
+
+
+============================================================
+  4-BOSQICH — PRODUCTS (MAHSULOTLAR)
   Oldin: Category va SubCategory yaratilgan bo'lsin
 ============================================================
 
@@ -465,24 +708,27 @@ Body: {} (bo'sh)
   TAVSIYA ETILGAN TEST TARTIBI
 ============================================================
 
-  [1] POST /shifts/              — Smena ochish
-  [2] GET  /shifts/{id}/         — Tekshirish
-  [3] POST /products/            — Mahsulot yaratish
-  [4] GET  /products/{id}/barcode/ — Barcode
-  [5] POST /movements/ (in)      — Filiallga kirim
-  [6] POST /movements/ (in)      — Omborga kirim
-  [7] GET  /stocks/              — Qoldiqlar
-  [8] POST /movements/ (out)     — Chiqim
-  [9] POST /transfers/           — Transfer yaratish
-  [10] POST /transfers/{id}/confirm/ — Tasdiqlash
-  [11] GET  /batches/            — FIFO partiyalar
-  [12] POST /sales/  (cash)      — Naqd sotuv
-  [13] POST /sales/  (debt)      — Nasiya sotuv
-  [14] GET  /sales/{id}/         — Sotuv detail
-  [15] PATCH /sales/{id}/cancel/ — Bekor qilish
-  [16] PATCH /shifts/{id}/close/ — Smena yopish
-  [17] GET  /shifts/{id}/x-report/ — X-report
+  [1]  POST /categories/           — Kategoriya yaratish
+  [2]  POST /subcategories/        — Subkategoriya yaratish
+  [3]  POST /shifts/               — Smena ochish
+  [4]  GET  /shifts/{id}/          — Smena tekshirish
+  [5]  POST /products/             — Mahsulot yaratish
+  [6]  GET  /products/{id}/        — Mahsulot detail (barcode_image_url bilan)
+  [7]  GET  /products/{id}/barcode/ — Barcode rasmi (PNG/SVG)
+  [8]  POST /movements/ (in)       — Filiallga kirim
+  [9]  POST /movements/ (in)       — Omborga kirim
+  [10] GET  /stocks/               — Qoldiqlar
+  [11] POST /movements/ (out)      — Chiqim
+  [12] POST /transfers/            — Transfer yaratish
+  [13] POST /transfers/{id}/confirm/ — Tasdiqlash
+  [14] GET  /batches/              — FIFO partiyalar
+  [15] POST /sales/  (cash)        — Naqd sotuv
+  [16] POST /sales/  (debt)        — Nasiya sotuv
+  [17] GET  /sales/{id}/           — Sotuv detail
+  [18] PATCH /sales/{id}/cancel/   — Bekor qilish
+  [19] PATCH /shifts/{id}/close/   — Smena yopish
+  [20] GET  /shifts/{id}/x-report/ — X-report
 
 ============================================================
-  Sana: 10.03.2026  |  Shop CRM System v1.0
+  Sana: 13.03.2026  |  Shop CRM System v1.0
 ============================================================
