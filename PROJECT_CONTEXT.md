@@ -1,5 +1,42 @@
 # CLAUDE UCHUN ESLATMA — Yangi chatda bu faylni o'qi va davom et
 
+## 📅 13.03.2026 SESSION — QILINGAN ISHLAR
+
+### 1. `barcode_image_url` — ProductDetailSerializer ga qo'shildi ✅
+**Fayl:** `warehouse/serializers.py`
+- `ProductDetailSerializer` ga `barcode_image_url = SerializerMethodField()` qo'shildi
+- `get_barcode_image_url(obj)`: barcode bo'lsa → absolute URL qaytaradi, yo'q bo'lsa → `null`
+- URL: `GET /api/v1/warehouse/products/{id}/barcode/` (PNG format, `?format=svg` ham ishlaydi)
+- Migration kerak emas
+
+### 2. `postman_test_guide.txt` — Category va SubCategory bo'limlari qo'shildi ✅
+**Fayl:** `postman_test_guide.txt`
+- 2-BOSQICH: CATEGORY (5 endpoint: list/create/retrieve/update/delete, har biri uchun body, javob, xato holatlari)
+- 3-BOSQICH: SUBCATEGORY (5 endpoint + `?category=` filter)
+- Eski "2-BOSQICH Products" → 4-BOSQICH ga ko'chirildi
+- Test ketma-ketligi [1-17] → [1-20] ga yangilandi, sana 13.03.2026
+
+### 3. Transfer xato matnlari — o'zbekchaga o'zgartirildi ✅
+**Fayl:** `warehouse/serializers.py`
+
+**Asosiy bug tuzatildi:** `TransferItemWriteSerializer(many=True)` nested serializer da
+`__init__` paytida context bind bo'lmagan → `queryset=Product.objects.none()` → barcha product IDlar rad etilardi.
+- **Tuzatish:** `queryset=Product.objects.all()` + `validate_product()` metodi (context validation paytida mavjud)
+
+**Xato matnlari:**
+- `from_branch` / `to_branch`: `queryset=Branch.objects.all()` + `validate_from/to_branch()` — nom ko'rsatadi
+- `from_warehouse` / `to_warehouse`: `queryset=Warehouse.objects.all()` + `validate_from/to_warehouse()` — nom ko'rsatadi
+- Noto'g'ri ID: `"Filial topilmadi (ID: 99)."`
+- Boshqa do'kon obyekti: `'"Toshkent filiali" sizning do\'koningizga tegishli emas.'`
+
+### 4. StockListSerializer — `product_id` qo'shildi ✅
+**Fayl:** `warehouse/serializers.py`
+- `StockListSerializer` ga `product_id = IntegerField(source='product.id')` qo'shildi
+- Sabab: Foydalanuvchilar Stock `id` ni Product `id` bilan chalkashtirardi
+- Tezlikka ta'sir yo'q (`select_related('product')` allaqachon bor)
+
+---
+
 ## 📅 12.03.2026 SESSION — QILINGAN ISHLAR
 
 ### 1. Stock by-product endpoint ✅ (`warehouse` app da)
