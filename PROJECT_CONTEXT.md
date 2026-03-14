@@ -1,5 +1,39 @@
 # CLAUDE UCHUN ESLATMA — Yangi chatda bu faylni o'qi va davom et
 
+## 📅 14.03.2026 SESSION — QILINGAN ISHLAR
+
+### 1. B15 — Celery Tasks kengaytirish ✅ (allaqachon commit qilingan edi)
+
+**Yangi fayllar:**
+- `accaunt/tasks.py` — YANGI fayl: `generate_monthly_worker_kpi` task
+
+**O'zgartirilgan fayllar:**
+- `warehouse/tasks.py` — `check_low_stock` task qo'shildi
+- `warehouse/serializers.py` — `LowStockSerializer` qo'shildi
+- `warehouse/views.py` — `StockViewSet.low_stock` @action qo'shildi
+- `config/settings/base.py` — `CELERY_BEAT_SCHEDULE` kengaytirildi (2 ta yangi task)
+
+**Yangi endpointlar:**
+- `GET /api/v1/warehouse/stocks/low-stock/` — Kam qoldiq mahsulotlar ro'yxati
+
+**Celery Beat jadval:**
+| Task | Vaqt |
+|------|------|
+| `update_exchange_rates` | Har kuni 09:00 |
+| `check_low_stock` | 00:00, 06:00, 12:00, 18:00 (har 6 soat) |
+| `generate_monthly_worker_kpi` | Har oy 1-kuni 00:01 |
+
+### 2. B16 — Export rejasi tuzildi (kod yozilmadi, faqat muhokama)
+
+**Reja:**
+- `openpyxl==3.1.5` va `reportlab==4.4.0` o'rnatildi (requirements da bor edi, lekin yuklanmagan edi)
+- Excel export: mahsulotlar, savdolar, kirim/chiqim, xarajatlar, WorkerKPI (5 ta endpoint)
+- PDF export: Z-report, savdolar hisoboti, sotuv cheki (3 ta endpoint)
+- Arxitektura: Variant A (to'g'ridan-to'g'ri response, Celery emas)
+- Keyingi sessiyada implementatsiya boshlanadi
+
+---
+
 ## 📅 13.03.2026 SESSION — QILINGAN ISHLAR
 
 ### 1. `barcode_image_url` — ProductDetailSerializer ga qo'shildi ✅
@@ -328,6 +362,8 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 | `Z/X-report` | ✅ Tugallangan | BOSQICH 10 — store app da                              |
 | `PriceList` | ⏭ Skip         | BOSQICH 12 — hozircha sale_price yetarli               |
 | `Supplier`  | ✅ Tugallangan  | BOSQICH 13 — warehouse app da (debt_balance + to'lov tarixi) |
+| `Celery Tasks` | ✅ Tugallangan | BOSQICH 15 — check_low_stock (6 soat), generate_monthly_worker_kpi (oylik), low-stock endpoint |
+| `Export`    | 🔄 Rejalashtirilgan | BOSQICH 16 — openpyxl+reportlab o'rnatildi, keyingi sessiyada Excel/PDF implementatsiya |
 | `Telegram bot` | ❌ Boshlanmagan | BOSQICH 11 — V2, keyingi versiya                   |
 | `SMS xabar`  | ❌ Boshlanmagan  | BOSQICH 11.5 — V2, Eskiz/PlayMobile API              |
 | `OFD`       | ❌ Boshlanmagan  | BOSQICH 14 — v2, keyingi versiyada (Uzbekistonda MAJBURIY 2026) |
