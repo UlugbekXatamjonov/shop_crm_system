@@ -329,4 +329,22 @@ CELERY_BEAT_SCHEDULE = {
             'expires': 3600,  # 1 soat ichida bajarilmasa — bekor qilinadi
         },
     },
+
+    # BOSQICH 15 — Kam qoldiq mahsulotlarni har 6 soatda tekshirish
+    'check-low-stock-every-6h': {
+        'task':     'warehouse.tasks.check_low_stock',
+        'schedule': crontab(hour='0,6,12,18', minute=0),  # 00:00, 06:00, 12:00, 18:00
+        'options': {
+            'expires': 21600,  # 6 soat ichida bajarilmasa — bekor qilinadi
+        },
+    },
+
+    # BOSQICH 15 — Har oy 1-kuni yangi WorkerKPI yozuvlarini yaratish
+    'generate-monthly-worker-kpi': {
+        'task':     'accaunt.tasks.generate_monthly_worker_kpi',
+        'schedule': crontab(hour=0, minute=1, day_of_month=1),  # Har oy 1-kuni 00:01
+        'options': {
+            'expires': 3600,  # 1 soat ichida bajarilmasa — bekor qilinadi
+        },
+    },
 }

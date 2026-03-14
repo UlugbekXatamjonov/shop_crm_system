@@ -714,6 +714,58 @@ class StockByProductSerializer(serializers.Serializer):
     locations      = StockLocationSerializer(many=True)
 
 
+class LowStockSerializer(serializers.ModelSerializer):
+    """
+    GET /api/v1/warehouse/stocks/low-stock/
+    Threshold dan kam qoldiqli mahsulotlar ro'yxati.
+
+    Javob formati:
+    [
+      {
+        "stock_id": 5,
+        "product_id": 12,
+        "product_name": "Pepsi 0.5L",
+        "product_unit": "Dona",
+        "location_type": "branch",
+        "location_name": "Baraka filial 1",
+        "quantity": "3.000",
+        "threshold": 5
+      },
+      ...
+    ]
+    """
+    stock_id      = serializers.IntegerField(source='id', read_only=True)
+    product_id    = serializers.IntegerField(source='product.id', read_only=True)
+    product_name  = serializers.CharField(source='product.name', read_only=True)
+    product_unit  = serializers.CharField(source='product.get_unit_display', read_only=True)
+    location_type = serializers.SerializerMethodField()
+    location_name = serializers.SerializerMethodField()
+    threshold     = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = Stock
+        fields = (
+            'stock_id',
+            'product_id', 'product_name', 'product_unit',
+            'location_type', 'location_name',
+            'quantity', 'threshold',
+        )
+
+    def get_location_type(self, obj):
+        return 'branch' if obj.branch_id else 'warehouse'
+
+    def get_location_name(self, obj):
+        if obj.branch_id:
+            return obj.branch.name
+        return obj.warehouse.name if obj.warehouse_id else None
+
+    def get_threshold(self, obj):
+        """Do'kon sozlamalaridan threshold qaytarish."""
+        thresholds = self.context.get('thresholds', {})
+        store_id = obj.product.store_id
+        return thresholds.get(store_id, 5)
+
+
 class StockCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Stock

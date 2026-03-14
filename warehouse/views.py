@@ -92,6 +92,7 @@ from .serializers import (
     StockAuditListSerializer,
     StockBatchSerializer,
     StockByProductSerializer,
+    LowStockSerializer,
     StockCreateSerializer,
     StockDetailSerializer,
     StockListSerializer,
@@ -918,6 +919,8 @@ class StockViewSet(viewsets.ModelViewSet):
             return StockListSerializer
         if self.action == 'by_product':
             return StockByProductSerializer
+        if self.action == 'low_stock':
+            return LowStockSerializer
         if self.action == 'create':
             return StockCreateSerializer
         if self.action in ('update', 'partial_update'):
@@ -1035,6 +1038,62 @@ class StockViewSet(viewsets.ModelViewSet):
             })
 
         return Response(result)
+
+    @action(detail=False, methods=['get'], url_path='low-stock')
+    def low_stock(self, request):
+        """
+        Threshold dan kam qoldiqli mahsulotlar.
+
+        GET /api/v1/warehouse/stocks/low-stock/
+
+        Faqat StoreSettings.low_stock_enabled=True bo'lgan do'konlarda ishlaydi.
+        Agar low_stock_enabled=False bo'lsa — bo'sh ro'yxat qaytaradi.
+
+        Javob: [
+          {
+            "stock_id": 5,
+            "product_id": 12,
+            "product_name": "Pepsi 0.5L",
+            "product_unit": "Dona",
+            "location_type": "branch",
+            "location_name": "Baraka filial 1",
+            "quantity": "3.000",
+            "threshold": 5
+          },
+          ...
+        ]
+        """
+        from config.cache_utils import get_store_settings
+
+        worker = getattr(request.user, 'worker', None)
+        if not worker or not worker.store:
+            return Response([])
+
+        store_settings = get_store_settings(worker.store_id)
+
+        if not store_settings.low_stock_enabled:
+            return Response([])
+
+        threshold = store_settings.low_stock_threshold
+
+        qs = (
+            Stock.objects
+            .filter(
+                product__store=worker.store,
+                quantity__gt=0,
+                quantity__lte=threshold,
+            )
+            .select_related('product', 'branch', 'warehouse')
+            .order_by('quantity', 'product__name')
+        )
+
+        # threshold ni serializer context ga beramiz (store_id → threshold mapping)
+        thresholds = {worker.store_id: threshold}
+        serializer = LowStockSerializer(
+            qs, many=True,
+            context={**self.get_serializer_context(), 'thresholds': thresholds},
+        )
+        return Response(serializer.data)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
