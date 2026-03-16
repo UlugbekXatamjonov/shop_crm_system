@@ -32,6 +32,9 @@ Router avtomatik quyidagi URL'larni yaratadi:
   PATCH  /api/v1/warehouse/products/{id}/        — mahsulot yangilash
   DELETE /api/v1/warehouse/products/{id}/        — mahsulotni nofaol qilish
   GET    /api/v1/warehouse/products/{id}/barcode/— barcode PNG/SVG rasm (?format=svg)
+  GET    /api/v1/warehouse/products/{id}/qr/    — QR kod PNG rasm (barcode yo'q mahsulotlar uchun)
+  GET    /api/v1/warehouse/products/scan/       — barcode/QR kod orqali mahsulot qidirish (?code=...)
+  POST   /api/v1/warehouse/products/bulk-qr/   — bir nechta mahsulot QR ZIP arxivi (maks 500)
 
   GET    /api/v1/warehouse/warehouses/           — omborlar ro'yxati
   POST   /api/v1/warehouse/warehouses/           — yangi ombor qo'shish (manager+)

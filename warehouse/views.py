@@ -43,8 +43,14 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from accaunt.audit_mixin import AuditMixin
 from accaunt.models import AuditLog
-from accaunt.permissions import CanAccess, IsManagerOrAbove
+from accaunt.permissions import (
+    CanAccess,
+    IsManagerOrAbove,
+    ProductLimitPermission,
+    WarehouseLimitPermission,
+)
 
 from config.cache_utils import get_store_settings
 
@@ -124,7 +130,7 @@ from .utils import fifo_deduct, generate_batch_code
 # KATEGORIYA VIEWSET
 # ============================================================
 
-class CategoryViewSet(viewsets.ModelViewSet):
+class CategoryViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Kategoriyalarni boshqarish.
 
@@ -170,33 +176,15 @@ class CategoryViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         worker   = self.request.user.worker
         instance = serializer.save(store=worker.store)
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='Category',
-            target_id=instance.id,
-            description=f"Kategoriya yaratildi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.CREATE, instance, f"Kategoriya yaratildi: '{instance.name}'")
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='Category',
-            target_id=instance.id,
-            description=f"Kategoriya yangilandi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.UPDATE, instance, f"Kategoriya yangilandi: '{instance.name}'")
 
     def perform_destroy(self, instance: Category):
         """Hard delete — kategoriyani bazadan o'chiradi."""
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.DELETE,
-            target_model='Category',
-            target_id=instance.id,
-            description=f"Kategoriya o'chirildi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.DELETE, instance, f"Kategoriya o'chirildi: '{instance.name}'")
         instance.delete()
 
     def create(self, request, *args, **kwargs):
@@ -248,7 +236,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
 # SUBKATEGORIYA VIEWSET (BOSQICH 1.1)
 # ============================================================
 
-class SubCategoryViewSet(viewsets.ModelViewSet):
+class SubCategoryViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Subkategoriyalarni boshqarish.
 
@@ -308,33 +296,15 @@ class SubCategoryViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         worker   = self.request.user.worker
         instance = serializer.save(store=worker.store)
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='SubCategory',
-            target_id=instance.id,
-            description=f"Subkategoriya yaratildi: '{instance.category.name} → {instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.CREATE, instance, f"Subkategoriya yaratildi: '{instance.category.name} → {instance.name}'")
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='SubCategory',
-            target_id=instance.id,
-            description=f"Subkategoriya yangilandi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.UPDATE, instance, f"Subkategoriya yangilandi: '{instance.name}'")
 
     def perform_destroy(self, instance: SubCategory):
         """Hard delete — subkategoriyani bazadan o'chiradi."""
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.DELETE,
-            target_model='SubCategory',
-            target_id=instance.id,
-            description=f"Subkategoriya o'chirildi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.DELETE, instance, f"Subkategoriya o'chirildi: '{instance.name}'")
         instance.delete()
 
     def create(self, request, *args, **kwargs):
@@ -386,7 +356,7 @@ class SubCategoryViewSet(viewsets.ModelViewSet):
 # VALYUTA VIEWSET (BOSQICH 1.3)
 # ============================================================
 
-class CurrencyViewSet(viewsets.ModelViewSet):
+class CurrencyViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Valyutalarni boshqarish.
 
@@ -420,13 +390,7 @@ class CurrencyViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         instance = serializer.save()
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='Currency',
-            target_id=instance.id,
-            description=f"Valyuta qo'shildi: '{instance.code} ({instance.name})'",
-        )
+        self._audit_log(AuditLog.Action.CREATE, instance, f"Valyuta qo'shildi: '{instance.code} ({instance.name})'")
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -479,7 +443,7 @@ class CurrencyViewSet(viewsets.ModelViewSet):
 # VALYUTA KURSI VIEWSET (BOSQICH 1.3)
 # ============================================================
 
-class ExchangeRateViewSet(viewsets.ModelViewSet):
+class ExchangeRateViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Valyuta kurslarini boshqarish.
 
@@ -527,15 +491,9 @@ class ExchangeRateViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         instance = serializer.save()
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='ExchangeRate',
-            target_id=instance.id,
-            description=(
-                f"Valyuta kursi kiritildi: {instance.currency.code} = "
-                f"{instance.rate} UZS ({instance.date})"
-            ),
+        self._audit_log(
+            AuditLog.Action.CREATE, instance,
+            f"Valyuta kursi kiritildi: {instance.currency.code} = {instance.rate} UZS ({instance.date})",
         )
 
     def create(self, request, *args, **kwargs):
@@ -555,7 +513,7 @@ class ExchangeRateViewSet(viewsets.ModelViewSet):
 # MAHSULOT VIEWSET (BOSQICH 1.2 — barcode action qo'shildi)
 # ============================================================
 
-class ProductViewSet(viewsets.ModelViewSet):
+class ProductViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Mahsulotlarni boshqarish.
 
@@ -581,8 +539,10 @@ class ProductViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'patch', 'delete']
 
     def get_permissions(self):
-        if self.action in ('list', 'retrieve', 'barcode_image'):
+        if self.action in ('list', 'retrieve', 'barcode_image', 'qr', 'scan'):
             return [IsAuthenticated(), CanAccess('mahsulotlar')]
+        if self.action == 'create':
+            return [IsAuthenticated(), IsManagerOrAbove(), ProductLimitPermission()]
         return [IsAuthenticated(), IsManagerOrAbove()]
 
     def get_serializer_class(self):
@@ -643,33 +603,15 @@ class ProductViewSet(viewsets.ModelViewSet):
             barcode_val = generate_unique_barcode(worker.store.id)
 
         instance = serializer.save(store=worker.store, barcode=barcode_val)
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='Product',
-            target_id=instance.id,
-            description=f"Mahsulot yaratildi: '{instance.name}' (barcode: {instance.barcode})",
-        )
+        self._audit_log(AuditLog.Action.CREATE, instance, f"Mahsulot yaratildi: '{instance.name}' (barcode: {instance.barcode})")
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='Product',
-            target_id=instance.id,
-            description=f"Mahsulot yangilandi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.UPDATE, instance, f"Mahsulot yangilandi: '{instance.name}'")
 
     def perform_destroy(self, instance: Product):
         """Hard delete — mahsulotni bazadan o'chiradi."""
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.DELETE,
-            target_model='Product',
-            target_id=instance.id,
-            description=f"Mahsulot o'chirildi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.DELETE, instance, f"Mahsulot o'chirildi: '{instance.name}'")
         instance.delete()
 
     def create(self, request, *args, **kwargs):
@@ -764,12 +706,122 @@ class ProductViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+    # ── QR CODE ACTION ───────────────────────────────────────
+    @action(methods=['get'], detail=True, url_path='qr')
+    def qr(self, request, pk=None):
+        """
+        Mahsulot QR kod rasmi (PNG).
+        Barcode qiymati QR kodga kodlanadi.
+
+        GET /api/v1/warehouse/products/{id}/qr/
+        """
+        import io
+        import qrcode as qrcode_lib
+
+        product  = self.get_object()
+        code_val = product.barcode or str(product.pk)
+
+        qr_img  = qrcode_lib.make(code_val)
+        buf     = io.BytesIO()
+        qr_img.save(buf, format='PNG')
+        buf.seek(0)
+
+        safe_name = product.name.replace(' ', '_')[:60]
+        response  = HttpResponse(buf.read(), content_type='image/png')
+        response['Content-Disposition'] = f'attachment; filename="qr_{safe_name}.png"'
+        return response
+
+    # ── SCAN ACTION ──────────────────────────────────────────
+    @action(methods=['get'], detail=False, url_path='scan')
+    def scan(self, request):
+        """
+        Barcode yoki QR kod orqali mahsulot qidirish.
+
+        GET /api/v1/warehouse/products/scan/?code=4607038319014
+        GET /api/v1/warehouse/products/scan/?code=QR-5-47
+        """
+        code = request.query_params.get('code', '').strip()
+        if not code:
+            raise ValidationError({'code': "Kod kiritilmadi."})
+
+        worker = request.user.worker
+        try:
+            product = (
+                Product.objects
+                .select_related('category', 'subcategory', 'store', 'price_currency')
+                .get(store=worker.store, barcode=code)
+            )
+        except Product.DoesNotExist:
+            return Response(
+                {'detail': f"'{code}' kodli mahsulot topilmadi."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(
+            ProductDetailSerializer(product, context=self.get_serializer_context()).data
+        )
+
+    # ── BULK QR ACTION ───────────────────────────────────────
+    @action(methods=['post'], detail=False, url_path='bulk-qr')
+    def bulk_qr(self, request):
+        """
+        Bir nechta mahsulot QR kodlarini ZIP arxivida qaytaradi.
+
+        POST /api/v1/warehouse/products/bulk-qr/
+        Body: {"product_ids": [1, 2, 3], "copies": 10}
+          product_ids — mahsulotlar ID ro'yxati (maks. 500)
+          copies      — har bir mahsulot uchun stiker soni (faylga yoziladi)
+
+        Javob: products_qr_YYYY-MM-DD.zip
+          Har fayl nomi: "{mahsulot_nomi}_x{copies}.png"
+        """
+        import io
+        import zipfile
+        from datetime import date as _date
+        import qrcode as qrcode_lib
+
+        product_ids = request.data.get('product_ids', [])
+        try:
+            copies = max(1, int(request.data.get('copies', 1)))
+        except (ValueError, TypeError):
+            copies = 1
+
+        if not product_ids:
+            raise ValidationError({'product_ids': "Mahsulotlar ro'yxati bo'sh."})
+        if len(product_ids) > 500:
+            raise ValidationError({'product_ids': "Bir vaqtda maksimal 500 ta mahsulot."})
+
+        worker   = request.user.worker
+        products = (
+            Product.objects
+            .filter(store=worker.store, pk__in=product_ids)
+            .only('id', 'name', 'barcode')
+        )
+
+        zip_buf = io.BytesIO()
+        with zipfile.ZipFile(zip_buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for product in products:
+                code_val  = product.barcode or str(product.pk)
+                qr_img    = qrcode_lib.make(code_val)
+                img_buf   = io.BytesIO()
+                qr_img.save(img_buf, format='PNG')
+                img_buf.seek(0)
+                safe_name = product.name.replace('/', '-').replace('\\', '-')[:60]
+                zf.writestr(f"{safe_name}_x{copies}.png", img_buf.read())
+
+        zip_buf.seek(0)
+        response = HttpResponse(zip_buf.read(), content_type='application/zip')
+        response['Content-Disposition'] = (
+            f'attachment; filename="products_qr_{_date.today()}.zip"'
+        )
+        return response
+
 
 # ============================================================
 # OMBOR (WAREHOUSE) VIEWSET
 # ============================================================
 
-class WarehouseViewSet(viewsets.ModelViewSet):
+class WarehouseViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Omborlarni boshqarish.
 
@@ -788,6 +840,8 @@ class WarehouseViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ('list', 'retrieve'):
             return [IsAuthenticated(), CanAccess('ombor')]
+        if self.action == 'create':
+            return [IsAuthenticated(), IsManagerOrAbove(), WarehouseLimitPermission()]
         return [IsAuthenticated(), IsManagerOrAbove()]
 
     def get_serializer_class(self):
@@ -815,33 +869,15 @@ class WarehouseViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         worker = getattr(self.request.user, 'worker', None)
         instance = serializer.save(store=worker.store)
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='Warehouse',
-            target_id=instance.id,
-            description=f"Yangi ombor qo'shildi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.CREATE, instance, f"Yangi ombor qo'shildi: '{instance.name}'")
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='Warehouse',
-            target_id=instance.id,
-            description=f"Ombor yangilandi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.UPDATE, instance, f"Ombor yangilandi: '{instance.name}'")
 
     def perform_destroy(self, instance: Warehouse):
         """Hard delete — omborni bazadan o'chiradi."""
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.DELETE,
-            target_model='Warehouse',
-            target_id=instance.id,
-            description=f"Ombor o'chirildi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.DELETE, instance, f"Ombor o'chirildi: '{instance.name}'")
         instance.delete()
 
     def create(self, request, *args, **kwargs):
@@ -893,7 +929,7 @@ class WarehouseViewSet(viewsets.ModelViewSet):
 # OMBOR QOLDIG'I VIEWSET
 # ============================================================
 
-class StockViewSet(viewsets.ModelViewSet):
+class StockViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Ombor qoldiqlarini boshqarish.
 
@@ -951,40 +987,21 @@ class StockViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         instance = serializer.save()
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='Stock',
-            target_id=instance.id,
-            description=(
-                f"Ombor qoldig'i qo'shildi: '{instance.product.name}' "
-                f"({self._location_name(instance)}) = {instance.quantity}"
-            ),
+        self._audit_log(
+            AuditLog.Action.CREATE, instance,
+            f"Ombor qoldig'i qo'shildi: '{instance.product.name}' ({self._location_name(instance)}) = {instance.quantity}",
         )
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='Stock',
-            target_id=instance.id,
-            description=(
-                f"Ombor qoldig'i yangilandi: '{instance.product.name}' "
-                f"({self._location_name(instance)}) = {instance.quantity}"
-            ),
+        self._audit_log(
+            AuditLog.Action.UPDATE, instance,
+            f"Ombor qoldig'i yangilandi: '{instance.product.name}' ({self._location_name(instance)}) = {instance.quantity}",
         )
 
     def perform_destroy(self, instance: Stock):
-        pk   = instance.id
         name = f"{instance.product.name} ({self._location_name(instance)})"
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.DELETE,
-            target_model='Stock',
-            target_id=pk,
-            description=f"Ombor qoldig'i o'chirildi: '{name}'",
-        )
+        self._audit_log(AuditLog.Action.DELETE, instance, f"Ombor qoldig'i o'chirildi: '{name}'")
         instance.delete()
 
     @action(detail=False, methods=['get'], url_path='by-product')
@@ -1144,7 +1161,7 @@ class StockViewSet(viewsets.ModelViewSet):
 # HARAKAT (KIRIM/CHIQIM) VIEWSET
 # ============================================================
 
-class StockMovementViewSet(viewsets.ModelViewSet):
+class StockMovementViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Mahsulot kirim/chiqim harakatlarini boshqarish.
 
@@ -1282,16 +1299,9 @@ class StockMovementViewSet(viewsets.ModelViewSet):
                         unit_cost=avg_cost
                     )
 
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='StockMovement',
-            target_id=instance.id,
-            description=(
-                f"{instance.get_movement_type_display()}: "
-                f"'{instance.product.name}' × {instance.quantity} "
-                f"({self._location_name(instance)})"
-            ),
+        self._audit_log(
+            AuditLog.Action.CREATE, instance,
+            f"{instance.get_movement_type_display()}: '{instance.product.name}' × {instance.quantity} ({self._location_name(instance)})",
         )
 
     def create(self, request, *args, **kwargs):
@@ -1314,7 +1324,7 @@ class StockMovementViewSet(viewsets.ModelViewSet):
 # TRANSFER VIEWSET
 # ============================================================
 
-class TransferViewSet(viewsets.ModelViewSet):
+class TransferViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Tovar ko'chirish (Transfer) — bir nechta mahsulotni guruhlab jo'natish.
 
@@ -1382,16 +1392,9 @@ class TransferViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         transfer = serializer.save()
-        AuditLog.objects.create(
-            actor=request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='Transfer',
-            target_id=transfer.id,
-            description=(
-                f"Transfer yaratildi (pending): "
-                f"{self._from_name(transfer)} → {self._to_name(transfer)}, "
-                f"{transfer.items.count()} ta mahsulot"
-            ),
+        self._audit_log(
+            AuditLog.Action.CREATE, transfer,
+            f"Transfer yaratildi (pending): {self._from_name(transfer)} → {self._to_name(transfer)}, {transfer.items.count()} ta mahsulot",
         )
         return Response(
             {
@@ -1566,16 +1569,9 @@ class TransferViewSet(viewsets.ModelViewSet):
         transfer.save(update_fields=['status', 'confirmed_at'])
 
         total_qty = sum(item.quantity for item in items)
-        AuditLog.objects.create(
-            actor=request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='Transfer',
-            target_id=transfer.id,
-            description=(
-                f"Transfer tasdiqlandi: "
-                f"{self._from_name(transfer)} → {self._to_name(transfer)}, "
-                f"{len(items)} ta mahsulot, jami {total_qty} birlik"
-            ),
+        self._audit_log(
+            AuditLog.Action.UPDATE, transfer,
+            f"Transfer tasdiqlandi: {self._from_name(transfer)} → {self._to_name(transfer)}, {len(items)} ta mahsulot, jami {total_qty} birlik",
         )
 
         return Response(
@@ -1606,15 +1602,9 @@ class TransferViewSet(viewsets.ModelViewSet):
         transfer.status = TransferStatus.CANCELLED
         transfer.save(update_fields=['status'])
 
-        AuditLog.objects.create(
-            actor=request.user,
-            action=AuditLog.Action.DELETE,
-            target_model='Transfer',
-            target_id=transfer.id,
-            description=(
-                f"Transfer bekor qilindi: "
-                f"{self._from_name(transfer)} → {self._to_name(transfer)}"
-            ),
+        self._audit_log(
+            AuditLog.Action.DELETE, transfer,
+            f"Transfer bekor qilindi: {self._from_name(transfer)} → {self._to_name(transfer)}",
         )
 
         return Response(
@@ -1672,7 +1662,7 @@ class StockBatchViewSet(viewsets.ReadOnlyModelViewSet):
 # ISROF (WASTAGE) VIEWSET  B7
 # ============================================================
 
-class WastageRecordViewSet(viewsets.ModelViewSet):
+class WastageRecordViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Isrof yozuvlarini boshqarish.
 
@@ -1798,15 +1788,9 @@ class WastageRecordViewSet(viewsets.ModelViewSet):
                 avg_cost = total_cost / instance.quantity
                 StockMovement.objects.filter(pk=movement.pk).update(unit_cost=avg_cost)
 
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='WastageRecord',
-            target_id=instance.id,
-            description=(
-                f"Isrof yozildi: '{instance.product.name}' × {instance.quantity} "
-                f"({instance.get_reason_display()})"
-            ),
+        self._audit_log(
+            AuditLog.Action.CREATE, instance,
+            f"Isrof yozildi: '{instance.product.name}' × {instance.quantity} ({instance.get_reason_display()})",
         )
 
     def create(self, request, *args, **kwargs):
@@ -1829,7 +1813,7 @@ class WastageRecordViewSet(viewsets.ModelViewSet):
 # INVENTARIZATSIYA (STOCK AUDIT) VIEWSET  B8
 # ============================================================
 
-class StockAuditViewSet(viewsets.ModelViewSet):
+class StockAuditViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Inventarizatsiyani boshqarish.
 
@@ -1939,15 +1923,9 @@ class StockAuditViewSet(viewsets.ModelViewSet):
             StockAuditItem.objects.bulk_create(items_to_create)
 
         location_name = branch.name if branch else warehouse.name
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='StockAudit',
-            target_id=audit.id,
-            description=(
-                f"Inventarizatsiya yaratildi (draft): '{location_name}', "
-                f"{len(items_to_create)} ta mahsulot"
-            ),
+        self._audit_log(
+            AuditLog.Action.CREATE, audit,
+            f"Inventarizatsiya yaratildi (draft): '{location_name}', {len(items_to_create)} ta mahsulot",
         )
 
     def create(self, request, *args, **kwargs):
@@ -2109,15 +2087,9 @@ class StockAuditViewSet(viewsets.ModelViewSet):
         audit.save(update_fields=['status', 'confirmed_on'])
 
         location_name = branch.name if branch else warehouse.name
-        AuditLog.objects.create(
-            actor=request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='StockAudit',
-            target_id=audit.id,
-            description=(
-                f"Inventarizatsiya tasdiqlandi: '{location_name}', "
-                f"{len(items)} ta mahsulot tekshirildi"
-            ),
+        self._audit_log(
+            AuditLog.Action.UPDATE, audit,
+            f"Inventarizatsiya tasdiqlandi: '{location_name}', {len(items)} ta mahsulot tekshirildi",
         )
 
         return Response(
@@ -2155,13 +2127,7 @@ class StockAuditViewSet(viewsets.ModelViewSet):
         audit.save(update_fields=['status'])
 
         location_name = audit.branch.name if audit.branch_id else audit.warehouse.name
-        AuditLog.objects.create(
-            actor=request.user,
-            action=AuditLog.Action.DELETE,
-            target_model='StockAudit',
-            target_id=audit.id,
-            description=f"Inventarizatsiya bekor qilindi: '{location_name}'",
-        )
+        self._audit_log(AuditLog.Action.DELETE, audit, f"Inventarizatsiya bekor qilindi: '{location_name}'")
 
         return Response(
             {
@@ -2231,7 +2197,7 @@ class StockAuditViewSet(viewsets.ModelViewSet):
 # YETKAZIB BERUVCHI VIEWSET  B13
 # ============================================================
 
-class SupplierViewSet(viewsets.ModelViewSet):
+class SupplierViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Yetkazib beruvchilarni boshqarish.
 
@@ -2283,35 +2249,17 @@ class SupplierViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         worker   = self.request.user.worker
         instance = serializer.save(store=worker.store)
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='Supplier',
-            target_id=instance.id,
-            description=f"Yetkazib beruvchi yaratildi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.CREATE, instance, f"Yetkazib beruvchi yaratildi: '{instance.name}'")
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='Supplier',
-            target_id=instance.id,
-            description=f"Yetkazib beruvchi yangilandi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.UPDATE, instance, f"Yetkazib beruvchi yangilandi: '{instance.name}'")
 
     def perform_destroy(self, instance):
         """Soft delete — status='inactive' ga o'tkazish."""
         instance.status = 'inactive'
         instance.save(update_fields=['status'])
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.DELETE,
-            target_model='Supplier',
-            target_id=instance.id,
-            description=f"Yetkazib beruvchi o'chirildi (soft): '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.DELETE, instance, f"Yetkazib beruvchi o'chirildi (soft): '{instance.name}'")
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -2358,7 +2306,7 @@ class SupplierViewSet(viewsets.ModelViewSet):
 # YETKAZIB BERUVCHI TO'LOV VIEWSET  B13
 # ============================================================
 
-class SupplierPaymentViewSet(viewsets.ModelViewSet):
+class SupplierPaymentViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Yetkazib beruvchiga to'lovlar.
 
@@ -2412,15 +2360,9 @@ class SupplierPaymentViewSet(viewsets.ModelViewSet):
         Supplier.objects.filter(pk=instance.supplier_id).update(
             debt_balance=F('debt_balance') - instance.amount
         )
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='SupplierPayment',
-            target_id=instance.id,
-            description=(
-                f"To'lov: '{instance.supplier.name}' — "
-                f"{instance.amount} ({instance.get_payment_type_display()})"
-            ),
+        self._audit_log(
+            AuditLog.Action.CREATE, instance,
+            f"To'lov: '{instance.supplier.name}' — {instance.amount} ({instance.get_payment_type_display()})",
         )
 
     def create(self, request, *args, **kwargs):

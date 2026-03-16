@@ -27,8 +27,9 @@ from rest_framework.filters import SearchFilter
 from rest_framework_simplejwt.tokens import RefreshToken
 from django_filters.rest_framework import DjangoFilterBackend
 
+from .audit_mixin import AuditMixin
 from .models import CustomUser, Worker, WorkerKPI, AuditLog, WorkerStatus
-from .permissions import IsManagerOrAbove, IsOwner
+from .permissions import IsManagerOrAbove, IsOwner, WorkerLimitPermission
 from .serializers import (
     UserRegistrationSerializer,
     UserLoginSerializer,
@@ -45,6 +46,7 @@ from .serializers import (
     WorkerSelfUpdateSerializer,
     WorkerKPISerializer,
     WorkerKPISetTargetSerializer,
+    AuditLogSerializer,
 )
 
 
@@ -264,7 +266,7 @@ class UserPasswordResetView(APIView):
 # WORKER VIEW'LARI
 # ============================================================
 
-class WorkerViewSet(viewsets.ModelViewSet):
+class WorkerViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Hodimlarni boshqarish.
 
@@ -308,12 +310,15 @@ class WorkerViewSet(viewsets.ModelViewSet):
         """
         me             → IsAuthenticated   (har qanday hodim o'zini ko'radi/yangilaydi)
         list/retrieve  → IsManagerOrAbove  (manager va seller ham ko'ra oladi)
-        create/update/destroy → IsOwner   (faqat ega)
+        create         → IsOwner + WorkerLimitPermission (limit tekshiruvi)
+        update/destroy → IsOwner   (faqat ega)
         """
         if self.action == 'me':
             return [IsAuthenticated()]
         if self.action in ('list', 'retrieve'):
             return [IsAuthenticated(), IsManagerOrAbove()]
+        if self.action == 'create':
+            return [IsAuthenticated(), IsOwner(), WorkerLimitPermission()]
         return [IsAuthenticated(), IsOwner()]
 
     def get_serializer_class(self):
@@ -380,11 +385,9 @@ class WorkerViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         worker = self.perform_create(serializer)
 
-        AuditLog.objects.create(
-            actor=request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='Worker',
-            target_id=worker.id if worker else None,
+        self._audit_log(
+            AuditLog.Action.CREATE,
+            worker,
             description=f"Yangi hodim qo'shildi: {serializer.validated_data.get('username')}",
         )
 
@@ -410,13 +413,8 @@ class WorkerViewSet(viewsets.ModelViewSet):
             )
         self.perform_update(serializer)
 
-        AuditLog.objects.create(
-            actor=request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='Worker',
-            target_id=instance.id,
-            description=f"Hodim ma'lumotlari yangilandi: {instance.user}",
-        )
+        self._audit_log(AuditLog.Action.UPDATE, instance,
+                        description=f"Hodim ma'lumotlari yangilandi: {instance.user}")
 
         return Response(
             {
@@ -461,13 +459,8 @@ class WorkerViewSet(viewsets.ModelViewSet):
             )
         serializer.save()
 
-        AuditLog.objects.create(
-            actor=request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='Worker',
-            target_id=worker.id,
-            description=f"Hodim o'z ma'lumotlarini yangiladi: {request.user}",
-        )
+        self._audit_log(AuditLog.Action.UPDATE, worker,
+                        description=f"Hodim o'z ma'lumotlarini yangiladi: {request.user}")
 
         return Response(
             {
@@ -486,13 +479,8 @@ class WorkerViewSet(viewsets.ModelViewSet):
         pk   = instance.id
         name = str(instance.user)
 
-        AuditLog.objects.create(
-            actor=request.user,
-            action=AuditLog.Action.DELETE,
-            target_model='Worker',
-            target_id=pk,
-            description=f"Hodim o'chirildi: {name}",
-        )
+        self._audit_log(AuditLog.Action.DELETE, instance,
+                        description=f"Hodim o'chirildi: {name}")
         instance.user.delete()  # Worker ham CASCADE o'chadi
 
         return Response(
@@ -527,7 +515,7 @@ class WorkerViewSet(viewsets.ModelViewSet):
 # WORKER KPI VIEWSET  B9
 # ============================================================
 
-class WorkerKPIViewSet(viewsets.ModelViewSet):
+class WorkerKPIViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Barcha xodimlarning KPI ko'rsatkichlari.
 
@@ -591,11 +579,9 @@ class WorkerKPIViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
-        AuditLog.objects.create(
-            actor=request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='WorkerKPI',
-            target_id=kpi.id,
+        self._audit_log(
+            AuditLog.Action.UPDATE,
+            kpi,
             description=(
                 f"KPI maqsad belgilandi: {kpi.worker} — "
                 f"{kpi.year}/{kpi.month:02d}, maqsad={kpi.target_amount}"
@@ -610,3 +596,64 @@ class WorkerKPIViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+
+
+# ============================================================
+# AUDIT LOG VIEWSET
+# ============================================================
+
+class AuditLogViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    """
+    Audit log yozuvlarini ko'rish (faqat owner).
+
+    Endpointlar:
+      GET /api/v1/audit-logs/            — ro'yxat
+      GET /api/v1/audit-logs/{id}/       — bitta yozuv
+
+    Filtrlar:
+      ?model=Product         — model nomi bo'yicha (Category, Sale, Expense ...)
+      ?action=create         — amal turi (create / update / delete)
+      ?worker=<id>           — hodim ID si
+      ?date_from=YYYY-MM-DD  — boshlanish sanasi
+      ?date_to=YYYY-MM-DD    — tugash sanasi
+
+    Ruxsat: faqat IsOwner
+    Tartiblash: yangi yozuvlar birinchi (-created_at)
+    """
+    permission_classes = [IsAuthenticated, IsOwner]
+    serializer_class   = AuditLogSerializer
+
+    def get_queryset(self):
+        worker = self.request.user.worker
+        qs = (
+            AuditLog.objects
+            .filter(actor__worker__store=worker.store)
+            .select_related('actor', 'actor__worker')
+            .order_by('-created_at')
+        )
+
+        # Model nomi filtri
+        model = self.request.query_params.get('model')
+        if model:
+            qs = qs.filter(target_model=model)
+
+        # Amal turi filtri
+        action_val = self.request.query_params.get('action')
+        if action_val:
+            qs = qs.filter(action=action_val)
+
+        # Hodim filtri
+        worker_id = self.request.query_params.get('worker')
+        if worker_id:
+            qs = qs.filter(actor__worker__id=worker_id)
+
+        # Sana oralig'i filtri
+        date_from = self.request.query_params.get('date_from')
+        if date_from:
+            qs = qs.filter(created_at__date__gte=date_from)
+
+        date_to = self.request.query_params.get('date_to')
+        if date_to:
+            qs = qs.filter(created_at__date__lte=date_to)
+
+        return qs

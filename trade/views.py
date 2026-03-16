@@ -48,6 +48,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from accaunt.audit_mixin import AuditMixin
 from accaunt.models import AuditLog
 from accaunt.permissions import CanAccess, IsManagerOrAbove
 
@@ -137,7 +138,7 @@ def _update_worker_kpi(worker, sale_delta=0, sale_amount=0,
 # MIJOZ GURUHI VIEWSET
 # ============================================================
 
-class CustomerGroupViewSet(viewsets.ModelViewSet):
+class CustomerGroupViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Mijoz guruhlari.
 
@@ -172,34 +173,18 @@ class CustomerGroupViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         worker   = self.request.user.worker
         instance = serializer.save(store=worker.store)
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='CustomerGroup',
-            target_id=instance.id,
-            description=f"Mijoz guruhi yaratildi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.CREATE, instance,
+                        description=f"Mijoz guruhi yaratildi: '{instance.name}'")
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='CustomerGroup',
-            target_id=instance.id,
-            description=f"Mijoz guruhi yangilandi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.UPDATE, instance,
+                        description=f"Mijoz guruhi yangilandi: '{instance.name}'")
 
     def perform_destroy(self, instance: CustomerGroup):
         name = instance.name
-        pk   = instance.id
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.DELETE,
-            target_model='CustomerGroup',
-            target_id=pk,
-            description=f"Mijoz guruhi o'chirildi: '{name}'",
-        )
+        self._audit_log(AuditLog.Action.DELETE, instance,
+                        description=f"Mijoz guruhi o'chirildi: '{name}'")
         instance.delete()   # hard delete, Customer.group → NULL (SET_NULL)
 
     def create(self, request, *args, **kwargs):
@@ -245,7 +230,7 @@ class CustomerGroupViewSet(viewsets.ModelViewSet):
 # MIJOZ VIEWSET
 # ============================================================
 
-class CustomerViewSet(viewsets.ModelViewSet):
+class CustomerViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Mijozlar.
 
@@ -322,13 +307,8 @@ class CustomerViewSet(viewsets.ModelViewSet):
             })
 
         instance = serializer.save(store=worker.store)
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='Customer',
-            target_id=instance.id,
-            description=f"Mijoz yaratildi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.CREATE, instance,
+                        description=f"Mijoz yaratildi: '{instance.name}'")
 
     def perform_update(self, serializer):
         worker = self.request.user.worker
@@ -338,23 +318,13 @@ class CustomerViewSet(viewsets.ModelViewSet):
                 'group': "Bu guruh sizning do'koningizga tegishli emas."
             })
         instance = serializer.save()
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='Customer',
-            target_id=instance.id,
-            description=f"Mijoz yangilandi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.UPDATE, instance,
+                        description=f"Mijoz yangilandi: '{instance.name}'")
 
     def perform_destroy(self, instance: Customer):
         """Hard delete — mijozni bazadan o'chiradi."""
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.DELETE,
-            target_model='Customer',
-            target_id=instance.id,
-            description=f"Mijoz o'chirildi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.DELETE, instance,
+                        description=f"Mijoz o'chirildi: '{instance.name}'")
         instance.delete()
 
     def create(self, request, *args, **kwargs):
@@ -400,7 +370,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
 # SOTUV VIEWSET
 # ============================================================
 
-class SaleViewSet(viewsets.ModelViewSet):
+class SaleViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Sotuvlar.
 
@@ -733,11 +703,9 @@ class SaleViewSet(viewsets.ModelViewSet):
         # --------------------------------------------------
         # 13. AuditLog
         # --------------------------------------------------
-        AuditLog.objects.create(
-            actor=request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='Sale',
-            target_id=sale.id,
+        self._audit_log(
+            AuditLog.Action.CREATE,
+            sale,
             description=(
                 f"Sotuv amalga oshirildi: #{sale.id}, "
                 f"filial='{branch.name}', "
@@ -834,11 +802,9 @@ class SaleViewSet(viewsets.ModelViewSet):
         sale.status = SaleStatus.CANCELLED
         sale.save(update_fields=['status'])
 
-        AuditLog.objects.create(
-            actor=request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='Sale',
-            target_id=sale.id,
+        self._audit_log(
+            AuditLog.Action.UPDATE,
+            sale,
             description=(
                 f"Sotuv bekor qilindi: #{sale.id}, "
                 f"filial='{sale.branch.name}'"
@@ -862,7 +828,7 @@ class SaleViewSet(viewsets.ModelViewSet):
 # QAYTARISH VIEWSET (BOSQICH 5)
 # ============================================================
 
-class SaleReturnViewSet(viewsets.ModelViewSet):
+class SaleReturnViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Sotuv qaytarishlarini boshqarish.
 
@@ -981,11 +947,9 @@ class SaleReturnViewSet(viewsets.ModelViewSet):
                 total_price = quantity * unit_price,
             )
 
-        AuditLog.objects.create(
-            actor=request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='SaleReturn',
-            target_id=sale_return.id,
+        self._audit_log(
+            AuditLog.Action.CREATE,
+            sale_return,
             description=(
                 f"Qaytarish yaratildi: #{sale_return.id}, "
                 f"filial='{branch.name}', jami={total_amount}"
@@ -1066,11 +1030,9 @@ class SaleReturnViewSet(viewsets.ModelViewSet):
         sale_return.status = SaleReturnStatus.CONFIRMED
         sale_return.save(update_fields=['status'])
 
-        AuditLog.objects.create(
-            actor=request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='SaleReturn',
-            target_id=sale_return.id,
+        self._audit_log(
+            AuditLog.Action.UPDATE,
+            sale_return,
             description=(
                 f"Qaytarish tasdiqlandi: #{sale_return.id}, "
                 f"filial='{branch.name}'"
@@ -1121,11 +1083,9 @@ class SaleReturnViewSet(viewsets.ModelViewSet):
         sale_return.status = SaleReturnStatus.CANCELLED
         sale_return.save(update_fields=['status'])
 
-        AuditLog.objects.create(
-            actor=request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='SaleReturn',
-            target_id=sale_return.id,
+        self._audit_log(
+            AuditLog.Action.UPDATE,
+            sale_return,
             description=f"Qaytarish bekor qilindi: #{sale_return.id}",
         )
 

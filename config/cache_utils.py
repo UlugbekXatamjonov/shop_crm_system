@@ -78,6 +78,55 @@ def get_store_settings(store_id: int):
     return settings_obj
 
 
+def invalidate_subscription_cache(store_id: int) -> None:
+    """
+    Do'kon obuna keshini tozalash.
+
+    Qachon chaqirish kerak:
+      - AdminSubscriptionViewSet da plan/status o'zgarganda
+      - To'lov qo'shilganda
+      - Celery task da subscription expired bo'lganda
+
+    Keyingi get_subscription() chaqiruvida DB dan yangi ma'lumot olinadi.
+    """
+    from django.conf import settings as django_settings
+    cache_key = f'subscription_{store_id}'
+    cache.delete(cache_key)
+    logger.debug(f"Subscription keshi tozalandi: store_id={store_id}")
+
+
+def get_subscription(store_id: int):
+    """
+    Subscription obyektini Redis keshdan olish.
+
+    TTL: settings.SUBSCRIPTION_CACHE_TTL (default: 3600 — 1 soat)
+    Keshda yo'q bo'lsa → DB dan oladi va keshga yozadi.
+    Subscription yo'q bo'lsa → None qaytaradi.
+    """
+    from django.conf import settings as django_settings
+    from subscription.models import Subscription
+
+    cache_key = f'subscription_{store_id}'
+    ttl       = getattr(django_settings, 'SUBSCRIPTION_CACHE_TTL', 3600)
+
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        sub = (
+            Subscription.objects
+            .select_related('plan', 'store')
+            .get(store_id=store_id)
+        )
+    except Subscription.DoesNotExist:
+        logger.warning(f"get_subscription: store_id={store_id} uchun obuna topilmadi.")
+        return None
+
+    cache.set(cache_key, sub, timeout=ttl)
+    return sub
+
+
 def invalidate_store_settings(store_id: int) -> None:
     """
     Do'kon sozlamalari keshini tozalash.

@@ -357,6 +357,14 @@ class StoreSettings(models.Model):
         verbose_name="Yetkazib beruvchi qarz hisobi"
     )
 
+    # ============================================================
+    # GURUH 11 — Export sozlamalari (BOSQICH 16)
+    # ============================================================
+    auto_pdf_on_smena_close = models.BooleanField(
+        default=False,
+        verbose_name="Smena yopilganda Z-report PDF avtomatik generatsiya"
+    )
+
     class Meta:
         verbose_name        = "Do'kon sozlamalari"
         verbose_name_plural = "Do'kon sozlamalari"

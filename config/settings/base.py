@@ -53,6 +53,9 @@ INSTALLED_APPS = [
     'trade',      # Savdo, chek, qaytarish
     'warehouse',  # Mahsulot, kategoriya, yetkazib beruvchi
     'expense',    # Xarajatlar
+    'export',       # Export / Import (B16)
+    'dashboard',    # Dashboard (B17)
+    'subscription', # Obuna tizimi (B20)
 ]
 
 
@@ -161,8 +164,10 @@ SIMPLE_JWT = {
 
 REST_FRAMEWORK = {
     # Standart ruxsat: faqat autentifikatsiya qilingan foydalanuvchilar
+    # ReadOnlyIfExpired — obuna tugagan do'konlar uchun faqat o'qish rejimi
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
+        'accaunt.permissions.ReadOnlyIfExpired',
     ],
 
     # JWT orqali autentifikatsiya
@@ -347,4 +352,26 @@ CELERY_BEAT_SCHEDULE = {
             'expires': 3600,  # 1 soat ichida bajarilmasa — bekor qilinadi
         },
     },
+
+    # BOSQICH 20 — Har kuni 00:01 da obuna muddatlarini tekshirish
+    'check-subscription-expiry-daily': {
+        'task':     'subscription.tasks.check_subscription_expiry',
+        'schedule': crontab(hour=0, minute=1),   # Har kuni 00:01
+        'options': {
+            'expires': 3600,  # 1 soat ichida bajarilmasa — bekor qilinadi
+        },
+    },
 }
+
+# ============================================================
+# SUBSCRIPTION SOZLAMALARI (B20)
+# ============================================================
+
+# Sinov davri kunlari — signals.py da ishlatiladi
+SUBSCRIPTION_TRIAL_DAYS = 30
+
+# Ogohlantirish kunlari — tasks.py da ishlatiladi
+SUBSCRIPTION_EXPIRY_NOTIFY = [10, 3, 1]
+
+# Redis kesh TTL (soniya) — cache_utils.py da ishlatiladi
+SUBSCRIPTION_CACHE_TTL = 3600  # 1 soat
