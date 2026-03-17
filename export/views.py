@@ -45,7 +45,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
 
-from accaunt.permissions import IsManagerOrAbove
+from accaunt.permissions import IsManagerOrAbove, SubscriptionRequired
 
 from expense.models import Expense, ExpenseCategory
 from store.models import Branch
@@ -121,7 +121,7 @@ class SaleExportView(APIView):
     GET /api/v1/export/sales/
     Filtrlar: format, date_from, date_to, branch, smena, status
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, SubscriptionRequired('has_export')]
 
     def get(self, request):
         worker = request.user.worker
@@ -181,7 +181,7 @@ class ExpenseExportView(APIView):
     GET /api/v1/export/expenses/
     Filtrlar: format, date_from, date_to, branch, smena, category
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, SubscriptionRequired('has_export')]
 
     def get(self, request):
         worker = request.user.worker
@@ -233,7 +233,7 @@ class StockExportView(APIView):
     Filtrlar: branch, warehouse
     Format: faqat excel (qoldig' PDF uchun foydali emas)
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, SubscriptionRequired('has_export')]
 
     def get(self, request):
         worker = request.user.worker
@@ -279,7 +279,7 @@ class StockMovementExportView(APIView):
     GET /api/v1/export/stock-movements/
     Filtrlar: format, date_from, date_to, branch, warehouse, movement_type
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, SubscriptionRequired('has_export')]
 
     def get(self, request):
         worker = request.user.worker
@@ -336,7 +336,7 @@ class SupplierExportView(APIView):
     GET /api/v1/export/suppliers/
     Filtrlar: format, status
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, SubscriptionRequired('has_export')]
 
     def get(self, request):
         worker = request.user.worker
@@ -391,7 +391,7 @@ VALID_UNITS = [u.value for u in ProductUnit]
 
 
 class ProductImportView(APIView):
-    permission_classes = [IsManagerOrAbove]
+    permission_classes = [IsManagerOrAbove, SubscriptionRequired('has_export')]
 
     def get(self, request):
         """GET → bo'sh shablon .xlsx"""
@@ -486,7 +486,7 @@ CUSTOMER_NOTES = {
 
 
 class CustomerImportView(APIView):
-    permission_classes = [IsManagerOrAbove]
+    permission_classes = [IsManagerOrAbove, SubscriptionRequired('has_export')]
 
     def get(self, request):
         return make_template('mijozlar_shablon.xlsx', CUSTOMER_HEADERS, CUSTOMER_NOTES)
@@ -561,7 +561,7 @@ MOVEMENT_NOTES = {
 
 
 class StockMovementImportView(APIView):
-    permission_classes = [IsManagerOrAbove]
+    permission_classes = [IsManagerOrAbove, SubscriptionRequired('has_export')]
 
     def get(self, request):
         return make_template('harakatlar_shablon.xlsx', MOVEMENT_HEADERS, MOVEMENT_NOTES)
@@ -683,7 +683,7 @@ SUPPLIER_NOTES = {
 
 
 class SupplierImportView(APIView):
-    permission_classes = [IsManagerOrAbove]
+    permission_classes = [IsManagerOrAbove, SubscriptionRequired('has_export')]
 
     def get(self, request):
         return make_template('yetkazibberuvchilar_shablon.xlsx', SUPPLIER_HEADERS, SUPPLIER_NOTES)
@@ -744,7 +744,7 @@ SUBCAT_NOTES = {
 
 
 class SubCategoryImportView(APIView):
-    permission_classes = [IsManagerOrAbove]
+    permission_classes = [IsManagerOrAbove, SubscriptionRequired('has_export')]
 
     def get(self, request):
         return make_template('subkategoriyalar_shablon.xlsx', SUBCAT_HEADERS, SUBCAT_NOTES)

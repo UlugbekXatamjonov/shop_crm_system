@@ -29,7 +29,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from .audit_mixin import AuditMixin
 from .models import CustomUser, Worker, WorkerKPI, AuditLog, WorkerStatus
-from .permissions import IsManagerOrAbove, IsOwner, WorkerLimitPermission
+from .permissions import IsManagerOrAbove, IsOwner, SubscriptionRequired, WorkerLimitPermission
 from .serializers import (
     UserRegistrationSerializer,
     UserLoginSerializer,
@@ -620,7 +620,7 @@ class AuditLogViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets
     Ruxsat: faqat IsOwner
     Tartiblash: yangi yozuvlar birinchi (-created_at)
     """
-    permission_classes = [IsAuthenticated, IsOwner]
+    permission_classes = [IsAuthenticated, IsOwner, SubscriptionRequired('has_audit_log')]
     serializer_class   = AuditLogSerializer
 
     def get_queryset(self):

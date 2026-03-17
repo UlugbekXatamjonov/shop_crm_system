@@ -29,6 +29,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accaunt.permissions import SubscriptionRequired
+
 from .utils import (
     calc_branches,
     calc_chart_data,
@@ -60,7 +62,7 @@ class DashboardView(APIView):
       current_smena  — ochiq smenalar holati
       chart_data     — kunlik sotuv, to'lov taqsimoti, soatlik heatmap
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, SubscriptionRequired('has_dashboard')]
 
     def get(self, request):
         worker   = request.user.worker

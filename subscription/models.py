@@ -100,7 +100,6 @@ class SubscriptionPlan(models.Model):
     has_wastage        = models.BooleanField(default=False, verbose_name="Isrof yozuvlari")
     has_stock_audit    = models.BooleanField(default=False, verbose_name="Inventarizatsiya")
     has_kpi            = models.BooleanField(default=False, verbose_name="KPI moduli")
-    has_price_list     = models.BooleanField(default=False, verbose_name="Narx ro'yxati")
     has_multi_currency = models.BooleanField(default=False, verbose_name="Ko'p valyuta")
     has_supplier       = models.BooleanField(default=False, verbose_name="Yetkazib beruvchi")
 
