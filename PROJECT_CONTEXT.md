@@ -1,5 +1,41 @@
 # CLAUDE UCHUN ESLATMA — Yangi chatda bu faylni o'qi va davom et
 
+## 📅 17.03.2026 SESSION — QILINGAN ISHLAR
+
+### 1. Loyiha to'liq tahlil va tekshiruv ✅
+
+**Maqsad:** Barcha yangi app va ViewSet'larni chuqur ko'rib chiqib, xatolarni aniqlash.
+
+**Topilgan va tuzatilgan kamchiliklar:**
+
+**A) `has_price_list` olib tashlandi** — B12 PriceList rejaldan olib tashlandi (shart emas deb qaror qilindi):
+- `subscription/models.py` → `has_price_list = BooleanField(...)` o'chirildi
+- `subscription/migrations/0002_remove_subscriptionplan_has_price_list.py` yaratildi
+
+**B) `SubscriptionRequired` permission'lar qo'shildi:**
+- `export/views.py` — barcha 10 ta view (5 export + 5 import) ga `SubscriptionRequired('has_export')` qo'shildi
+- `dashboard/views.py` — `DashboardView` ga `SubscriptionRequired('has_dashboard')` qo'shildi
+- `accaunt/views.py` — `AuditLogViewSet` ga `SubscriptionRequired('has_audit_log')` qo'shildi
+
+**O'zgartirilgan fayllar:**
+- `subscription/models.py` — has_price_list o'chirildi (12 ta has_* flag qoldi)
+- `subscription/migrations/0002_remove_subscriptionplan_has_price_list.py` — yangi migration
+- `export/views.py` — SubscriptionRequired import + barcha 10 permission_classes yangilandi
+- `dashboard/views.py` — SubscriptionRequired import + DashboardView permission yangilandi
+- `accaunt/views.py` — SubscriptionRequired import + AuditLogViewSet permission yangilandi
+
+**Railway da bajarish kerak:**
+```bash
+python manage.py migrate subscription   # 0002 migration qo'llash
+```
+
+**Hozirgi holat (17.03.2026):**
+- V1 to'liq tugallandi ✅ — B12 rejaldan olib tashlandi, barcha qolganlar bajarildi
+- Keyingi bosqich: V2 (B11 Telegram, B11.5 SMS, B14 OFD, B18 Offline sync)
+- ⚠️ Django admin da `SubscriptionPlan(plan_type='trial')` yaratilishi shart — aks holda Store signal xato beradi
+
+---
+
 ## 📅 16.03.2026 SESSION — QILINGAN ISHLAR
 
 ### 1. B16 — Export/Import app ✅ (`export` app)
