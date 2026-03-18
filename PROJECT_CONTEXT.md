@@ -1,5 +1,37 @@
 # CLAUDE UCHUN ESLATMA — Yangi chatda bu faylni o'qi va davom et
 
+## 📅 18.03.2026 SESSION #2 — QILINGAN ISHLAR
+
+### 1. Ombor detail ga mahsulotlar ro'yxati qo'shildi ✅
+
+**Muammo:** `GET /api/v1/warehouse/warehouses/{id}/` faqat ombor ma'lumotlarini qaytarardi — ichidagi mahsulotlar ko'rinmasdi.
+
+**Yechim:** `WarehouseDetailSerializer` ga `products` maydoni + yangi `WarehouseStockItemSerializer` qo'shildi.
+
+**O'zgartirilgan fayl:**
+- `warehouse/serializers.py` — `WarehouseStockItemSerializer` yangi klass va `WarehouseDetailSerializer.products` SerializerMethodField
+
+**Yangi serializer (`WarehouseStockItemSerializer`) maydonlari:**
+- `product_id`, `product_name` — mahsulot identifikatori va nomi
+- `quantity` — joriy qoldiq miqdori
+- `purchase_price` — o'rtacha tannarx (AVCO, avtomatik)
+- `sale_price` — sotish narxi (qo'lda)
+- `barcode` — shtrix-kod
+- `barcode_image_url` — barcode PNG rasm URL (`/api/v1/warehouse/products/{id}/barcode/`)
+- `added_on` — Stock oxirgi yangilangan vaqti
+
+**Endpoint o'zgarishi:**
+```
+GET /api/v1/warehouse/warehouses/{id}/  — endi "products": [...] qo'shildi
+```
+
+**Arxitektura eslatmasi:**
+- `purchase_price` = AVCO (o'rtacha tannarx) — StockMovement(IN) da avtomatik yangilanadi
+- `sale_price` = sotish narxi — qo'lda o'rnatiladi
+- `StockMovement.unit_cost` = faqat shu kirim partiyasining narxi (bir martalik)
+
+---
+
 ## 📅 18.03.2026 SESSION — QILINGAN ISHLAR
 
 ### 1. Cloudinary media storage integratsiyasi ✅
