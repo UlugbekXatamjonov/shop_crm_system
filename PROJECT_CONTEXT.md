@@ -2,7 +2,26 @@
 
 ## 📅 18.03.2026 SESSION — QILINGAN ISHLAR
 
-### 1. Loyiha chuqur tahlili — 23 ta muammo topildi, barchasi tuzatildi ✅
+### 1. Cloudinary media storage integratsiyasi ✅
+
+**Muammo:** Railway har deploy da yangi container yaratadi — `/media/` papkadagi rasmlar yo'qolardi (ephemeral filesystem).
+
+**Yechim:** Cloudinary bulut xizmati ulandi — rasmlar endi `res.cloudinary.com` da saqlanadi.
+
+**O'zgartirilgan fayllar:**
+- `config/settings/production.py` — `STORAGES` dict ga Cloudinary backend qo'shildi, `CLOUDINARY_STORAGE` sozlamalari `CLOUDINARY_URL` env dan olinadi
+- `config/urls.py` — `DEBUG=True` bo'lganda lokal media fayllar serve qilish qo'shildi
+- `requirements/production.txt` — `cloudinary`, `django-cloudinary-storage` paketlari qo'shildi
+
+**Railway env variables:**
+- `CLOUDINARY_URL=cloudinary://<api_key>:<api_secret>@<cloud_name>` — yagona format (eng ishonchli)
+
+**Muhim:**
+- Faqat **yangi yuklangan** rasmlar Cloudinary ga boradi — eski lokal rasmlar avtomatik ko'chmaydi
+- Bepul limit: 25GB/oy
+- Rasm URL formati: `https://res.cloudinary.com/<cloud_name>/image/upload/...`
+
+### 2. Loyiha chuqur tahlili — 23 ta muammo topildi, barchasi tuzatildi ✅
 
 **Kritik tuzatishlar:**
 - `subscription/serializers.py` — `has_price_list` maydon modeldan o'chirilgan edi, serializer fields dan ham olib tashlandi
