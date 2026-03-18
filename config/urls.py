@@ -97,9 +97,13 @@ urlpatterns = [
 ]
 
 # ============================================================
-# MEDIA VA STATIC (faqat development uchun)
+# MEDIA VA STATIC
 # ============================================================
 
+# Media fayllar (yuklangan rasmlar) — DEBUG=True/False da ham serve qilinadi
+# Production da WhiteNoise faqat static fayllarni beradi, media uchun Django o'zi serve qiladi
+# Katta loyihada Cloudinary/AWS S3 ga o'tish tavsiya etiladi
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL,  document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

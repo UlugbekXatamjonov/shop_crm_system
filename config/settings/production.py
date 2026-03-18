@@ -131,10 +131,10 @@ CORS_ORIGIN_ALLOW_ALL = False
 _extra_origins = [
     o.strip() for o in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if o.strip()
 ]
-CORS_ORIGIN_WHITELIST = tuple([
+CORS_ALLOWED_ORIGINS = [
     'https://shop-crm-front.vercel.app',   # Vercel production frontend
     *_extra_origins,
-])
+]
 
 
 # ============================================================
