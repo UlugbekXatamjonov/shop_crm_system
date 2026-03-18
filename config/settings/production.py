@@ -159,16 +159,34 @@ MIDDLEWARE = [
 # ============================================================
 # MEDIA FAYLLAR (Cloudinary — bulut rasm saqlash)
 # ============================================================
-# Cloudinary dashboard dan olinadi: https://console.cloudinary.com/
-# Railway env ga qo'shish kerak: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+# Railway env ga CLOUDINARY_URL qo'shish kerak:
+#   CLOUDINARY_URL=cloudinary://API_KEY:API_SECRET@CLOUD_NAME
+# Yoki alohida: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
 
 INSTALLED_APPS += ['cloudinary_storage', 'cloudinary']  # noqa: F405
 
-CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': os.environ.get('CLOUDINARY_CLOUD_NAME', ''),
-    'API_KEY':    os.environ.get('CLOUDINARY_API_KEY', ''),
-    'API_SECRET': os.environ.get('CLOUDINARY_API_SECRET', ''),
-}
+import cloudinary  # noqa: E402
+
+_cloudinary_url = os.environ.get('CLOUDINARY_URL', '')
+if _cloudinary_url:
+    # CLOUDINARY_URL formatidan foydalanish (eng ishonchli)
+    cloudinary.config(cloudinary_url=_cloudinary_url)
+    # django-cloudinary-storage uchun ham parse qilish
+    # cloudinary_url=cloudinary://API_KEY:API_SECRET@CLOUD_NAME
+    import re
+    _match = re.match(r'cloudinary://([^:]+):([^@]+)@(.+)', _cloudinary_url)
+    if _match:
+        CLOUDINARY_STORAGE = {
+            'API_KEY':    _match.group(1),
+            'API_SECRET': _match.group(2),
+            'CLOUD_NAME': _match.group(3),
+        }
+else:
+    CLOUDINARY_STORAGE = {
+        'CLOUD_NAME': os.environ.get('CLOUDINARY_CLOUD_NAME', ''),
+        'API_KEY':    os.environ.get('CLOUDINARY_API_KEY', ''),
+        'API_SECRET': os.environ.get('CLOUDINARY_API_SECRET', ''),
+    }
 
 # Django 4.2+ yangi format — STORAGES (DEFAULT_FILE_STORAGE eskirgan)
 STORAGES = {
