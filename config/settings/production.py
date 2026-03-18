@@ -160,6 +160,23 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 
 # ============================================================
+# MEDIA FAYLLAR (Cloudinary — bulut rasm saqlash)
+# ============================================================
+# Cloudinary dashboard dan olinadi: https://console.cloudinary.com/
+# Railway env ga qo'shish kerak: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+
+INSTALLED_APPS += ['cloudinary_storage', 'cloudinary']  # noqa: F405
+
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': os.environ.get('CLOUDINARY_CLOUD_NAME', ''),
+    'API_KEY':    os.environ.get('CLOUDINARY_API_KEY', ''),
+    'API_SECRET': os.environ.get('CLOUDINARY_API_SECRET', ''),
+}
+
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+
+# ============================================================
 # LOGGING — Xatolar va ogohlantirishlarni faylga yozish
 # ============================================================
 
