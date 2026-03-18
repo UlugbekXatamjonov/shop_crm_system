@@ -41,7 +41,7 @@ class SubscriptionPlanSerializer(serializers.ModelSerializer):
             'max_branches', 'max_warehouses', 'max_workers', 'max_products',
             # Modullar
             'has_subcategory', 'has_sale_return', 'has_wastage',
-            'has_stock_audit', 'has_kpi', 'has_price_list',
+            'has_stock_audit', 'has_kpi',
             'has_multi_currency', 'has_supplier',
             'has_export', 'has_dashboard', 'has_qr_bulk',
             'has_audit_log', 'has_telegram',

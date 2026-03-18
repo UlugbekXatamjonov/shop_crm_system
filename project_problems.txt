@@ -2,9 +2,8 @@
 
 
 ------ Qilish kerak ---------
-1) stoke listda pepesi ikki hil joyda bo'lsa alohida obyekt bo'lib ko'rinyapdi, shuni o'rniga har qanday mahsulot o'z bir obyekt bo'lib, uning qayerda qancha bor ekanligi o'sha obyektning maydonlari bo'lib kelsin. Shuni qilish mumkinmi ? agar bo'lsa API qanday ko'rinishda bo'lishini ko'rsat
-2) barkode generate funksiyasi ?
-3) 
+1) 
+2) 
 
 ------ Tugadi ---------
 

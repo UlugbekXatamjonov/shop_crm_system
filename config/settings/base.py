@@ -220,12 +220,12 @@ FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://shop-crm-front.vercel.app
 # ============================================================
 
 # Ruxsat etilgan frontend manzillari
-CORS_ORIGIN_WHITELIST = (
+CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',                    # Vue.js dev server (Vite)
     'http://localhost:8080',                    # Vue.js dev server (Vue CLI)
     'http://localhost:3000',                    # React (agar kerak bo'lsa)
     'https://shop-crm-front.vercel.app',        # Vercel production frontend
-)
+]
 
 # Ruxsat etilgan HTTP metodlar
 CORS_ALLOW_METHODS = [

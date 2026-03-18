@@ -211,6 +211,7 @@ class BranchViewSet(AuditMixin, viewsets.ModelViewSet):
             .filter(store=worker.store)
             .select_related('store')
             .prefetch_related('workers')  # BranchListSerializer.workers_count uchun
+            .order_by('status', 'name')
         )
 
     def get_serializer_context(self):

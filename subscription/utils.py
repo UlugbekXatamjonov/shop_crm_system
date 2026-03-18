@@ -193,7 +193,12 @@ def reactivate_downgraded_objects(subscription) -> dict:
             current_counts[entry.object_type] = (
                 current_counts.get(entry.object_type, 0) + 1
             )
-            key = entry.object_type.lower() + 's'
+            plural_map = {
+                'branch': 'branches',
+                'warehouse': 'warehouses',
+                'worker': 'workers',
+            }
+            key = plural_map.get(entry.object_type.lower(), entry.object_type.lower() + 's')
             result[key] = result.get(key, 0) + 1
 
         except Exception as exc:

@@ -214,12 +214,14 @@ def calc_products(store_id: int, date_from: date, date_to: date, branch_id=None,
     settings = get_store_settings(store_id)
     threshold = settings.low_stock_threshold if settings.low_stock_enabled else 0
 
-    low_stock = (
+    low_stock_qs = (
         Stock.objects
         .filter(stock_filter, quantity__lte=threshold, quantity__gt=0)
         .select_related('product', 'branch', 'warehouse')
-        .order_by('quantity')[:20]
+        .order_by('quantity')
     )
+    low_stock_count = low_stock_qs.count()
+    low_stock = low_stock_qs[:20]
 
     # Ombor umumiy qiymati (qoldiq × tannarx)
     warehouse_value = (
@@ -267,7 +269,7 @@ def calc_products(store_id: int, date_from: date, date_to: date, branch_id=None,
             }
             for s in low_stock
         ],
-        'low_stock_count':   low_stock.count(),
+        'low_stock_count':   low_stock_count,
         'warehouse_value':   _d(warehouse_value),
     }
 
@@ -420,29 +422,42 @@ def calc_suppliers(store_id: int) -> dict:
 # ============================================================
 
 def calc_branches(store_id: int, date_from: date, date_to: date) -> list:
-    """Har bir filial bo'yicha sotuv yig'indisi."""
+    """Har bir filial bo'yicha sotuv yig'indisi (bitta query)."""
     branches = Branch.objects.filter(store_id=store_id, status='active')
+    branch_map = {b.id: b.name for b in branches}
 
-    result = []
-    for branch in branches:
-        agg = Sale.objects.filter(
+    if not branch_map:
+        return []
+
+    # Barcha filiallar uchun bitta query
+    agg_qs = (
+        Sale.objects
+        .filter(
             store_id=store_id,
-            branch=branch,
+            branch_id__in=branch_map.keys(),
             status=SaleStatus.COMPLETED,
             created_on__date__gte=date_from,
             created_on__date__lte=date_to,
-        ).aggregate(
+        )
+        .values('branch_id')
+        .annotate(
             revenue=Sum(ExpressionWrapper(
                 F('total_price') - F('discount_amount'),
                 output_field=DecimalField(),
             )),
             count=Count('id'),
         )
+    )
+    agg_map = {r['branch_id']: r for r in agg_qs}
+
+    result = []
+    for branch_id, name in branch_map.items():
+        data = agg_map.get(branch_id, {})
         result.append({
-            'branch_id': branch.id,
-            'name':      branch.name,
-            'revenue':   _d(agg['revenue'] or 0),
-            'count':     agg['count'] or 0,
+            'branch_id': branch_id,
+            'name':      name,
+            'revenue':   _d(data.get('revenue') or 0),
+            'count':     data.get('count') or 0,
         })
 
     # Tushum bo'yicha tartiblash
@@ -455,7 +470,7 @@ def calc_branches(store_id: int, date_from: date, date_to: date) -> list:
 # ============================================================
 
 def calc_current_smena(store_id: int, branch_id=None) -> dict:
-    """Ochiq smena(lar) holati."""
+    """Ochiq smena(lar) holati (bitta query)."""
     qs = Smena.objects.filter(
         store_id=store_id,
         status=SmenaStatus.OPEN,
@@ -463,25 +478,38 @@ def calc_current_smena(store_id: int, branch_id=None) -> dict:
     if branch_id:
         qs = qs.filter(branch_id=branch_id)
 
+    smena_list = list(qs)
+    smena_ids = [s.id for s in smena_list]
+
+    # Barcha ochiq smenalar uchun bitta query
+    sales_agg = {}
+    if smena_ids:
+        sales_agg = {
+            r['smena_id']: r
+            for r in (
+                Sale.objects
+                .filter(smena_id__in=smena_ids, status=SaleStatus.COMPLETED)
+                .values('smena_id')
+                .annotate(
+                    count=Count('id'),
+                    revenue=Sum(ExpressionWrapper(
+                        F('total_price') - F('discount_amount'),
+                        output_field=DecimalField(),
+                    )),
+                )
+            )
+        }
+
     open_smenas = []
-    for smena in qs:
-        sales = Sale.objects.filter(
-            smena=smena,
-            status=SaleStatus.COMPLETED,
-        ).aggregate(
-            count=Count('id'),
-            revenue=Sum(ExpressionWrapper(
-                F('total_price') - F('discount_amount'),
-                output_field=DecimalField(),
-            )),
-        )
+    for smena in smena_list:
+        data = sales_agg.get(smena.id, {})
         open_smenas.append({
             'smena_id':    smena.id,
             'branch':      smena.branch.name,
             'worker':      smena.worker_open.get_full_name() if smena.worker_open_id else '',
             'start_time':  smena.start_time.strftime('%d.%m.%Y %H:%M') if smena.start_time else '',
-            'sales_count': sales['count'] or 0,
-            'sales_total': _d(sales['revenue'] or 0),
+            'sales_count': data.get('count') or 0,
+            'sales_total': _d(data.get('revenue') or 0),
         })
 
     return {

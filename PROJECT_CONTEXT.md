@@ -1,5 +1,47 @@
 # CLAUDE UCHUN ESLATMA — Yangi chatda bu faylni o'qi va davom et
 
+## 📅 18.03.2026 SESSION — QILINGAN ISHLAR
+
+### 1. Loyiha chuqur tahlili — 23 ta muammo topildi, barchasi tuzatildi ✅
+
+**Kritik tuzatishlar:**
+- `subscription/serializers.py` — `has_price_list` maydon modeldan o'chirilgan edi, serializer fields dan ham olib tashlandi
+- `subscription/utils.py` — `reactivate_downgraded_objects()` da `'branchs'` → `'branches'` plural xato tuzatildi (plural_map qo'shildi)
+
+**Performance (N+1 query) tuzatishlar:**
+- `dashboard/utils.py` — `calc_branches()`: har filial uchun alohida query → bitta `values('branch_id').annotate(...)` query
+- `dashboard/utils.py` — `calc_current_smena()`: har smena uchun alohida query → bitta `values('smena_id').annotate(...)` query
+- `dashboard/utils.py` — `low_stock.count()` sliced queryset da noto'g'ri natija berardi → slicing dan oldin count()
+
+**Race condition tuzatishlar:**
+- `expense/views.py` — `ExpenseCategoryViewSet.create()`: `.get(name=...)` o'rniga `serializer.instance` ishlatildi
+- `expense/views.py` — `ExpenseViewSet.create()`: `.latest('created_on')` o'rniga `.get(pk=serializer.instance.pk)` ishlatildi
+
+**Config tuzatishlar:**
+- `config/settings/base.py` — `CORS_ORIGIN_WHITELIST` → `CORS_ALLOWED_ORIGINS` (django-cors-headers 4.0+ standart)
+- `config/cache_utils.py` — ishlatilmagan `import pickle` olib tashlandi
+- `accaunt/utils.py` — production da qolgan `print(email)` debug chiqarildi
+
+**Tartib (ordering) tuzatishlar — active birinchi, inactive keyin:**
+- `warehouse/views.py` — CategoryViewSet, SubCategoryViewSet, ProductViewSet, WarehouseViewSet, SupplierViewSet → `.order_by('status', 'name')`
+- `trade/views.py` — CustomerGroupViewSet → `.order_by('name')`, CustomerViewSet → `.order_by('status', 'name')`
+- `store/views.py` — BranchViewSet → `.order_by('status', 'name')`
+- `expense/views.py` — ExpenseCategoryViewSet → `.order_by('status', 'name')`
+
+**O'zgartirilgan fayllar (11 ta):**
+- `subscription/serializers.py`, `subscription/utils.py`
+- `dashboard/utils.py`
+- `expense/views.py`
+- `config/settings/base.py`, `config/cache_utils.py`
+- `accaunt/utils.py`
+- `warehouse/views.py`, `trade/views.py`, `store/views.py`
+- `project_problems.txt`
+
+**Muhim qoida o'rnatildi:**
+- ⚠️ Barcha obyektlar **hard delete** bo'lishi kerak (soft delete emas). Agar soft delete kerak bo'lgan joy bo'lsa — foydalanuvchiga maslahatlashish.
+
+---
+
 ## 📅 17.03.2026 SESSION — QILINGAN ISHLAR
 
 ### 1. Loyiha to'liq tahlil va tekshiruv ✅

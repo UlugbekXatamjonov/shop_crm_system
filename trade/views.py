@@ -168,7 +168,7 @@ class CustomerGroupViewSet(AuditMixin, viewsets.ModelViewSet):
         worker = getattr(self.request.user, 'worker', None)
         if not worker or not worker.store:
             return CustomerGroup.objects.none()
-        return CustomerGroup.objects.filter(store=worker.store)
+        return CustomerGroup.objects.filter(store=worker.store).order_by('name')
 
     def perform_create(self, serializer):
         worker   = self.request.user.worker
@@ -294,7 +294,7 @@ class CustomerViewSet(AuditMixin, viewsets.ModelViewSet):
                 Q(phone__icontains=search_param)
             )
 
-        return qs
+        return qs.order_by('status', 'name')
 
     def perform_create(self, serializer):
         worker = self.request.user.worker

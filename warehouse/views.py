@@ -164,7 +164,7 @@ class CategoryViewSet(AuditMixin, viewsets.ModelViewSet):
         worker = getattr(self.request.user, 'worker', None)
         if not worker or not worker.store:
             return Category.objects.none()
-        return Category.objects.filter(store=worker.store)
+        return Category.objects.filter(store=worker.store).order_by('status', 'name')
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -284,7 +284,7 @@ class SubCategoryViewSet(AuditMixin, viewsets.ModelViewSet):
         if category_id:
             qs = qs.filter(category_id=category_id)
 
-        return qs
+        return qs.order_by('status', 'name')
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -580,7 +580,7 @@ class ProductViewSet(AuditMixin, viewsets.ModelViewSet):
         if status_val:
             qs = qs.filter(status=status_val)
 
-        return qs
+        return qs.order_by('status', 'name')
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -857,7 +857,7 @@ class WarehouseViewSet(AuditMixin, viewsets.ModelViewSet):
         worker = getattr(self.request.user, 'worker', None)
         if not worker or not worker.store:
             return Warehouse.objects.none()
-        return Warehouse.objects.filter(store=worker.store)
+        return Warehouse.objects.filter(store=worker.store).order_by('status', 'name')
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -2237,7 +2237,7 @@ class SupplierViewSet(AuditMixin, viewsets.ModelViewSet):
             qs = qs.filter(status=status_filter)
         else:
             qs = qs.filter(status='active')
-        return qs
+        return qs.order_by('status', 'name')
 
     def get_serializer_context(self):
         context = super().get_serializer_context()

@@ -23,7 +23,6 @@ Ishlatish (istalgan ViewSet da):
 """
 
 import logging
-import pickle
 
 from django.core.cache import cache
 

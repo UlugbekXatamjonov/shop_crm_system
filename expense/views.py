@@ -69,7 +69,7 @@ class ExpenseCategoryViewSet(AuditMixin, viewsets.ModelViewSet):
         if status_filter:
             qs = qs.filter(status=status_filter)
 
-        return qs
+        return qs.order_by('status', 'name')
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -97,10 +97,7 @@ class ExpenseCategoryViewSet(AuditMixin, viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
-        instance = ExpenseCategory.objects.get(
-            store=request.user.worker.store,
-            name=serializer.validated_data['name'],
-        )
+        instance = serializer.instance
         return Response(
             {
                 'message': "Xarajat kategoriyasi muvaffaqiyatli yaratildi.",
@@ -235,9 +232,7 @@ class ExpenseViewSet(AuditMixin, viewsets.ModelViewSet):
         self.perform_create(serializer)
         instance = Expense.objects.select_related(
             'category', 'branch', 'worker__user', 'smena',
-        ).filter(
-            store=request.user.worker.store,
-        ).latest('created_on')
+        ).get(pk=serializer.instance.pk)
         return Response(
             {
                 'message': "Xarajat muvaffaqiyatli qayd etildi.",
