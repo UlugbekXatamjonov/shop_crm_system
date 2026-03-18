@@ -81,6 +81,15 @@ urlpatterns = [
     # Expense CRUD: /api/v1/expense-categories/, /api/v1/expenses/
     path('api/v1/', include('expense.api_urls')),
 
+    # Export / Import: /api/v1/export/...
+    path('api/v1/export/', include('export.api_urls')),
+
+    # Dashboard: /api/v1/dashboard/
+    path('api/v1/dashboard/', include('dashboard.api_urls')),
+
+    # Subscription: /api/v1/subscription/ + /api/v1/admin/subscriptions/
+    path('api/v1/', include('subscription.api_urls')),
+
     # --- API Dokumentatsiya ---
     path('swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path('swagger/',         schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),

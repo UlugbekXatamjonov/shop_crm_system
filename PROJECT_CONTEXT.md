@@ -1,36 +1,198 @@
 # CLAUDE UCHUN ESLATMA — Yangi chatda bu faylni o'qi va davom et
 
-## 📅 14.03.2026 SESSION — QILINGAN ISHLAR
+## 📅 17.03.2026 SESSION — QILINGAN ISHLAR
 
-### 1. B15 — Celery Tasks kengaytirish ✅ (allaqachon commit qilingan edi)
+### 1. Loyiha to'liq tahlil va tekshiruv ✅
 
-**Yangi fayllar:**
-- `accaunt/tasks.py` — YANGI fayl: `generate_monthly_worker_kpi` task
+**Maqsad:** Barcha yangi app va ViewSet'larni chuqur ko'rib chiqib, xatolarni aniqlash.
+
+**Topilgan va tuzatilgan kamchiliklar:**
+
+**A) `has_price_list` olib tashlandi** — B12 PriceList rejaldan olib tashlandi (shart emas deb qaror qilindi):
+- `subscription/models.py` → `has_price_list = BooleanField(...)` o'chirildi
+- `subscription/migrations/0002_remove_subscriptionplan_has_price_list.py` yaratildi
+
+**B) `SubscriptionRequired` permission'lar qo'shildi:**
+- `export/views.py` — barcha 10 ta view (5 export + 5 import) ga `SubscriptionRequired('has_export')` qo'shildi
+- `dashboard/views.py` — `DashboardView` ga `SubscriptionRequired('has_dashboard')` qo'shildi
+- `accaunt/views.py` — `AuditLogViewSet` ga `SubscriptionRequired('has_audit_log')` qo'shildi
 
 **O'zgartirilgan fayllar:**
-- `warehouse/tasks.py` — `check_low_stock` task qo'shildi
-- `warehouse/serializers.py` — `LowStockSerializer` qo'shildi
-- `warehouse/views.py` — `StockViewSet.low_stock` @action qo'shildi
-- `config/settings/base.py` — `CELERY_BEAT_SCHEDULE` kengaytirildi (2 ta yangi task)
+- `subscription/models.py` — has_price_list o'chirildi (12 ta has_* flag qoldi)
+- `subscription/migrations/0002_remove_subscriptionplan_has_price_list.py` — yangi migration
+- `export/views.py` — SubscriptionRequired import + barcha 10 permission_classes yangilandi
+- `dashboard/views.py` — SubscriptionRequired import + DashboardView permission yangilandi
+- `accaunt/views.py` — SubscriptionRequired import + AuditLogViewSet permission yangilandi
 
-**Yangi endpointlar:**
-- `GET /api/v1/warehouse/stocks/low-stock/` — Kam qoldiq mahsulotlar ro'yxati
+**Railway da bajarish kerak:**
+```bash
+python manage.py migrate subscription   # 0002 migration qo'llash
+```
 
-**Celery Beat jadval:**
-| Task | Vaqt |
-|------|------|
-| `update_exchange_rates` | Har kuni 09:00 |
-| `check_low_stock` | 00:00, 06:00, 12:00, 18:00 (har 6 soat) |
-| `generate_monthly_worker_kpi` | Har oy 1-kuni 00:01 |
+**Hozirgi holat (17.03.2026):**
+- V1 to'liq tugallandi ✅ — B12 rejaldan olib tashlandi, barcha qolganlar bajarildi
+- Keyingi bosqich: V2 (B11 Telegram, B11.5 SMS, B14 OFD, B18 Offline sync)
+- ⚠️ Django admin da `SubscriptionPlan(plan_type='trial')` yaratilishi shart — aks holda Store signal xato beradi
 
-### 2. B16 — Export rejasi tuzildi (kod yozilmadi, faqat muhokama)
+---
 
-**Reja:**
-- `openpyxl==3.1.5` va `reportlab==4.4.0` o'rnatildi (requirements da bor edi, lekin yuklanmagan edi)
-- Excel export: mahsulotlar, savdolar, kirim/chiqim, xarajatlar, WorkerKPI (5 ta endpoint)
-- PDF export: Z-report, savdolar hisoboti, sotuv cheki (3 ta endpoint)
-- Arxitektura: Variant A (to'g'ridan-to'g'ri response, Celery emas)
-- Keyingi sessiyada implementatsiya boshlanadi
+## 📅 16.03.2026 SESSION — QILINGAN ISHLAR
+
+### 1. B16 — Export/Import app ✅ (`export` app)
+
+**Yangi fayl:** `export/apps.py`, `export/views.py`, `export/api_urls.py`, `export/utils/__init__.py`
+
+**Export endpointlari (Excel yoki PDF, `?format=excel|pdf`):**
+```
+GET /api/v1/export/sales/               — Savdolar (date_from, date_to, branch, smena, status)
+GET /api/v1/export/expenses/            — Xarajatlar (date_from, date_to, branch, smena, category)
+GET /api/v1/export/stocks/              — Qoldiqlar (branch, warehouse)
+GET /api/v1/export/stock-movements/     — Kirim/chiqim (date_from, date_to, branch, warehouse, movement_type)
+GET /api/v1/export/suppliers/           — Yetkazib beruvchilar (status)
+```
+
+**Import endpointlari (Excel yuklash):**
+```
+GET  /api/v1/export/products/template/          → bo'sh .xlsx shablon
+POST /api/v1/export/products/import/            → {created, skipped, errors}
+GET  /api/v1/export/customers/template/
+POST /api/v1/export/customers/import/
+GET  /api/v1/export/stock-movements/template/
+POST /api/v1/export/stock-movements/import/
+GET  /api/v1/export/suppliers/template/
+POST /api/v1/export/suppliers/import/
+GET  /api/v1/export/subcategories/template/
+POST /api/v1/export/subcategories/import/
+```
+
+**Ruxsatlar:** Export → IsAuthenticated; Import → IsManagerOrAbove
+**Throttling:** `export` scope — minutiga 5 ta
+**Kutubxonalar:** `openpyxl` (Excel), `reportlab` (PDF)
+**`store/migrations/0007_storesettings_auto_pdf.py`** — StoreSettings ga `auto_pdf` maydoni
+
+---
+
+### 2. B17 — Dashboard ✅ (`dashboard` app)
+
+**Yangi fayllar:** `dashboard/__init__.py`, `dashboard/apps.py`, `dashboard/utils.py`, `dashboard/views.py`, `dashboard/api_urls.py`
+
+**Endpoint:**
+```
+GET /api/v1/dashboard/   — To'liq statistika (Redis kesh, 5 daqiqa TTL)
+```
+
+**Query parametrlar:**
+- `date_from`, `date_to` — YYYY-MM-DD
+- `branch` — Branch ID
+- `limit` — chart_data uchun nuqtalar soni (default: 30)
+
+**Statistika bloklari (8 ta):**
+| Blok | Ma'lumotlar |
+|------|-------------|
+| `sales` | Bugungi/jami tushum, sotuv soni, o'rtacha chek, o'sish % (oldingi davr bilan) |
+| `products` | Jami/faol/kam qoldiq/qoldiqsiz mahsulotlar |
+| `customers` | Jami/yangi/qaytib kelgan mijozlar |
+| `expenses` | Jami xarajat, kategoriyalar bo'yicha breakdown |
+| `suppliers` | Jami yetkazib beruvchi, jami qarz |
+| `branches` | Faol filiallar va har birining bugungi savdosi |
+| `current_smena` | Joriy smena (agar ochiq bo'lsa): savdo soni, tushum |
+| `chart_data` | Kunlik/soatlik savdo grafigi ma'lumotlari |
+
+**Kesh kaliti:** `dashboard_{store_id}_{branch}_{date_from}_{date_to}_{limit}`
+
+---
+
+### 3. B19 — QR Code + AuditLog ✅
+
+**AuditMixin (`accaunt/audit_mixin.py` — yangi fayl):**
+- `AuditMixin` klass — barcha ViewSet'larga `_audit_log(action, obj, description, extra_data)` metodi
+- Barcha applar ViewSet'lariga qo'shildi: `warehouse`, `trade`, `expense`, `store`
+- Eski qo'lda yozilgan `AuditLog.objects.create()` lar `self._audit_log()` bilan almashtirildi
+
+**QR Code (ProductViewSet ga 3 yangi action):**
+```
+GET  /api/v1/warehouse/products/{id}/qr/       — bitta mahsulot QR PNG rasm
+GET  /api/v1/warehouse/products/scan/?code=... — barcode/QR orqali mahsulot qidirish
+POST /api/v1/warehouse/products/bulk-qr/       — {product_ids:[...], copies:N} → ZIP
+```
+
+**AuditLog endpointlari (`accaunt/api_urls.py` ga qo'shildi):**
+```
+GET /api/v1/workers/audit-logs/       — ro'yxat (faqat owner)
+GET /api/v1/workers/audit-logs/{id}/  — detail
+```
+Filtrlar: `?model=`, `?action=`, `?worker=`, `?date_from=`, `?date_to=`
+
+**O'zgartirilgan fayllar:**
+- `accaunt/audit_mixin.py` — yangi
+- `accaunt/serializers.py` — `AuditLogSerializer` qo'shildi
+- `accaunt/views.py` — `AuditLogViewSet` qo'shildi
+- `accaunt/api_urls.py` — audit-logs router
+- `warehouse/views.py` — AuditMixin + QR actions + limit permissions
+- `warehouse/api_urls.py` — scan/bulk-qr routelar
+- `trade/views.py`, `expense/views.py`, `store/views.py` — AuditMixin
+
+---
+
+### 4. B20 — Subscription tizimi ✅ (`subscription` app)
+
+**Yangi app:** `subscription/` — to'liq yangi app
+
+**Modellar (`subscription/models.py`):**
+- `PlanType`: trial | basic | pro | enterprise (Trial = Free)
+- `SubscriptionStatus`: trial | active | expired | cancelled
+- `SubscriptionPlan`: narx, chegirma, limitlar (max_branches/warehouses/workers/products, 0=cheksiz), 13 ta `has_*` feature flag
+- `Subscription`: OneToOne→Store, plan, status, start/end_date, notified_* flaglar, `days_left` property, `is_active` property
+- `SubscriptionInvoice`: immutable to'lov yozuvlari
+- `SubscriptionDowngradeLog`: `previous_status` saqlanadi (reactivation uchun kritik!)
+
+**`subscription/migrations/0001_initial.py`** — barcha modellar
+
+**Asosiy logika (`subscription/utils.py`):**
+- `apply_lifo_deactivation(sub)` — Branch/Warehouse/Worker LIFO inactive (owner hech qachon), select_for_update + atomic
+- `reactivate_downgraded_objects(sub)` — DowngradeLog orqali FIFO qaytarish, yangi plan limitiga rioya
+- `close_open_smenas(store)` — worker_close=None, "Tizim tomonidan yopildi: obuna cheklovi"
+- `_blacklist_worker_tokens(worker)` — simplejwt BlacklistedToken, try/except
+
+**Signals (`subscription/signals.py`):**
+- `post_save` Store → Trial subscription avtomatik (`settings.SUBSCRIPTION_TRIAL_DAYS=30`)
+
+**Celery task (`subscription/tasks.py`):**
+- `check_subscription_expiry` — har kuni 00:01, notified_10d/3d/1d flaglar, expired → LIFO, smena yopish
+
+**Owner endpointlar:**
+```
+GET /api/v1/subscription/           — joriy obuna holati
+GET /api/v1/subscription/plans/     — barcha tarif rejalari
+GET /api/v1/subscription/invoices/  — to'lov tarixi
+```
+
+**SuperAdmin endpointlar:**
+```
+GET    /api/v1/admin/subscriptions/              — ro'yxat (?status=, ?plan_type=)
+GET    /api/v1/admin/subscriptions/{id}/         — detail
+PATCH  /api/v1/admin/subscriptions/{id}/         — plan/status/sana o'zgartirish
+POST   /api/v1/admin/subscriptions/{id}/extend/  — muddat uzaytirish
+POST   /api/v1/admin/subscriptions/{id}/add-invoice/ — to'lov qo'shish
+```
+
+**`config/cache_utils.py` yangilandi:**
+- `get_subscription(store_id)` — 1 soat TTL
+- `invalidate_subscription_cache(store_id)`
+
+**`config/settings/base.py` yangilandi:**
+- `'subscription'` INSTALLED_APPS ga qo'shildi
+- `SUBSCRIPTION_TRIAL_DAYS = 30`
+- `SUBSCRIPTION_EXPIRY_NOTIFY = [10, 3, 1]`
+- `SUBSCRIPTION_CACHE_TTL = 3600`
+- Celery beat: `check-subscription-expiry-daily` (har kuni 00:01)
+- `DEFAULT_PERMISSION_CLASSES` ga `ReadOnlyIfExpired` global qo'shildi
+
+**`accaunt/permissions.py` yangilandi:**
+- `SubscriptionRequired(feature)` — tarif rejada feature borligini tekshiradi
+- `BranchLimitPermission`, `WarehouseLimitPermission`, `WorkerLimitPermission`, `ProductLimitPermission` — create da limit tekshiruvi
+- `ReadOnlyIfExpired` — expired do'kon uchun faqat GET + login/logout/subscription yo'llari
+- Limit permission'lar qo'shildi: `BranchViewSet`, `WarehouseViewSet`, `WorkerViewSet`, `ProductViewSet`
 
 ---
 
@@ -344,16 +506,19 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 
 ---
 
-## LOYIHA HOLATI (11.03.2026)
+## LOYIHA HOLATI (16.03.2026)
 
 | App         | Holat             | Izoh                                                   |
 |-------------|-------------------|--------------------------------------------------------|
-| `accaunt`   | ✅ Tugallangan    | CustomUser, Worker, AuditLog, JWT auth — password reset, WorkerList/Detail da store+branch |
-| `store`     | ✅ Tugallangan    | Store, Branch CRUD (hard delete, multi-tenant, workers in detail, Uzbek errors) |
-| `warehouse` | ✅ Tugallangan    | Category, SubCategory, Product(+image, +barcode EAN-13, +subcategory, +price_currency, **+AVCO purchase_price**), Currency, ExchangeRate, Warehouse, Stock(**+by-product endpoint**), StockMovement, Transfer+TransferItem, StockBatch(FIFO) — BOSQICH 1 ✅ |
-| `trade`     | ✅ Tugallangan   | BOSQICH 4 ✅ + **BOSQICH 5 ✅** — Sale, SaleItem, **SaleReturn**(pending→confirmed→StockMovement(IN), cancel), CustomerGroup, Customer |
-| `expense`   | ✅ Tugallangan  | **BOSQICH 6 ✅** — ExpenseCategory(soft delete), Expense(+receipt_image, +smena, hard delete) |
-| `StoreSettings` | ✅ Tugallangan  | BOSQICH 2 ✅ — 10 guruh, 30+ maydon, signal+Redis kesh |
+| `accaunt`   | ✅ Tugallangan    | CustomUser, Worker, AuditLog+AuditLogSerializer+AuditLogViewSet, AuditMixin, JWT auth, WorkerKPI, WorkerLimitPermission, ReadOnlyIfExpired, BranchLimitPermission, WarehouseLimitPermission, ProductLimitPermission, SubscriptionRequired |
+| `store`     | ✅ Tugallangan    | Store, Branch(+BranchLimitPermission), StoreSettings(+auto_pdf migration 0007), Smena(X/Z-report) |
+| `warehouse` | ✅ Tugallangan    | Category, SubCategory, Product(+QR+scan+bulk_qr+ProductLimitPermission), Currency, ExchangeRate, Warehouse(+WarehouseLimitPermission), Stock, StockMovement, Transfer, StockBatch(FIFO), WastageRecord, StockAudit, Supplier+SupplierPayment |
+| `trade`     | ✅ Tugallangan    | Sale, SaleItem, SaleReturn, CustomerGroup, Customer — AuditMixin ulangan |
+| `expense`   | ✅ Tugallangan    | ExpenseCategory, Expense — AuditMixin ulangan |
+| `export`    | ✅ Tugallangan    | **BOSQICH 16** — Excel/PDF export (Sales/Expenses/Stocks/StockMovements/Suppliers) + Excel import (Products/Customers/StockMovements/Suppliers/SubCategories) |
+| `dashboard` | ✅ Tugallangan    | **BOSQICH 17** — 8 blok statistika, Redis 5 daqiqa kesh, branch/date/limit filtrlar |
+| `subscription` | ✅ Tugallangan | **BOSQICH 20** — Trial/Basic/Pro/Enterprise rejalari, LIFO deactivation, DowngradeLog, ReadOnlyIfExpired, Celery daily check, SuperAdmin CRUD |
+| `StoreSettings` | ✅ Tugallangan | BOSQICH 2 ✅ — 10 guruh, 30+ maydon, signal+Redis kesh |
 | `Smena`     | ✅ Tugallangan   | BOSQICH 3 ✅ — SmenaStatus+Smena model, SmenaViewSet (open/close/x-report), migration 0005 |
 | `SaleReturn` | ✅ Tugallangan  | BOSQICH 5 ✅ — trade app da, migration 0003             |
 | `WastageRecord` | ✅ Tugallangan | BOSQICH 7 — warehouse app da                        |
@@ -368,7 +533,6 @@ Settings: `config/settings/base.py` → `local.py` (SQLite) / `production.py` (P
 | `SMS xabar`  | ❌ Boshlanmagan  | BOSQICH 11.5 — V2, Eskiz/PlayMobile API              |
 | `OFD`       | ❌ Boshlanmagan  | BOSQICH 14 — v2, keyingi versiyada (Uzbekistonda MAJBURIY 2026) |
 | `Offline sync` | ❌ Boshlanmagan | BOSQICH 18 — idempotency + sync queue                |
-| `subscription` | ❌ Boshlanmagan  | BOSQICH 20 — SubscriptionPlan, Subscription (trial/active/expired), Coupon, CouponUsage, SubscriptionPayment, Middleware, Celery eslatma |
 
 ---
 

@@ -18,6 +18,7 @@ from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from accaunt.audit_mixin import AuditMixin
 from accaunt.models import AuditLog
 from accaunt.permissions import CanAccess, IsManagerOrAbove
 
@@ -42,7 +43,7 @@ from .serializers import (
 # XARAJAT KATEGORIYASI VIEWSET
 # ============================================================
 
-class ExpenseCategoryViewSet(viewsets.ModelViewSet):
+class ExpenseCategoryViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Xarajat kategoriyalarini boshqarish.
     Soft delete — status='inactive' ga o'tkaziladi.
@@ -89,13 +90,8 @@ class ExpenseCategoryViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         worker   = self.request.user.worker
         instance = serializer.save(store=worker.store)
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='ExpenseCategory',
-            target_id=instance.id,
-            description=f"Xarajat kategoriyasi yaratildi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.CREATE, instance,
+                        description=f"Xarajat kategoriyasi yaratildi: '{instance.name}'")
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -115,13 +111,8 @@ class ExpenseCategoryViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='ExpenseCategory',
-            target_id=instance.id,
-            description=f"Xarajat kategoriyasi yangilandi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.UPDATE, instance,
+                        description=f"Xarajat kategoriyasi yangilandi: '{instance.name}'")
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', True)
@@ -142,13 +133,8 @@ class ExpenseCategoryViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         instance.status = 'inactive'
         instance.save(update_fields=['status'])
-        AuditLog.objects.create(
-            actor=request.user,
-            action=AuditLog.Action.DELETE,
-            target_model='ExpenseCategory',
-            target_id=instance.id,
-            description=f"Xarajat kategoriyasi nofaol qilindi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.DELETE, instance,
+                        description=f"Xarajat kategoriyasi nofaol qilindi: '{instance.name}'")
         return Response(
             {'message': "Xarajat kategoriyasi nofaol qilindi."},
             status=status.HTTP_200_OK,
@@ -159,7 +145,7 @@ class ExpenseCategoryViewSet(viewsets.ModelViewSet):
 # XARAJAT VIEWSET
 # ============================================================
 
-class ExpenseViewSet(viewsets.ModelViewSet):
+class ExpenseViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Xarajatlarni boshqarish.
     Hard delete — xarajat to'liq o'chiriladi (faqat manager+).
@@ -234,11 +220,9 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             worker=worker,
             smena=current_smena,
         )
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='Expense',
-            target_id=instance.id,
+        self._audit_log(
+            AuditLog.Action.CREATE,
+            instance,
             description=(
                 f"Xarajat qayd etildi: '{instance.category.name}', "
                 f"{instance.amount} so'm, {instance.date}"
@@ -264,13 +248,8 @@ class ExpenseViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='Expense',
-            target_id=instance.id,
-            description=f"Xarajat yangilandi: #{instance.id}",
-        )
+        self._audit_log(AuditLog.Action.UPDATE, instance,
+                        description=f"Xarajat yangilandi: #{instance.id}")
 
     def update(self, request, *args, **kwargs):
         partial  = kwargs.pop('partial', True)
@@ -292,16 +271,11 @@ class ExpenseViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        expense_id   = instance.id
+        expense_id    = instance.id
         category_name = instance.category.name
+        self._audit_log(AuditLog.Action.DELETE, instance,
+                        description=f"Xarajat o'chirildi: #{expense_id} ({category_name})")
         instance.delete()
-        AuditLog.objects.create(
-            actor=request.user,
-            action=AuditLog.Action.DELETE,
-            target_model='Expense',
-            target_id=expense_id,
-            description=f"Xarajat o'chirildi: #{expense_id} ({category_name})",
-        )
         return Response(
             {'message': "Xarajat o'chirildi."},
             status=status.HTTP_200_OK,

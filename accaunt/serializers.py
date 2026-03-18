@@ -30,7 +30,7 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 
-from .models import CustomUser, Worker, WorkerKPI, WorkerRole, ALL_PERMISSIONS, ROLE_PERMISSIONS, phone_regex
+from .models import AuditLog, CustomUser, Worker, WorkerKPI, WorkerRole, ALL_PERMISSIONS, ROLE_PERMISSIONS, phone_regex
 from .utils import Util
 
 
@@ -1068,3 +1068,80 @@ class WorkerKPISetTargetSerializer(serializers.ModelSerializer):
         if value < 0:
             raise serializers.ValidationError("Bonus summasi manfiy bo'lishi mumkin emas.")
         return value
+
+
+# ============================================================
+# AUDIT LOG SERIALIZER
+# ============================================================
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    """
+    Audit log yozuvini o'qish uchun serializer.
+
+    actor        — Kim bajardi: "Alisher Karimov (Menejer)"
+    action_label — Amal: "Yaratildi" / "Yangilandi" / "O'chirildi"
+    model_label  — Model: "Mahsulot" / "Sotuv" / "Xarajat" ...
+    """
+    actor        = serializers.SerializerMethodField()
+    action_label = serializers.SerializerMethodField()
+    model_label  = serializers.SerializerMethodField()
+    created_at   = serializers.DateTimeField(format='%d.%m.%Y %H:%M')
+
+    class Meta:
+        model  = AuditLog
+        fields = [
+            'id',
+            'actor',
+            'action',
+            'action_label',
+            'model_label',
+            'target_model',
+            'target_id',
+            'description',
+            'extra_data',
+            'created_at',
+        ]
+
+    def get_actor(self, obj) -> str:
+        if not obj.actor:
+            return "Tizim"
+        worker = getattr(obj.actor, 'worker', None)
+        full   = obj.actor.get_full_name() or obj.actor.username
+        if worker:
+            return f"{full} ({worker.get_role_display()})"
+        return full
+
+    def get_action_label(self, obj) -> str:
+        return obj.get_action_display()
+
+    # Model nomini o'zbek tilida ko'rsatish
+    _MODEL_LABELS = {
+        'Category':        'Kategoriya',
+        'SubCategory':     'Subkategoriya',
+        'Product':         'Mahsulot',
+        'Warehouse':       'Ombor',
+        'Stock':           'Qoldiq',
+        'StockMovement':   'Kirim/Chiqim',
+        'Transfer':        'Transfer',
+        'WastageRecord':   'Isrof',
+        'StockAudit':      'Inventarizatsiya',
+        'Supplier':        'Yetkazib beruvchi',
+        'SupplierPayment': 'Yetkazib beruvchi to\'lovi',
+        'Currency':        'Valyuta',
+        'ExchangeRate':    'Valyuta kursi',
+        'Sale':            'Sotuv',
+        'SaleReturn':      'Qaytarish',
+        'Customer':        'Mijoz',
+        'CustomerGroup':   'Mijoz guruhi',
+        'Expense':         'Xarajat',
+        'ExpenseCategory': 'Xarajat kategoriyasi',
+        'Store':           "Do'kon",
+        'Branch':          'Filial',
+        'StoreSettings':   "Do'kon sozlamalari",
+        'Smena':           'Smena',
+        'Worker':          'Xodim',
+        'WorkerKPI':       'Xodim KPI',
+    }
+
+    def get_model_label(self, obj) -> str:
+        return self._MODEL_LABELS.get(obj.target_model, obj.target_model)

@@ -321,6 +321,8 @@ class StoreSettingsSerializer(serializers.ModelSerializer):
             'ofd_token', 'ofd_device_id',
             # Guruh 10 — Yetkazib beruvchi
             'supplier_credit_enabled',
+            # Guruh 11 — Export
+            'auto_pdf_on_smena_close',
         )
         read_only_fields = ('id', 'store', 'store_name')
 
@@ -366,6 +368,8 @@ class StoreSettingsUpdateSerializer(serializers.ModelSerializer):
             'ofd_token', 'ofd_device_id',
             # Guruh 10 — Yetkazib beruvchi
             'supplier_credit_enabled',
+            # Guruh 11 — Export
+            'auto_pdf_on_smena_close',
         )
 
     def validate_max_discount_percent(self, value):

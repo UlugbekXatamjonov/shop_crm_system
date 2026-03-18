@@ -25,6 +25,8 @@ Smena qoidalari:
   - Z-report: smena yopiladi + yakuniy hisobot
 """
 
+import io
+
 from django.utils import timezone
 
 from rest_framework import status, viewsets
@@ -33,8 +35,9 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from accaunt.audit_mixin import AuditMixin
 from accaunt.models import AuditLog
-from accaunt.permissions import CanAccess, IsOwner
+from accaunt.permissions import BranchLimitPermission, CanAccess, IsOwner
 
 from config.cache_utils import get_store_settings, invalidate_store_settings
 
@@ -61,7 +64,7 @@ from .serializers import (
 # DO'KON VIEWSET
 # ============================================================
 
-class StoreViewSet(viewsets.ModelViewSet):
+class StoreViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Do'konni boshqarish.
 
@@ -110,33 +113,18 @@ class StoreViewSet(viewsets.ModelViewSet):
             worker.store = instance
             worker.save(update_fields=['store'])
 
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='Store',
-            target_id=instance.id,
-            description=f"Do'kon yaratildi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.CREATE, instance,
+                        description=f"Do'kon yaratildi: '{instance.name}'")
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='Store',
-            target_id=instance.id,
-            description=f"Do'kon yangilandi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.UPDATE, instance,
+                        description=f"Do'kon yangilandi: '{instance.name}'")
 
     def perform_destroy(self, instance: Store):
         """Hard delete — do'konni bazadan o'chiradi."""
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.DELETE,
-            target_model='Store',
-            target_id=instance.id,
-            description=f"Do'kon o'chirildi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.DELETE, instance,
+                        description=f"Do'kon o'chirildi: '{instance.name}'")
         instance.delete()
 
     def create(self, request, *args, **kwargs):
@@ -182,7 +170,7 @@ class StoreViewSet(viewsets.ModelViewSet):
 # FILIAL VIEWSET
 # ============================================================
 
-class BranchViewSet(viewsets.ModelViewSet):
+class BranchViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Filiallarni boshqarish.
 
@@ -201,6 +189,8 @@ class BranchViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ('list', 'retrieve'):
             return [IsAuthenticated()]
+        if self.action == 'create':
+            return [IsAuthenticated(), IsOwner(), BranchLimitPermission()]
         return [IsAuthenticated(), IsOwner()]
 
     def get_serializer_class(self):
@@ -234,33 +224,18 @@ class BranchViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         worker = self.request.user.worker
         instance = serializer.save(store=worker.store)
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='Branch',
-            target_id=instance.id,
-            description=f"Filial yaratildi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.CREATE, instance,
+                        description=f"Filial yaratildi: '{instance.name}'")
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='Branch',
-            target_id=instance.id,
-            description=f"Filial yangilandi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.UPDATE, instance,
+                        description=f"Filial yangilandi: '{instance.name}'")
 
     def perform_destroy(self, instance: Branch):
         """Hard delete — filialni bazadan o'chiradi."""
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.DELETE,
-            target_model='Branch',
-            target_id=instance.id,
-            description=f"Filial o'chirildi: '{instance.name}'",
-        )
+        self._audit_log(AuditLog.Action.DELETE, instance,
+                        description=f"Filial o'chirildi: '{instance.name}'")
         instance.delete()
 
     def create(self, request, *args, **kwargs):
@@ -312,7 +287,7 @@ class BranchViewSet(viewsets.ModelViewSet):
 # DO'KON SOZLAMALARI VIEWSET — BOSQICH 2
 # ============================================================
 
-class StoreSettingsViewSet(viewsets.ModelViewSet):
+class StoreSettingsViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Do'kon sozlamalarini boshqarish.
 
@@ -363,14 +338,10 @@ class StoreSettingsViewSet(viewsets.ModelViewSet):
         instance = serializer.save()
         # QOIDA 3 — keshni tozalash
         invalidate_store_settings(instance.store_id)
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='StoreSettings',
-            target_id=instance.id,
-            description=(
-                f"Do'kon sozlamalari yangilandi: '{instance.store.name}'"
-            ),
+        self._audit_log(
+            AuditLog.Action.UPDATE,
+            instance,
+            description=f"Do'kon sozlamalari yangilandi: '{instance.store.name}'",
         )
 
     def update(self, request, *args, **kwargs):
@@ -396,7 +367,7 @@ class StoreSettingsViewSet(viewsets.ModelViewSet):
 # SMENA VIEWSET — BOSQICH 3
 # ============================================================
 
-class SmenaViewSet(viewsets.ModelViewSet):
+class SmenaViewSet(AuditMixin, viewsets.ModelViewSet):
     """
     Smena (kassir smenasi) tizimi.
 
@@ -493,11 +464,9 @@ class SmenaViewSet(viewsets.ModelViewSet):
             worker_open=worker,
             status=SmenaStatus.OPEN,
         )
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.CREATE,
-            target_model='Smena',
-            target_id=smena.id,
+        self._audit_log(
+            AuditLog.Action.CREATE,
+            smena,
             description=(
                 f"Smena ochildi: filial='{smena.branch.name}', "
                 f"naqd={smena.cash_start}"
@@ -560,27 +529,65 @@ class SmenaViewSet(viewsets.ModelViewSet):
             end_time=timezone.now(),
             status=SmenaStatus.CLOSED,
         )
-        AuditLog.objects.create(
-            actor=self.request.user,
-            action=AuditLog.Action.UPDATE,
-            target_model='Smena',
-            target_id=smena.id,
+        self._audit_log(
+            AuditLog.Action.UPDATE,
+            smena,
             description=(
                 f"Smena yopildi: filial='{smena.branch.name}', "
                 f"naqd={smena.cash_end}"
             ),
         )
-        return Response(
-            {
-                'message': 'Smena muvaffaqiyatli yopildi.',
-                'data': SmenaDetailSerializer(
-                    smena,
-                    context=self.get_serializer_context(),
-                ).data,
-                'z_report': self._build_report(smena),
-            },
-            status=status.HTTP_200_OK,
-        )
+
+        z_report = self._build_report(smena)
+
+        # 5. auto_pdf_on_smena_close — Z-report PDF ni response ga qo'shish
+        pdf_url = None
+        if settings.auto_pdf_on_smena_close:
+            try:
+                from export.utils.pdf import make_pdf_response
+                report = z_report
+                headers = ['Ko\'rsatkich', 'Qiymat']
+                rows = [
+                    ['Filial',          smena.branch.name],
+                    ['Kassir (ochgan)', smena.worker_open.get_full_name() if smena.worker_open_id else ''],
+                    ['Kassir (yopgan)', smena.worker_close.get_full_name() if smena.worker_close_id else ''],
+                    ['Boshlanish',      smena.start_time.strftime('%d.%m.%Y %H:%M') if smena.start_time else ''],
+                    ['Tugash',          smena.end_time.strftime('%d.%m.%Y %H:%M') if smena.end_time else ''],
+                    ['Naqd (ochilish)', str(smena.cash_start or 0)],
+                    ['Naqd (yopilish)', str(smena.cash_end or 0)],
+                ]
+                # Z-report ma'lumotlari (mavjud bo'lsa)
+                if isinstance(report, dict):
+                    for k, v in report.items():
+                        if k not in ('id', 'branch'):
+                            rows.append([str(k), str(v)])
+
+                pdf_response = make_pdf_response(
+                    filename=f'z_report_smena_{smena.id}.pdf',
+                    title=f'Z-Report — Smena #{smena.id} — {smena.branch.name}',
+                    headers=headers,
+                    rows=rows,
+                )
+                # PDF ni response body ga emas, alohida field sifatida qaytaramiz
+                # (binary fayl bo'lgani uchun base64 encode qilamiz)
+                import base64
+                pdf_bytes = b''.join(pdf_response.streaming_content) if hasattr(pdf_response, 'streaming_content') else pdf_response.content
+                pdf_url = 'data:application/pdf;base64,' + base64.b64encode(pdf_bytes).decode('utf-8')
+            except Exception:
+                pass  # PDF generatsiya xatosi — asosiy javobga ta'sir qilmasin
+
+        response_data = {
+            'message': 'Smena muvaffaqiyatli yopildi.',
+            'data': SmenaDetailSerializer(
+                smena,
+                context=self.get_serializer_context(),
+            ).data,
+            'z_report': z_report,
+        }
+        if pdf_url is not None:
+            response_data['z_report_pdf'] = pdf_url
+
+        return Response(response_data, status=status.HTTP_200_OK)
 
     # ----------------------------------------------------------
     # X-REPORT action — smena yopilmaydi

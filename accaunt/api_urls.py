@@ -23,10 +23,11 @@ Router avtomatik quyidagi URL'larni yaratadi:
 """
 
 from rest_framework.routers import DefaultRouter
-from .views import WorkerViewSet, WorkerKPIViewSet
+from .views import WorkerViewSet, WorkerKPIViewSet, AuditLogViewSet
 
 router = DefaultRouter()
-router.register(r'workers', WorkerViewSet,    basename='worker')
-router.register(r'kpi',     WorkerKPIViewSet, basename='kpi')
+router.register(r'workers',    WorkerViewSet,    basename='worker')
+router.register(r'kpi',        WorkerKPIViewSet, basename='kpi')
+router.register(r'audit-logs', AuditLogViewSet,  basename='audit-log')
 
 urlpatterns = router.urls
