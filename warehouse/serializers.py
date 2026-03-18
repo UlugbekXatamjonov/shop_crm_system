@@ -574,9 +574,42 @@ class WarehouseListSerializer(serializers.ModelSerializer):
         return obj.stocks.count()
 
 
+class WarehouseStockItemSerializer(serializers.ModelSerializer):
+    """Ombor detail da mahsulot ma'lumotlari (Stock + Product)."""
+    product_id     = serializers.IntegerField(source='product.id', read_only=True)
+    product_name   = serializers.CharField(source='product.name', read_only=True)
+    purchase_price = serializers.DecimalField(
+        source='product.purchase_price', max_digits=14, decimal_places=2, read_only=True
+    )
+    sale_price     = serializers.DecimalField(
+        source='product.sale_price', max_digits=14, decimal_places=2, read_only=True
+    )
+    barcode        = serializers.CharField(source='product.barcode', read_only=True)
+    barcode_image_url = serializers.SerializerMethodField()
+    added_on       = serializers.DateTimeField(source='updated_on', read_only=True)
+
+    class Meta:
+        model  = Stock
+        fields = (
+            'product_id', 'product_name',
+            'quantity',
+            'purchase_price', 'sale_price',
+            'barcode', 'barcode_image_url',
+            'added_on',
+        )
+
+    def get_barcode_image_url(self, obj):
+        if not obj.product.barcode:
+            return None
+        request = self.context.get('request')
+        url = f'/api/v1/warehouse/products/{obj.product_id}/barcode/'
+        return request.build_absolute_uri(url) if request else url
+
+
 class WarehouseDetailSerializer(serializers.ModelSerializer):
     store_name  = serializers.CharField(source='store.name', read_only=True)
     stock_count = serializers.SerializerMethodField()
+    products    = serializers.SerializerMethodField()
 
     class Meta:
         model  = Warehouse
@@ -584,10 +617,15 @@ class WarehouseDetailSerializer(serializers.ModelSerializer):
             'id', 'name', 'address',
             'store_name', 'status',
             'stock_count', 'created_on',
+            'products',
         )
 
     def get_stock_count(self, obj):
         return obj.stocks.count()
+
+    def get_products(self, obj):
+        stocks = obj.stocks.select_related('product').order_by('product__name')
+        return WarehouseStockItemSerializer(stocks, many=True, context=self.context).data
 
 
 class WarehouseCreateSerializer(serializers.ModelSerializer):
