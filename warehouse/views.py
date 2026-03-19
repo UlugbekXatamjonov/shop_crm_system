@@ -276,7 +276,8 @@ class SubCategoryViewSet(AuditMixin, viewsets.ModelViewSet):
             return SubCategory.objects.none()
 
         qs = SubCategory.objects.filter(
-            store=worker.store
+            store=worker.store,
+            category__status='active'
         ).select_related('category', 'store')
 
         # Kategoriya bo'yicha filter
