@@ -381,7 +381,8 @@ class ProductListSerializer(serializers.ModelSerializer):
     subcategory_name = serializers.CharField(source='subcategory.name', read_only=True)
     unit_display     = serializers.CharField(source='get_unit_display', read_only=True)
     status_display   = serializers.CharField(source='get_status_display', read_only=True)
-    currency_code    = serializers.SerializerMethodField()
+    currency_code     = serializers.SerializerMethodField()
+    barcode_image_url = serializers.SerializerMethodField()
 
     class Meta:
         model  = Product
@@ -390,12 +391,22 @@ class ProductListSerializer(serializers.ModelSerializer):
             'category_name', 'subcategory_name',
             'unit', 'unit_display',
             'sale_price', 'currency_code',
-            'barcode', 'status', 'status_display',
+            'barcode', 'barcode_image_url',
+            'status', 'status_display',
             'image',
         )
 
     def get_currency_code(self, obj):
         return obj.price_currency.code if obj.price_currency else None
+
+    def get_barcode_image_url(self, obj):
+        if not obj.barcode:
+            return None
+        request = self.context.get('request')
+        url = f'/api/v1/warehouse/products/{obj.id}/barcode/'
+        if request:
+            return request.build_absolute_uri(url)
+        return url
 
 
 class ProductDetailSerializer(serializers.ModelSerializer):
