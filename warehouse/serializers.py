@@ -381,7 +381,7 @@ class ProductListSerializer(serializers.ModelSerializer):
     subcategory_name = serializers.CharField(source='subcategory.name', read_only=True)
     unit_display     = serializers.CharField(source='get_unit_display', read_only=True)
     status_display   = serializers.CharField(source='get_status_display', read_only=True)
-    currency_code    = serializers.CharField(source='price_currency.code', read_only=True)
+    currency_code    = serializers.SerializerMethodField()
 
     class Meta:
         model  = Product
@@ -391,7 +391,11 @@ class ProductListSerializer(serializers.ModelSerializer):
             'unit', 'unit_display',
             'sale_price', 'currency_code',
             'barcode', 'status', 'status_display',
+            'image',
         )
+
+    def get_currency_code(self, obj):
+        return obj.price_currency.code if obj.price_currency else None
 
 
 class ProductDetailSerializer(serializers.ModelSerializer):
@@ -401,9 +405,9 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     subcategory_name = serializers.CharField(source='subcategory.name', read_only=True)
     unit_display     = serializers.CharField(source='get_unit_display', read_only=True)
     status_display   = serializers.CharField(source='get_status_display', read_only=True)
-    currency_id      = serializers.IntegerField(source='price_currency.id', read_only=True)
-    currency_code    = serializers.CharField(source='price_currency.code', read_only=True)
-    currency_symbol  = serializers.CharField(source='price_currency.symbol', read_only=True)
+    currency_id      = serializers.SerializerMethodField()
+    currency_code    = serializers.SerializerMethodField()
+    currency_symbol  = serializers.SerializerMethodField()
     store_name       = serializers.CharField(source='store.name', read_only=True)
     stock_total      = serializers.SerializerMethodField()
     barcode_image_url = serializers.SerializerMethodField()
@@ -421,6 +425,15 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             'store_name', 'status', 'status_display',
             'stock_total', 'created_on',
         )
+
+    def get_currency_id(self, obj):
+        return obj.price_currency.id if obj.price_currency else None
+
+    def get_currency_code(self, obj):
+        return obj.price_currency.code if obj.price_currency else None
+
+    def get_currency_symbol(self, obj):
+        return obj.price_currency.symbol if obj.price_currency else None
 
     def get_stock_total(self, obj):
         from django.db.models import Sum
