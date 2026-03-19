@@ -1136,6 +1136,57 @@ class MovementCreateSerializer(serializers.ModelSerializer):
         return data
 
 
+class MovementBulkItemSerializer(serializers.Serializer):
+    """Bulk harakatda bitta qator: mahsulot + miqdor + narx (ixtiyoriy) + supplier (ixtiyoriy)."""
+    product   = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
+    quantity  = serializers.DecimalField(max_digits=15, decimal_places=3)
+    unit_cost = serializers.DecimalField(max_digits=15, decimal_places=2, required=False, allow_null=True)
+    supplier  = serializers.PrimaryKeyRelatedField(queryset=Supplier.objects.all(), required=False, allow_null=True)
+
+    def validate_quantity(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Miqdor 0 dan katta bo'lishi shart.")
+        return value
+
+
+class MovementBulkCreateSerializer(serializers.Serializer):
+    """
+    Bir vaqtda bir necha mahsulot kirim/chiqim qilish.
+
+    POST /api/v1/warehouse/movements/bulk/
+    {
+        "movement_type": "in",
+        "branch": 1,
+        "note": "Maysaradan kirim",
+        "items": [
+            {"product": 5, "quantity": 100, "unit_cost": 12000, "supplier": 2},
+            {"product": 8, "quantity": 50,  "unit_cost": 8000}
+        ]
+    }
+    """
+    movement_type = serializers.ChoiceField(choices=MovementType.choices)
+    branch        = serializers.PrimaryKeyRelatedField(queryset=Branch.objects.all(), required=False, allow_null=True)
+    warehouse     = serializers.PrimaryKeyRelatedField(queryset=Warehouse.objects.all(), required=False, allow_null=True)
+    note          = serializers.CharField(required=False, allow_blank=True, default='')
+    items         = MovementBulkItemSerializer(many=True)
+
+    def validate_items(self, value):
+        if not value:
+            raise serializers.ValidationError("Kamida bitta mahsulot kiritilishi shart.")
+        return value
+
+    def validate(self, data):
+        branch    = data.get('branch')
+        warehouse = data.get('warehouse')
+        if branch and warehouse:
+            raise serializers.ValidationError(
+                "Filial va ombor bir vaqtda ko'rsatilishi mumkin emas. Faqat bittasini tanlang."
+            )
+        if not branch and not warehouse:
+            raise serializers.ValidationError("Filial yoki ombor ko'rsatilishi shart.")
+        return data
+
+
 # ============================================================
 # TRANSFER SERIALIZERLARI
 # ============================================================

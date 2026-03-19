@@ -51,6 +51,7 @@ Router avtomatik quyidagi URL'larni yaratadi:
   GET    /api/v1/warehouse/movements/            — harakatlar ro'yxati (branch|warehouse)
   POST   /api/v1/warehouse/movements/            — harakat yaratish (kirim/chiqim, branch yoki warehouse)
   GET    /api/v1/warehouse/movements/{id}/       — harakat tafsilotlari
+  POST   /api/v1/warehouse/movements/bulk/       — guruhli kirim/chiqim (atomic: bitta xato → barchasi rollback)
 
   GET    /api/v1/warehouse/transfers/            — transferlar ro'yxati
   POST   /api/v1/warehouse/transfers/            — yangi transfer (pending holat)

@@ -85,6 +85,7 @@ from .serializers import (
     ExchangeRateCreateSerializer,
     ExchangeRateDetailSerializer,
     ExchangeRateListSerializer,
+    MovementBulkCreateSerializer,
     MovementCreateSerializer,
     MovementDetailSerializer,
     MovementListSerializer,
@@ -1214,17 +1215,11 @@ class StockMovementViewSet(AuditMixin, viewsets.ModelViewSet):
             return instance.branch.name
         return instance.warehouse.name if instance.warehouse_id else '—'
 
-    @transaction.atomic
-    def perform_create(self, serializer):
-        worker      = getattr(self.request.user, 'worker', None)
-        store       = getattr(worker, 'store', None)
-        unit_cost   = serializer.validated_data.get('unit_cost')
-        supplier_id = serializer.validated_data.get('supplier')
-        supplier_id = supplier_id.pk if supplier_id else None
-        instance    = serializer.save(worker=worker)
-
-        # Stock qoldig'ini yangilash (branch YOKI warehouse)
-        # get_or_create + F() expression — parallel so'rovlarda race condition yo'q
+    def _apply_movement(self, instance, unit_cost, supplier_id, store):
+        """
+        StockMovement saqlangandan keyin Stock/StockBatch/AVCO/Supplier yangilash.
+        perform_create va bulk_create ikkalasidan chaqiriladi.
+        """
         if instance.branch_id:
             stock, _ = Stock.objects.select_for_update().get_or_create(
                 product=instance.product,
@@ -1245,7 +1240,6 @@ class StockMovementViewSet(AuditMixin, viewsets.ModelViewSet):
                 quantity=F('quantity') + instance.quantity,
                 updated_on=timezone.now(),
             )
-            # ── FIFO: IN harakat uchun yangi partiya yaratish ──
             if unit_cost is not None and store:
                 batch_code = generate_batch_code(store)
                 StockBatch.objects.create(
@@ -1259,8 +1253,6 @@ class StockMovementViewSet(AuditMixin, viewsets.ModelViewSet):
                     movement     = instance,
                     store        = store,
                 )
-                # ── AVCO: purchase_price o'rtacha tannarx bilan yangilash ──
-                # Barcha aktiv partiyalar bo'yicha weighted average hisoblanadi
                 result = (
                     StockBatch.objects
                     .filter(product=instance.product, qty_left__gt=0)
@@ -1305,6 +1297,16 @@ class StockMovementViewSet(AuditMixin, viewsets.ModelViewSet):
             f"{instance.get_movement_type_display()}: '{instance.product.name}' × {instance.quantity} ({self._location_name(instance)})",
         )
 
+    @transaction.atomic
+    def perform_create(self, serializer):
+        worker      = getattr(self.request.user, 'worker', None)
+        store       = getattr(worker, 'store', None)
+        unit_cost   = serializer.validated_data.get('unit_cost')
+        supplier    = serializer.validated_data.get('supplier')
+        supplier_id = supplier.pk if supplier else None
+        instance    = serializer.save(worker=worker)
+        self._apply_movement(instance, unit_cost, supplier_id, store)
+
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -1314,6 +1316,85 @@ class StockMovementViewSet(AuditMixin, viewsets.ModelViewSet):
                 'message': "Harakat muvaffaqiyatli qayd etildi.",
                 'data': MovementDetailSerializer(
                     serializer.instance,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=False, methods=['post'], url_path='bulk')
+    @transaction.atomic
+    def bulk_create(self, request):
+        """
+        Bir vaqtda bir necha mahsulot kirim/chiqim.
+        Bitta item xato bo'lsa — barchasi rollback qilinadi.
+
+        POST /api/v1/warehouse/movements/bulk/
+        """
+        worker = getattr(request.user, 'worker', None)
+        store  = getattr(worker, 'store', None)
+
+        serializer = MovementBulkCreateSerializer(
+            data=request.data,
+            context=self.get_serializer_context(),
+        )
+        serializer.is_valid(raise_exception=True)
+        data          = serializer.validated_data
+        movement_type = data['movement_type']
+        branch        = data.get('branch')
+        warehouse     = data.get('warehouse')
+        note          = data.get('note', '')
+        items         = data['items']
+
+        # 1. Avval barcha itemlarni validatsiya qilamiz (qoldiq yetarliligi)
+        for idx, item in enumerate(items, start=1):
+            product  = item['product']
+            quantity = item['quantity']
+
+            # Store tegishliligini tekshirish
+            if store and product.store != store:
+                raise ValidationError(
+                    {f"items[{idx}]": f"'{product.name}' mahsuloti sizning do'koningizga tegishli emas."}
+                )
+
+            # OUT: qoldiq yetarliligini tekshirish
+            if movement_type == MovementType.OUT:
+                stock_qs = Stock.objects.filter(product=product)
+                stock_qs = stock_qs.filter(branch=branch) if branch else stock_qs.filter(warehouse=warehouse)
+                current_qty = stock_qs.values_list('quantity', flat=True).first() or 0
+                if current_qty < quantity:
+                    location_name = branch.name if branch else warehouse.name
+                    raise ValidationError(
+                        {f"items[{idx}]": f"'{product.name}' qoldig'i yetarli emas ({location_name}): mavjud {current_qty}, so'ralgan {quantity}."}
+                    )
+
+        # 2. Hammasi to'g'ri — saqlash
+        created = []
+        for item in items:
+            unit_cost   = item.get('unit_cost')
+            supplier    = item.get('supplier')
+            supplier_id = supplier.pk if supplier else None
+
+            instance = StockMovement.objects.create(
+                product       = item['product'],
+                branch        = branch,
+                warehouse     = warehouse,
+                movement_type = movement_type,
+                quantity      = item['quantity'],
+                unit_cost     = unit_cost,
+                note          = note,
+                supplier      = supplier,
+                worker        = worker,
+            )
+            self._apply_movement(instance, unit_cost, supplier_id, store)
+            created.append(instance)
+
+        return Response(
+            {
+                'message': f"{len(created)} ta harakat muvaffaqiyatli qayd etildi.",
+                'data': MovementDetailSerializer(
+                    created,
+                    many=True,
                     context=self.get_serializer_context(),
                 ).data,
             },
