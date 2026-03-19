@@ -1,5 +1,23 @@
 # CLAUDE UCHUN ESLATMA — Yangi chatda bu faylni o'qi va davom et
 
+## 📅 19.03.2026 SESSION #2 — QILINGAN ISHLAR
+
+### 1. postman_test_guide.txt → PROJECT_CONTEXT.md ga ko'chirildi ✅
+
+**Tavsif:** Barcha Postman test qo'llanmasi (1945 qator, 27 bosqich, 54 qadam, 90+ endpoint)
+alohida fayldan PROJECT_CONTEXT.md ga birlashtirildi.
+
+**O'zgartirilgan fayl:** `PROJECT_CONTEXT.md`
+- Yangi bo'lim: `## POSTMAN TEST QO'LLANMASI` qo'shildi
+- 1945 qator content qo'shildi
+
+**O'chirilgan fayl:** `postman_test_guide.txt`
+- Barcha ma'lumotlar PROJECT_CONTEXT.md ga ko'chgani uchun eski fayl o'chirildi
+
+**Commit:** `ff2cd22`
+
+---
+
 ## 📅 19.03.2026 SESSION — QILINGAN ISHLAR
 
 ### 1. Product image maydonini ro'yxatga qo'shish ✅
