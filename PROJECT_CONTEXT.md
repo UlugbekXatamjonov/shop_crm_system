@@ -1,5 +1,78 @@
 # CLAUDE UCHUN ESLATMA — Yangi chatda bu faylni o'qi va davom et
 
+## 📅 19.03.2026 SESSION — QILINGAN ISHLAR
+
+### 1. Product image maydonini ro'yxatga qo'shish ✅
+
+**O'zgartirilgan fayl:** `warehouse/serializers.py`
+- `ProductListSerializer.fields` ga `image` qo'shildi
+
+### 2. currency_code null bo'lganda yo'qolib ketish muammosi tuzatildi ✅
+
+**Muammo:** `price_currency` null bo'lgan mahsulotlarda `currency_code`, `currency_id`, `currency_symbol` maydonlari response dan butunlay yo'qolardi.
+
+**Sabab:** `CharField(source='price_currency.code')` — FK null bo'lganda DRF `SkipField` exception tashlaydi → maydon response ga kirmaydi.
+
+**Yechim:** `SerializerMethodField` ga o'tkazildi — null check bilan:
+```python
+currency_code = serializers.SerializerMethodField()
+def get_currency_code(self, obj):
+    return obj.price_currency.code if obj.price_currency else None
+```
+`ProductListSerializer` va `ProductDetailSerializer` da ham tuzatildi.
+
+### 3. barcode_image_url mahsulot ro'yxatiga qo'shildi ✅
+
+**O'zgartirilgan fayl:** `warehouse/serializers.py`
+- `ProductListSerializer` ga `barcode_image_url = SerializerMethodField()` qo'shildi
+- `get_barcode_image_url()`: `request.build_absolute_uri(f'/api/v1/warehouse/products/{obj.id}/barcode/')`
+
+### 4. currency_code matn orqali mahsulot yaratish/yangilash ✅
+
+**Muammo:** Faqat `price_currency` (ID) qabul qilinar edi — frontend "USD", "UZS" kabi kod yubormoqchi edi.
+
+**Yechim:** `ProductCreateSerializer` va `ProductUpdateSerializer` ga `currency_code` write-only field qo'shildi.
+- `validate()` da: `Currency.objects.get(code=currency_code.upper())` → `price_currency` ga joylashadi
+- `price_currency` yoki `currency_code` dan biri yetarli, ikkinchisi shart emas
+
+### 5. Inactive kategoriyaning subkategoriyalari yashirildi ✅
+
+**Muammo:** Kategoriya `status='inactive'` bo'lganda ham uning subkategoriyalari ro'yxatda ko'rinardi.
+
+**Yechim (filter-based):** `SubCategoryViewSet.get_queryset()` ga `category__status='active'` filter qo'shildi.
+- DB o'zgartirilmadi — faqat queryset filtri
+- Kategoriya qayta faollashtirilsa, subkategoriyalar avtomatik ko'rinadi
+
+### 6. StockMovement bulk endpoint qo'shildi ✅
+
+**Yangi endpoint:**
+```
+POST /api/v1/warehouse/movements/bulk/   — guruhli kirim/chiqim (atomic)
+```
+
+**Ishlash tartibi:**
+1. Barcha itemlarni validatsiya qil (store ownership, OUT uchun stock yetarliligi)
+2. Xato bo'lsa → `ValidationError` → rollback (birortasi ham saqlanmaydi)
+3. Hammasi to'g'ri bo'lsa → atomik save
+
+**Yangi serializer lar:**
+- `MovementBulkItemSerializer` (fields: product, quantity, unit_cost, supplier)
+- `MovementBulkCreateSerializer` (fields: movement_type, branch, warehouse, note, items)
+
+**Refactoring:** `_apply_movement()` helper method ajratildi — `perform_create` va `bulk_create` ikkalasi ishlatadi (AVCO, FIFO, debt_balance mantiq)
+
+**O'zgartirilgan fayllar:**
+- `warehouse/serializers.py` — 2 ta yangi serializer
+- `warehouse/views.py` — `_apply_movement()` helper + `bulk_create` action
+- `warehouse/api_urls.py` — doc comment yangilandi
+
+### 7. postman_test_guide.txt to'liq qayta yozildi ✅
+
+**27 bosqich, 54 qadam** — barcha endpointlar to'g'ri ketma-ketlikda:
+Auth → Store → Branch → StoreSettings → Worker → Currency/ExchangeRate → Category → SubCategory → Products → Supplier → Warehouse → Smena → StockMovement (single+bulk) → Stock → StockBatch → Transfer → Wastage → StockAudit → Sale → Customer → SaleReturn → Expense → WorkerKPI → Dashboard → Export/Import → AuditLog → Subscription
+
+---
+
 ## 📅 18.03.2026 SESSION #2 — QILINGAN ISHLAR
 
 ### 1. Ombor detail ga mahsulotlar ro'yxati qo'shildi ✅
