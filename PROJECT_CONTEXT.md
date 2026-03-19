@@ -2395,3 +2395,1954 @@ shop_crm_system/
 ├── entrypoint.sh         ← set -e; migrate; gunicorn (PORT env)
 └── railway.toml          ← builder=DOCKERFILE, healthcheckPath=/health/, timeout=300
 ```
+
+
+---
+
+## POSTMAN TEST QO'LLANMASI
+
+============================================================
+  SHOP CRM SYSTEM — POSTMAN TEST QO'LLANMASI
+  Base URL: https://shopcrmsystem-production.up.railway.app/api/v1
+  Header:   Authorization: Bearer <access_token>
+  Sana: 19.03.2026  |  Jami: 90+ endpoint
+============================================================
+
+TO'G'RI TEST KETMA-KETLIGI (umumiy):
+  [1]  Auth — ro'yxatdan o'tish, login
+  [2]  Store — do'kon ma'lumotlari
+  [3]  Branch — filiallar
+  [4]  StoreSettings — sozlamalar
+  [5]  Worker — xodimlar
+  [6]  Currency + ExchangeRate — valyutalar
+  [7]  Category → SubCategory → Product
+  [8]  Supplier — yetkazib beruvchilar
+  [9]  Warehouse — omborlar
+  [10] Smena ochish
+  [11] StockMovement IN — kirim (yoki bulk)
+  [12] Stocks — qoldiqlarni tekshirish
+  [13] StockBatch — FIFO partiyalar
+  [14] Transfer
+  [15] Wastage — isrof
+  [16] StockAudit — inventarizatsiya
+  [17] Sale — sotuv
+  [18] SaleReturn — qaytarish
+  [19] Expense — xarajat
+  [20] Smena yopish → Z-Report
+  [21] Dashboard
+  [22] Export / Import
+  [23] WorkerKPI
+  [24] AuditLog
+  [25] Subscription
+
+
+============================================================
+  1-BOSQICH — AUTH (KIRISH / CHIQISH)
+  Base: /api/v1/auth/
+============================================================
+
+--- Ro'yxatdan o'tish ---
+POST /api/v1/auth/register/
+Body (JSON):
+  username    [str]  MAJBURIY
+  password    [str]  MAJBURIY
+  first_name  [str]  ixtiyoriy
+  last_name   [str]  ixtiyoriy
+  email       [str]  ixtiyoriy
+
+Misol:
+{
+    "username": "ulugbek",
+    "password": "Secret123!",
+    "first_name": "Ulugbek"
+}
+
+Javob (201):
+{
+    "message": "Muvaffaqiyatli ro'yxatdan o'tdingiz.",
+    "data": {
+        "access": "<token>",
+        "refresh": "<token>",
+        "user": { ... }
+    }
+}
+
+-------------------------------------------
+
+--- Login ---
+POST /api/v1/auth/login/
+Body (JSON):
+{
+    "username": "ulugbek",
+    "password": "Secret123!"
+}
+
+Javob (200):
+{
+    "access": "<access_token>",   ← shu tokenni keyingi barcha so'rovlarda ishlating
+    "refresh": "<refresh_token>"
+}
+
+  * Bundan keyin BARCHA so'rovlarga:
+    Header → Authorization: Bearer <access_token>
+
+-------------------------------------------
+
+--- Logout ---
+POST /api/v1/auth/logout/
+Body (JSON):
+{
+    "refresh": "<refresh_token>"
+}
+
+-------------------------------------------
+
+--- Profilni ko'rish ---
+GET /api/v1/auth/profil/
+
+-------------------------------------------
+
+--- Profilni yangilash ---
+PATCH /api/v1/auth/profil/
+Body (JSON) — faqat o'zgartirilgan maydonlar:
+{
+    "first_name": "Ulugbek",
+    "last_name": "Xatamjonov",
+    "email": "ulugbek@gmail.com"
+}
+
+-------------------------------------------
+
+--- Parolni o'zgartirish ---
+POST /api/v1/auth/change-password/
+Body (JSON):
+{
+    "old_password": "Secret123!",
+    "new_password": "NewSecret456!"
+}
+
+-------------------------------------------
+
+--- Parol reset (email orqali) ---
+POST /api/v1/auth/send-reset-email/
+Body (JSON):
+{
+    "email": "ulugbek@gmail.com"
+}
+  * Email ga reset havolasi yuboriladi
+
+-------------------------------------------
+
+--- Parolni qayta belgilash ---
+POST /api/v1/auth/reset-password/{uid}/{token}/
+Body (JSON):
+{
+    "new_password": "NewSecret456!"
+}
+  * uid va token — emaildagi havoladan olinadi
+
+
+============================================================
+  2-BOSQICH — STORE (DO'KON)
+  Ruxsat: owner
+  Base URL: /api/v1/stores/
+============================================================
+
+--- Do'kon ro'yxati ---
+GET /api/v1/stores/
+
+-------------------------------------------
+
+--- Do'kon detail ---
+GET /api/v1/stores/{id}/
+
+Javob:
+{
+    "id": 1,
+    "name": "Baraka Do'koni",
+    "owner_name": "Ulugbek",
+    "status": "active",
+    "created_on": "2026-03-01 | 09:00"
+}
+
+-------------------------------------------
+
+--- Do'kon yangilash ---
+PATCH /api/v1/stores/{id}/
+Body (JSON):
+{
+    "name": "Baraka Do'koni (yangi nom)"
+}
+
+-------------------------------------------
+
+--- Do'konni o'chirish ---
+DELETE /api/v1/stores/{id}/
+
+
+============================================================
+  3-BOSQICH — BRANCH (FILIALLAR)
+  Ruxsat: list/retrieve → seller+ | create/update/delete → manager+
+  Base URL: /api/v1/branches/
+============================================================
+
+--- Filial yaratish ---
+POST /api/v1/branches/
+Body (JSON):
+  name     [str]  MAJBURIY — unikal (do'kon ichida)
+  address  [str]  ixtiyoriy
+  phone    [str]  ixtiyoriy
+
+Misol:
+{
+    "name": "Baraka filial 1",
+    "address": "Toshkent, Chilonzor 5",
+    "phone": "+998991234567"
+}
+
+Javob (201):
+{
+    "message": "Filial muvaffaqiyatli yaratildi.",
+    "data": {
+        "id": 1,
+        "name": "Baraka filial 1",
+        "address": "Toshkent, Chilonzor 5",
+        "status": "active",
+        "status_display": "Faol"
+    }
+}
+
+-------------------------------------------
+
+--- Filiallar ro'yxati ---
+GET /api/v1/branches/
+Filter: ?status=active|inactive
+
+-------------------------------------------
+
+--- Filial detail ---
+GET /api/v1/branches/{id}/
+
+-------------------------------------------
+
+--- Filial yangilash ---
+PATCH /api/v1/branches/{id}/
+{
+    "name": "Baraka filial 1 (yangi)",
+    "status": "inactive"
+}
+
+-------------------------------------------
+
+--- Filial o'chirish ---
+DELETE /api/v1/branches/{id}/
+  * Soft delete — status=inactive
+
+
+============================================================
+  4-BOSQICH — STORESETTINGS (DO'KON SOZLAMALARI)
+  Ruxsat: GET → CanAccess('sozlamalar') | PATCH → owner
+  Base URL: /api/v1/settings/
+  Eslatma: Do'kon yaratilganda avtomatik yaratiladi
+============================================================
+
+--- Sozlamalarni ko'rish ---
+GET /api/v1/settings/
+
+Javob (asosiy maydonlar):
+{
+    "id": 1,
+    "store_name": "Baraka Do'koni",
+    "default_currency": "UZS",
+    "shift_enabled": false,
+    "subcategory_enabled": true,
+    "allow_cash": true,
+    "allow_card": true,
+    "allow_debt": true,
+    "allow_discount": true,
+    "require_cash_count": false,
+    "low_stock_threshold": 10,
+    "auto_pdf": false,
+    "show_eur_price": false,
+    "show_cny_price": false
+}
+
+-------------------------------------------
+
+--- Sozlamalarni yangilash ---
+PATCH /api/v1/settings/{id}/
+Body (JSON) — faqat o'zgartirilgan maydonlar:
+{
+    "shift_enabled": true,
+    "allow_discount": false,
+    "low_stock_threshold": 5,
+    "default_currency": "USD"
+}
+
+Mavjud default_currency qiymatlari: UZS | USD | EUR | RUB | CNY
+
+
+============================================================
+  5-BOSQICH — WORKER (XODIMLAR)
+  Base URL: /api/v1/workers/
+============================================================
+
+--- O'z profilini ko'rish ---
+GET /api/v1/workers/me/
+
+Javob:
+{
+    "id": 1,
+    "role": "owner",
+    "role_display": "Ega",
+    "first_name": "Ulugbek",
+    "last_name": "Xatamjonov",
+    "username": "ulugbek",
+    "email": "ulugbek@gmail.com",
+    "phone1": "+998991234567",
+    "salary": "0.00",
+    "status": "active",
+    "permissions": ["boshqaruv", "sotuv", "ombor", ...]
+}
+
+-------------------------------------------
+
+--- O'z profilini yangilash ---
+PATCH /api/v1/workers/me/
+Body (JSON) — faqat o'zgartirilgan maydonlar:
+{
+    "phone1": "+998997654321",
+    "email": "new@gmail.com"
+}
+
+-------------------------------------------
+
+--- Xodimlar ro'yxati ---
+GET /api/v1/workers/
+  * Ruxsat: manager+
+
+-------------------------------------------
+
+--- Xodim detail ---
+GET /api/v1/workers/{id}/
+  * Ruxsat: manager+
+
+-------------------------------------------
+
+--- Yangi xodim qo'shish ---
+POST /api/v1/workers/
+Body (JSON):
+  username    [str]  MAJBURIY
+  password    [str]  MAJBURIY
+  first_name  [str]  ixtiyoriy
+  last_name   [str]  ixtiyoriy
+  role        [str]  ixtiyoriy — manager | seller (default: seller)
+  branch      [int]  ixtiyoriy — Filial ID
+  salary      [num]  ixtiyoriy
+  permissions [arr]  ixtiyoriy — rol asosida avtomatik to'ldiriladi
+
+Misol:
+{
+    "username": "seller1",
+    "password": "Seller123!",
+    "first_name": "Jasur",
+    "role": "seller",
+    "branch": 1
+}
+
+-------------------------------------------
+
+--- Xodim yangilash ---
+PATCH /api/v1/workers/{id}/
+{
+    "salary": "3000000.00",
+    "status": "tatil",
+    "permissions": ["sotuv", "savdolar", "mijozlar"]
+}
+
+WorkerStatus qiymatlari: active | tatil | ishdan_ketgan
+
+-------------------------------------------
+
+--- Xodim KPI tarixi ---
+GET /api/v1/workers/{id}/kpi/
+Filter: ?month=3  ?year=2026
+
+
+============================================================
+  6-BOSQICH — CURRENCY (VALYUTA) VA EXCHANGE RATE (KURS)
+  Base URL: /api/v1/warehouse/currencies/
+            /api/v1/warehouse/exchange-rates/
+============================================================
+
+--- Valyutalar ro'yxati ---
+GET /api/v1/warehouse/currencies/
+
+Javob:
+[
+    {"id": 1, "code": "UZS", "name": "O'zbek so'mi", "symbol": "so'm", "is_base": true},
+    {"id": 2, "code": "USD", "name": "Amerika dollari", "symbol": "$", "is_base": false}
+]
+
+-------------------------------------------
+
+--- Valyuta yaratish ---
+POST /api/v1/warehouse/currencies/
+Body (JSON):
+  code     [str]   MAJBURIY — masalan: "EUR"
+  name     [str]   MAJBURIY
+  symbol   [str]   MAJBURIY
+  is_base  [bool]  ixtiyoriy (faqat bitta base bo'lishi mumkin)
+
+Misol:
+{
+    "code": "USD",
+    "name": "Amerika dollari",
+    "symbol": "$"
+}
+
+-------------------------------------------
+
+--- Valyuta detail ---
+GET /api/v1/warehouse/currencies/{id}/
+  * latest_rate maydoni ham keladi
+
+-------------------------------------------
+
+--- Valyuta kursi qo'shish ---
+POST /api/v1/warehouse/exchange-rates/
+Body (JSON):
+  currency  [int]  MAJBURIY — Currency ID
+  rate      [num]  MAJBURIY — 1 xorijiy = ? UZS
+
+Misol (1 USD = 12700 UZS):
+{
+    "currency": 2,
+    "rate": "12700.00"
+}
+
+-------------------------------------------
+
+--- Kurslar ro'yxati ---
+GET /api/v1/warehouse/exchange-rates/
+Filter: ?currency=2  ?date=2026-03-19
+
+-------------------------------------------
+
+--- Kurs detail ---
+GET /api/v1/warehouse/exchange-rates/{id}/
+
+
+============================================================
+  7-BOSQICH — CATEGORY (KATEGORIYALAR)
+  Ruxsat: list/retrieve → seller+ | create/update/delete → manager+
+  Base URL: /api/v1/warehouse/categories/
+============================================================
+
+--- Kategoriya yaratish ---
+POST /api/v1/warehouse/categories/
+Body (JSON):
+  name         [str]  MAJBURIY — max 200 belgi, do'kon ichida unikal
+  description  [str]  ixtiyoriy
+
+Misol:
+{
+    "name": "Ichimliklar",
+    "description": "Sovuq va issiq ichimliklar"
+}
+
+Javob (201):
+{
+    "message": "Kategoriya muvaffaqiyatli yaratildi.",
+    "data": {
+        "id": 1,
+        "name": "Ichimliklar",
+        "description": "Sovuq va issiq ichimliklar",
+        "store_name": "Baraka Do'koni",
+        "status": "active",
+        "status_display": "Faol",
+        "product_count": 0,
+        "subcategory_count": 0,
+        "created_on": "2026-03-19 | 09:00"
+    }
+}
+
+Xato hollari:
+  400 — "Kategoriya nomi kiritilishi shart."
+  400 — "Bunday nomli Kategoriya mavjud. Iltimos boshqa nom tanlang !"
+
+-------------------------------------------
+
+--- Kategoriyalar ro'yxati ---
+GET /api/v1/warehouse/categories/
+  * Tartib: active birinchi, keyin inactive
+
+-------------------------------------------
+
+--- Kategoriya detail ---
+GET /api/v1/warehouse/categories/{id}/
+
+-------------------------------------------
+
+--- Kategoriya yangilash ---
+PATCH /api/v1/warehouse/categories/{id}/
+{
+    "name": "Ichimliklar (yangilangan)",
+    "status": "inactive"
+}
+
+  ⚠️ Kategoriya inactive bo'lsa — barcha subkategoriyalari
+     ro'yhatda ko'rinmay qoladi (DB da o'zgarmaydi)!
+
+-------------------------------------------
+
+--- Kategoriya o'chirish ---
+DELETE /api/v1/warehouse/categories/{id}/
+  * Hard delete
+
+Javob (200): {"message": "Kategoriya muvaffaqiyatli o'chirildi."}
+
+
+============================================================
+  8-BOSQICH — SUBCATEGORY (SUBKATEGORIYALAR)
+  Base URL: /api/v1/warehouse/subcategories/
+  ⚠️ Kategoriya inactive bo'lsa uning subcategorylari ko'rinmaydi
+============================================================
+
+--- Subkategoriya yaratish ---
+POST /api/v1/warehouse/subcategories/
+Body (JSON):
+  name         [str]  MAJBURIY
+  category     [int]  MAJBURIY — active kategoriya ID
+  description  [str]  ixtiyoriy
+
+Misol:
+{
+    "name": "Gazlangan",
+    "category": 1
+}
+
+Javob (201):
+{
+    "message": "Subkategoriya muvaffaqiyatli yaratildi.",
+    "data": {
+        "id": 1,
+        "name": "Gazlangan",
+        "category_id": 1,
+        "category_name": "Ichimliklar",
+        "status": "active",
+        "product_count": 0
+    }
+}
+
+-------------------------------------------
+
+--- Subkategoriyalar ro'yxati ---
+GET /api/v1/warehouse/subcategories/
+Filter: ?category=1
+
+-------------------------------------------
+
+--- Subkategoriya detail ---
+GET /api/v1/warehouse/subcategories/{id}/
+
+-------------------------------------------
+
+--- Subkategoriya yangilash ---
+PATCH /api/v1/warehouse/subcategories/{id}/
+{
+    "name": "Gazlangan (yangi)",
+    "status": "inactive"
+}
+
+-------------------------------------------
+
+--- Subkategoriya o'chirish ---
+DELETE /api/v1/warehouse/subcategories/{id}/
+
+
+============================================================
+  9-BOSQICH — PRODUCTS (MAHSULOTLAR)
+  Base URL: /api/v1/warehouse/products/
+  Oldin: Category (va ixtiyoriy SubCategory) yaratilgan bo'lsin
+============================================================
+
+--- Mahsulot yaratish ---
+POST /api/v1/warehouse/products/
+Body (form-data — rasm yuklash uchun):
+  name            [str]   MAJBURIY — max 300 belgi, unikal
+  category        [int]   MAJBURIY — Category ID
+  subcategory     [int]   ixtiyoriy
+  unit            [str]   MAJBURIY — piece | kg | litre | box | meter
+  sale_price      [num]   MAJBURIY — sotish narxi
+  purchase_price  [num]   ixtiyoriy (AVCO kirimda avtomatik yangilaydi)
+  price_currency  [int]   ixtiyoriy — Currency ID
+  currency_code   [str]   ixtiyoriy — "UZS" | "USD" | "EUR" | "RUB" | "CNY"
+  barcode         [str]   ixtiyoriy — bo'sh qolsa avtomatik EAN-13
+  image           [file]  ixtiyoriy — mahsulot rasmi (Cloudinary ga yuklaydi)
+
+  ⚠️ price_currency (ID) YOKI currency_code (matn) — bittasini yuboring.
+     Ikkalasi yuborilsa price_currency ustunlik qiladi.
+
+Misol (JSON):
+{
+    "name": "Coca-Cola 0.5L",
+    "category": 1,
+    "subcategory": 1,
+    "unit": "piece",
+    "sale_price": "5000.00",
+    "currency_code": "UZS"
+}
+
+Javob (201):
+{
+    "message": "Mahsulot muvaffaqiyatli yaratildi.",
+    "data": {
+        "id": 5,
+        "name": "Coca-Cola 0.5L",
+        "category_id": 1,
+        "category_name": "Ichimliklar",
+        "subcategory_id": 1,
+        "subcategory_name": "Gazlangan",
+        "unit": "piece",
+        "unit_display": "Dona",
+        "purchase_price": "0.00",
+        "sale_price": "5000.00",
+        "currency_id": 1,
+        "currency_code": "UZS",
+        "currency_symbol": "so'm",
+        "barcode": "2000016000005",
+        "barcode_image_url": "https://.../warehouse/products/5/barcode/",
+        "image": null,
+        "status": "active",
+        "status_display": "Faol",
+        "stock_total": 0,
+        "created_on": "2026-03-19 | 10:00"
+    }
+}
+
+Xato hollari:
+  400 — "Mahsulot nomi kiritilishi shart."
+  400 — "Bunday nomli Mahsulot mavjud. Iltimos boshqa nom tanlang !"
+  400 — "'YEUR' valyuta kodi topilmadi."
+
+-------------------------------------------
+
+--- Mahsulotlar ro'yxati ---
+GET /api/v1/warehouse/products/
+Filter: ?category=1  ?status=active|inactive
+
+Javob maydoni:
+  id, name, category_name, subcategory_name, unit, unit_display
+  sale_price, currency_code  (null bo'lsa null qaytaradi, yo'qolmaydi)
+  barcode, barcode_image_url, image, status, status_display
+
+-------------------------------------------
+
+--- Mahsulot detail ---
+GET /api/v1/warehouse/products/{id}/
+
+-------------------------------------------
+
+--- Barcode rasmi (PNG) ---
+GET /api/v1/warehouse/products/{id}/barcode/
+  * Javob: PNG rasm (binary)
+  * ?format=svg  → SVG formatda
+
+-------------------------------------------
+
+--- QR-kod rasmi ---
+GET /api/v1/warehouse/products/{id}/qr/
+  * Javob: PNG rasm
+
+-------------------------------------------
+
+--- Barcode/QR orqali mahsulot qidirish ---
+GET /api/v1/warehouse/products/scan/?code=2000016000005
+  * Skanerlangan barcode yoki QR matnini ?code= ga bering
+  * Javob: ProductDetail (bitta mahsulot)
+
+Xato hollari:
+  400 — "code parametri kiritilishi shart."
+  404 — "Bu barcode/QR kod bo'yicha mahsulot topilmadi."
+
+-------------------------------------------
+
+--- Bulk QR-kodlar (ZIP) ---
+POST /api/v1/warehouse/products/bulk-qr/
+Body (JSON):
+{
+    "product_ids": [5, 8, 11],
+    "copies": 2
+}
+  * Javob: ZIP fayl (har mahsulot × copies dona QR PNG)
+  * Maksimum: 500 ta QR
+
+-------------------------------------------
+
+--- Mahsulot yangilash ---
+PATCH /api/v1/warehouse/products/{id}/
+Body (JSON) — faqat o'zgartirilgan maydonlar:
+{
+    "sale_price": "5500.00",
+    "currency_code": "USD",
+    "status": "inactive"
+}
+
+-------------------------------------------
+
+--- Mahsulot o'chirish ---
+DELETE /api/v1/warehouse/products/{id}/
+  * Soft delete → status=inactive
+
+
+============================================================
+  10-BOSQICH — SUPPLIER (YETKAZIB BERUVCHI)
+  Base URL: /api/v1/warehouse/suppliers/
+============================================================
+
+--- Supplier yaratish ---
+POST /api/v1/warehouse/suppliers/
+Body (JSON):
+  name     [str]  MAJBURIY — unikal (do'kon ichida)
+  phone    [str]  ixtiyoriy
+  address  [str]  ixtiyoriy
+  note     [str]  ixtiyoriy
+
+Misol:
+{
+    "name": "Maysara LLC",
+    "phone": "+998991234567",
+    "address": "Toshkent, Chilonzor"
+}
+
+Javob (201):
+{
+    "message": "Yetkazib beruvchi muvaffaqiyatli qo'shildi.",
+    "data": {
+        "id": 1,
+        "name": "Maysara LLC",
+        "phone": "+998991234567",
+        "debt_balance": "0.00",
+        "status": "active"
+    }
+}
+
+-------------------------------------------
+
+--- Supplierlar ro'yxati ---
+GET /api/v1/warehouse/suppliers/
+Filter: ?status=active|inactive
+
+-------------------------------------------
+
+--- Supplier detail ---
+GET /api/v1/warehouse/suppliers/{id}/
+
+-------------------------------------------
+
+--- Supplier yangilash ---
+PATCH /api/v1/warehouse/suppliers/{id}/
+{
+    "phone": "+998990000000",
+    "status": "inactive"
+}
+
+-------------------------------------------
+
+--- Supplier o'chirish ---
+DELETE /api/v1/warehouse/suppliers/{id}/
+  * Soft delete
+
+-------------------------------------------
+
+--- Supplier to'lov (qarzni kamaytirish) ---
+POST /api/v1/warehouse/supplier-payments/
+Body (JSON):
+  supplier      [int]  MAJBURIY — Supplier ID
+  amount        [num]  MAJBURIY — musbat son
+  payment_type  [str]  MAJBURIY — cash | card | transfer
+  note          [str]  ixtiyoriy
+
+Misol:
+{
+    "supplier": 1,
+    "amount": "500000.00",
+    "payment_type": "cash",
+    "note": "Oylik to'lov"
+}
+
+  * Saqlanganida: supplier.debt_balance -= amount
+
+-------------------------------------------
+
+--- To'lovlar ro'yxati ---
+GET /api/v1/warehouse/supplier-payments/
+Filter: ?supplier=1  ?smena=1
+
+  ⚠️ Kirim (IN) yaratishda supplier ko'rsatilsa:
+     debt_balance += quantity * unit_cost avtomatik oshadi
+
+
+============================================================
+  11-BOSQICH — WAREHOUSE (OMBORLAR)
+  Base URL: /api/v1/warehouse/warehouses/
+============================================================
+
+--- Ombor yaratish ---
+POST /api/v1/warehouse/warehouses/
+Body (JSON):
+  name     [str]  MAJBURIY — unikal (do'kon ichida)
+  address  [str]  ixtiyoriy
+
+Misol:
+{
+    "name": "Asosiy ombor",
+    "address": "Toshkent, Yakkasaroy"
+}
+
+-------------------------------------------
+
+--- Omborlar ro'yxati ---
+GET /api/v1/warehouse/warehouses/
+Filter: ?status=active|inactive
+
+-------------------------------------------
+
+--- Ombor detail (ichidagi mahsulotlar bilan) ---
+GET /api/v1/warehouse/warehouses/{id}/
+
+Javob:
+{
+    "id": 1,
+    "name": "Asosiy ombor",
+    "status": "active",
+    "products": [
+        {
+            "product_id": 5,
+            "product_name": "Coca-Cola 0.5L",
+            "quantity": "120.000",
+            "purchase_price": "3500.00",
+            "sale_price": "5000.00",
+            "barcode": "2000016000005",
+            "barcode_image_url": "https://.../products/5/barcode/",
+            "added_on": "2026-03-19 | 10:43"
+        }
+    ]
+}
+
+-------------------------------------------
+
+--- Ombor yangilash ---
+PATCH /api/v1/warehouse/warehouses/{id}/
+{
+    "name": "Asosiy ombor (yangi)",
+    "status": "inactive"
+}
+
+-------------------------------------------
+
+--- Ombor o'chirish ---
+DELETE /api/v1/warehouse/warehouses/{id}/
+  * Soft delete
+
+
+============================================================
+  12-BOSQICH — SMENA (SHIFT)
+  shift_enabled=True bo'lsa sotuvdan OLDIN smena ochish SHART
+  Base URL: /api/v1/shifts/
+============================================================
+
+--- Smena ochish ---
+POST /api/v1/shifts/
+Body (JSON):
+  branch      [int]  MAJBURIY — Filial ID
+  cash_start  [num]  ixtiyoriy — Boshlang'ich naqd pul (default: 0)
+  note        [str]  ixtiyoriy
+
+Misol:
+{
+    "branch": 1,
+    "cash_start": 500000,
+    "note": "Ertalabki smena"
+}
+
+Javob (201):
+{
+    "message": "Smena muvaffaqiyatli ochildi.",
+    "data": {
+        "id": 1,
+        "branch_name": "Baraka filial 1",
+        "status": "open",
+        "cash_start": "500000.00",
+        "opened_at": "2026-03-19 | 09:00"
+    }
+}
+
+-------------------------------------------
+
+--- Smenalar ro'yxati ---
+GET /api/v1/shifts/
+Filter: ?branch=1  ?status=open|closed
+
+-------------------------------------------
+
+--- Smena detail ---
+GET /api/v1/shifts/{id}/
+
+-------------------------------------------
+
+--- X-Report (smena davomidagi hisobot) ---
+GET /api/v1/shifts/{id}/x-report/
+  * Smena ochiq bo'lsa ham olib bo'ladi
+  * Sotuv soni, tushum, xarajatlar
+
+-------------------------------------------
+
+--- Smena yopish ---
+PATCH /api/v1/shifts/{id}/close/
+Body (JSON):
+{
+    "cash_end": 750000,
+    "note": "Kun oxiri"
+}
+  * require_cash_count=True bo'lsa cash_end MAJBURIY
+
+-------------------------------------------
+
+--- Z-Report (yopilgan smena yakuniy hisoboti) ---
+GET /api/v1/shifts/{id}/z-report/
+  * Faqat yopilgan smena uchun ishlaydi
+
+
+============================================================
+  13-BOSQICH — STOCKMOVEMENT (KIRIM / CHIQIM)
+  DIQQAT: branch YOKI warehouse — faqat BITTASINI yuboring!
+  Base URL: /api/v1/warehouse/movements/
+============================================================
+
+--- KIRIM (IN) — bitta mahsulot ---
+POST /api/v1/warehouse/movements/
+Body (JSON):
+  product        [int]  MAJBURIY — Product ID
+  branch         [int]  shart*   — Filial ID
+  warehouse      [int]  shart*   — Ombor ID   (* bittasi bo'lishi shart)
+  movement_type  [str]  MAJBURIY — "in"
+  quantity       [num]  MAJBURIY — musbat son
+  unit_cost      [num]  ixtiyoriy — xarid narxi (FIFO batch va AVCO yangilaydi)
+  supplier       [int]  ixtiyoriy — Supplier ID (debt_balance oshadi)
+  note           [str]  ixtiyoriy
+
+Misol (filiallga):
+{
+    "product": 5,
+    "branch": 1,
+    "movement_type": "in",
+    "quantity": "100.000",
+    "unit_cost": "3500.00",
+    "supplier": 1,
+    "note": "Yangi tovar keldi"
+}
+
+Misol (omborga):
+{
+    "product": 5,
+    "warehouse": 1,
+    "movement_type": "in",
+    "quantity": "200.000",
+    "unit_cost": "3500.00"
+}
+
+Javob (201):
+{
+    "message": "Harakat muvaffaqiyatli qayd etildi.",
+    "data": { ...MovementDetail... }
+}
+
+-------------------------------------------
+
+--- CHIQIM (OUT) ---
+POST /api/v1/warehouse/movements/
+{
+    "product": 5,
+    "branch": 1,
+    "movement_type": "out",
+    "quantity": "5.000"
+}
+
+  * unit_cost OUT da e'tiborsiz — FIFO dan avtomatik hisoblanadi
+  * Qoldiq yetmasa → 400 xato
+
+Xato holati:
+  400 — "Qoldiq yetarli emas. 'Filial1' da 'Coca-Cola' qoldig'i: 10, so'ralgan: 50."
+
+-------------------------------------------
+
+--- GURUHLI KIRIM/CHIQIM (BULK — atomic) ---
+POST /api/v1/warehouse/movements/bulk/
+
+  * Bir so'rovda N ta mahsulot
+  * Bitta xato → barchasi rollback (hech narsa saqlanmaydi)
+
+Body (JSON):
+  movement_type  [str]  MAJBURIY — "in" | "out"
+  branch         [int]  shart*   — Filial ID
+  warehouse      [int]  shart*   — Ombor ID
+  note           [str]  ixtiyoriy
+  items          [arr]  MAJBURIY — kamida 1 ta
+    items[].product   [int]  MAJBURIY
+    items[].quantity  [num]  MAJBURIY — musbat son
+    items[].unit_cost [num]  ixtiyoriy (IN uchun)
+    items[].supplier  [int]  ixtiyoriy (IN uchun)
+
+Misol (3 mahsulot kirim):
+{
+    "movement_type": "in",
+    "branch": 1,
+    "note": "Maysaradan kirim",
+    "items": [
+        {"product": 5, "quantity": 100, "unit_cost": 3500, "supplier": 1},
+        {"product": 8, "quantity": 50,  "unit_cost": 8000},
+        {"product": 11,"quantity": 200, "unit_cost": 5000}
+    ]
+}
+
+Javob (201):
+{
+    "message": "3 ta harakat muvaffaqiyatli qayd etildi.",
+    "data": [ ...MovementDetail x3... ]
+}
+
+Xato (hech narsa saqlanmaydi):
+{
+    "items[3]": "Coca-Cola qoldig'i yetarli emas (1-filial): mavjud 30, so'ralgan 200."
+}
+
+-------------------------------------------
+
+--- Harakatlar ro'yxati ---
+GET /api/v1/warehouse/movements/
+Filter: ?product=1  ?branch=1  ?warehouse=1  ?movement_type=in|out
+
+-------------------------------------------
+
+--- Harakat detail ---
+GET /api/v1/warehouse/movements/{id}/
+
+
+============================================================
+  14-BOSQICH — STOCK (QOLDIQLAR)
+  Base URL: /api/v1/warehouse/stocks/
+============================================================
+
+--- Barcha qoldiqlar ---
+GET /api/v1/warehouse/stocks/
+Filter: ?branch=1  ?warehouse=1  ?product=1
+
+-------------------------------------------
+
+--- Mahsulot bo'yicha guruhlangan qoldiqlar ---
+GET /api/v1/warehouse/stocks/by-product/
+
+Javob:
+[
+    {
+        "product_id": 5,
+        "product_name": "Coca-Cola 0.5L",
+        "product_unit": "Dona",
+        "total_quantity": "190.000",
+        "locations": [
+            {
+                "stock_id": 6,
+                "location_type": "branch",
+                "location_id": 1,
+                "location_name": "Baraka filial 1",
+                "quantity": "70.000",
+                "updated_on": "2026-03-19 | 10:43"
+            },
+            {
+                "stock_id": 5,
+                "location_type": "warehouse",
+                "location_id": 1,
+                "location_name": "Asosiy ombor",
+                "quantity": "120.000",
+                "updated_on": "2026-03-19 | 10:43"
+            }
+        ]
+    }
+]
+
+-------------------------------------------
+
+--- Kam qoldiqli mahsulotlar ---
+GET /api/v1/warehouse/stocks/low-stock/
+  * StoreSettings.low_stock_threshold dan kam bo'lganlar
+
+-------------------------------------------
+
+--- Qoldiq detail ---
+GET /api/v1/warehouse/stocks/{id}/
+
+-------------------------------------------
+
+--- Qo'lda qoldiq yaratish (boshlang'ich inventarizatsiya) ---
+POST /api/v1/warehouse/stocks/
+Body (JSON):
+{
+    "product": 5,
+    "branch": 1,
+    "quantity": "50.000"
+}
+
+-------------------------------------------
+
+--- Qoldiq yangilash ---
+PATCH /api/v1/warehouse/stocks/{id}/
+{"quantity": "75.000"}
+
+-------------------------------------------
+
+--- Qoldiq o'chirish ---
+DELETE /api/v1/warehouse/stocks/{id}/
+  * Hard delete
+
+
+============================================================
+  15-BOSQICH — STOCKBATCH (FIFO PARTIYALAR)
+  Avtomatik yaratiladi (movement IN + unit_cost da)
+  Faqat o'qish mumkin
+  Base URL: /api/v1/warehouse/batches/
+============================================================
+
+--- Partiyalar ro'yxati ---
+GET /api/v1/warehouse/batches/
+Filter: ?product=1  ?branch=1  ?warehouse=1
+
+Javob maydoni:
+  batch_code   — partiya kodi (STORE-YY-MM-DD-XXXX)
+  unit_cost    — bu partiyaning xarid narxi
+  qty_received — dastlabki kirim miqdori
+  qty_left     — hozirgi qolgan miqdor (0 = partiya tugagan)
+
+-------------------------------------------
+
+--- Partiya detail ---
+GET /api/v1/warehouse/batches/{id}/
+
+
+============================================================
+  16-BOSQICH — TRANSFER (JOYLAR ORASIDA O'TKAZISH)
+  Base URL: /api/v1/warehouse/transfers/
+============================================================
+
+--- Transfer yaratish ---
+POST /api/v1/warehouse/transfers/
+Body (JSON):
+  from_branch     [int]  shart* — Qayerdan (filial)
+  from_warehouse  [int]  shart* — Qayerdan (ombor)  (* bittasi)
+  to_branch       [int]  shart* — Qayerga (filial)
+  to_warehouse    [int]  shart* — Qayerga (ombor)   (* bittasi)
+  items           [arr]  MAJBURIY — kamida 1 ta
+    items[].product   [int]  MAJBURIY
+    items[].quantity  [num]  MAJBURIY
+  note            [str]  ixtiyoriy
+
+Misol (filialdan → omborga):
+{
+    "from_branch": 1,
+    "to_warehouse": 1,
+    "items": [
+        {"product": 5, "quantity": "10.000"},
+        {"product": 8, "quantity": "5.000"}
+    ],
+    "note": "Omborga qaytarish"
+}
+
+  ⚠️ status=pending — stock HALI o'zgarmaydi!
+
+-------------------------------------------
+
+--- Transferlar ro'yxati ---
+GET /api/v1/warehouse/transfers/
+Filter: ?status=pending|confirmed|cancelled
+
+-------------------------------------------
+
+--- Transfer detail ---
+GET /api/v1/warehouse/transfers/{id}/
+
+-------------------------------------------
+
+--- Transfer tasdiqlash ---
+POST /api/v1/warehouse/transfers/{id}/confirm/
+Body: {} (bo'sh)
+  * Stock "from" dan ayiriladi, "to" ga qo'shiladi (FIFO)
+
+-------------------------------------------
+
+--- Transfer bekor qilish ---
+POST /api/v1/warehouse/transfers/{id}/cancel/
+Body: {} (bo'sh)
+  * Faqat pending holat bekor qilinadi
+
+
+============================================================
+  17-BOSQICH — WASTAGE (ISROF)
+  Yaratilganda StockMovement(OUT) avtomatik yaratiladi
+  Base URL: /api/v1/warehouse/wastages/
+============================================================
+
+--- Isrof yaratish ---
+POST /api/v1/warehouse/wastages/
+Body (JSON):
+  product    [int]  MAJBURIY
+  branch     [int]  shart*   — Filial ID
+  warehouse  [int]  shart*   — Ombor ID  (* bittasi)
+  quantity   [num]  MAJBURIY — mavjud qoldiqdan oshmaydi
+  reason     [str]  ixtiyoriy — sabab
+
+Misol:
+{
+    "product": 5,
+    "branch": 1,
+    "quantity": "3.000",
+    "reason": "Muddati o'tdi"
+}
+
+Xato holati:
+  400 — "Qoldiq yetarli emas."
+
+-------------------------------------------
+
+--- Isroflar ro'yxati ---
+GET /api/v1/warehouse/wastages/
+Filter: ?product=1  ?branch=1  ?warehouse=1
+
+-------------------------------------------
+
+--- Isrof detail ---
+GET /api/v1/warehouse/wastages/{id}/
+
+
+============================================================
+  18-BOSQICH — STOCK AUDIT (INVENTARIZATSIYA)
+  Base URL: /api/v1/warehouse/audits/
+============================================================
+
+--- Inventarizatsiya yaratish ---
+POST /api/v1/warehouse/audits/
+Body (JSON):
+  branch     [int]  shart* — Filial ID
+  warehouse  [int]  shart* — Ombor ID  (* bittasi)
+  note       [str]  ixtiyoriy
+
+Misol:
+{
+    "branch": 1,
+    "note": "Oylik inventarizatsiya"
+}
+
+  * Yaratilganda: mavjud barcha Stock → audit items ga ko'chiriladi
+  * status=draft
+
+-------------------------------------------
+
+--- Inventarizatsiyalar ro'yxati ---
+GET /api/v1/warehouse/audits/
+Filter: ?status=draft|confirmed  ?branch=1  ?warehouse=1
+
+-------------------------------------------
+
+--- Audit detail (items bilan) ---
+GET /api/v1/warehouse/audits/{id}/
+
+Javob:
+{
+    "id": 1,
+    "branch_name": "Baraka filial 1",
+    "status": "draft",
+    "items": [
+        {
+            "id": 10,
+            "product_name": "Coca-Cola 0.5L",
+            "system_quantity": "70.000",   ← tizimda bor miqdor
+            "actual_quantity": null,       ← hisoblangan miqdor (siz kiritasiz)
+            "difference": null
+        }
+    ]
+}
+
+-------------------------------------------
+
+--- Audit item yangilash (haqiqiy miqdorni kiritish) ---
+PATCH /api/v1/warehouse/audits/{id}/items/{item_id}/
+Body (JSON):
+{
+    "actual_quantity": "65.000"
+}
+
+-------------------------------------------
+
+--- Inventarizatsiyani tasdiqlash ---
+POST /api/v1/warehouse/audits/{id}/confirm/
+Body: {} (bo'sh)
+  * actual < system → OUT StockMovement yaratiladi
+  * actual > system → IN StockMovement yaratiladi
+  * status=confirmed
+
+-------------------------------------------
+
+--- Inventarizatsiyani bekor qilish ---
+POST /api/v1/warehouse/audits/{id}/cancel/
+Body: {} (bo'sh)
+  * Faqat draft holat bekor qilinadi
+
+
+============================================================
+  19-BOSQICH — SALE (SOTUV)
+  Oldin: Stock da mahsulot bo'lsin
+  shift_enabled=True bo'lsa smena ochiq bo'lsin
+  Base URL: /api/v1/sales/
+============================================================
+
+--- Sotuv yaratish — NAQD ---
+POST /api/v1/sales/
+Body (JSON):
+  branch          [int]  MAJBURIY
+  payment_type    [str]  MAJBURIY — cash | card | debt
+  paid_amount     [num]  MAJBURIY
+  items           [arr]  MAJBURIY — kamida 1 ta
+    items[].product    [int]  MAJBURIY
+    items[].quantity   [num]  MAJBURIY — min: 0.001
+    items[].unit_price [num]  ixtiyoriy — berilmasa product.sale_price
+  customer        [int]  ixtiyoriy
+  discount_amount [num]  ixtiyoriy (default: 0)
+  note            [str]  ixtiyoriy
+
+Misol (naqd):
+{
+    "branch": 1,
+    "payment_type": "cash",
+    "paid_amount": "10000.00",
+    "items": [
+        {"product": 5, "quantity": "2.000"},
+        {"product": 8, "quantity": "1.000", "unit_price": "4500.00"}
+    ]
+}
+
+-------------------------------------------
+
+--- Sotuv yaratish — NASIYA ---
+{
+    "branch": 1,
+    "customer": 3,
+    "payment_type": "debt",
+    "paid_amount": "0.00",
+    "items": [
+        {"product": 5, "quantity": "1.000"}
+    ]
+}
+  * paid_amount < total → qolgan qism customer.debt_balance ga qo'shiladi
+
+-------------------------------------------
+
+--- Sotuv yaratish — KARTA ---
+{
+    "branch": 1,
+    "payment_type": "card",
+    "paid_amount": "25000.00",
+    "items": [
+        {"product": 5, "quantity": "5.000"}
+    ]
+}
+
+Xato hollari:
+  400 — "Qoldiq yetarli emas. 'Mahsulot1' uchun qoldiq: 3, so'ralgan: 5."
+  400 — "Naqd to'lov taqiqlangan (allow_cash=False)."
+  400 — "Chegirma ruxsat etilmagan (allow_discount=False)."
+  400 — "Ochiq smena topilmadi. Avval smenani oching."
+
+-------------------------------------------
+
+--- Sotuvlar ro'yxati ---
+GET /api/v1/sales/
+Filter: ?branch=1  ?status=completed|cancelled
+        ?payment_type=cash|card|debt  ?smena=1
+
+-------------------------------------------
+
+--- Sotuv detail ---
+GET /api/v1/sales/{id}/
+
+Javob asosiy maydonlari:
+  total_price, discount_amount, paid_amount, debt_amount, items[]
+
+-------------------------------------------
+
+--- Sotuv bekor qilish ---
+PATCH /api/v1/sales/{id}/cancel/
+Body: {} (bo'sh)
+  * Stock qaytariladi (StockMovement IN avtomatik)
+  * Mijoz qarzi kamayadi (agar debt bo'lsa)
+
+
+============================================================
+  20-BOSQICH — CUSTOMER GROUP + CUSTOMER (MIJOZLAR)
+  Base URL: /api/v1/customer-groups/  va  /api/v1/customers/
+============================================================
+
+--- Mijoz guruhi yaratish ---
+POST /api/v1/customer-groups/
+Body (JSON):
+{
+    "name": "VIP mijozlar",
+    "discount_percent": "10.00"
+}
+
+-------------------------------------------
+
+--- Mijoz guruhlari ro'yxati ---
+GET /api/v1/customer-groups/
+
+-------------------------------------------
+
+--- Mijoz guruhi yangilash ---
+PATCH /api/v1/customer-groups/{id}/
+{"name": "Premium"}
+
+-------------------------------------------
+
+--- Mijoz guruhi o'chirish ---
+DELETE /api/v1/customer-groups/{id}/
+
+-------------------------------------------
+
+--- Mijoz yaratish ---
+POST /api/v1/customers/
+Body (JSON):
+  name    [str]  MAJBURIY
+  phone   [str]  ixtiyoriy
+  group   [int]  ixtiyoriy — CustomerGroup ID
+  address [str]  ixtiyoriy
+
+Misol:
+{
+    "name": "Bobur Karimov",
+    "phone": "+998901234567",
+    "group": 1
+}
+
+-------------------------------------------
+
+--- Mijozlar ro'yxati ---
+GET /api/v1/customers/
+Filter: ?status=active|inactive  ?group=1
+
+-------------------------------------------
+
+--- Mijoz detail ---
+GET /api/v1/customers/{id}/
+
+-------------------------------------------
+
+--- Mijoz yangilash ---
+PATCH /api/v1/customers/{id}/
+{
+    "name": "Bobur Karimov (yangi)",
+    "status": "inactive"
+}
+
+-------------------------------------------
+
+--- Mijoz o'chirish ---
+DELETE /api/v1/customers/{id}/
+  * Soft delete
+
+
+============================================================
+  21-BOSQICH — SALE RETURN (QAYTARISH)
+  Base URL: /api/v1/sale-returns/
+============================================================
+
+--- Qaytarish yaratish ---
+POST /api/v1/sale-returns/
+Body (JSON):
+  sale    [int]  MAJBURIY — asl Sale ID
+  items   [arr]  MAJBURIY
+    items[].sale_item  [int]  MAJBURIY — SaleItem ID
+    items[].quantity   [num]  MAJBURIY — qaytariladigan miqdor
+  note    [str]  ixtiyoriy
+
+Misol:
+{
+    "sale": 7,
+    "items": [
+        {"sale_item": 12, "quantity": "1.000"}
+    ],
+    "note": "Muddati o'tgan"
+}
+
+  * status=pending — stock HALI qaytmaydi!
+
+-------------------------------------------
+
+--- Qaytarishlar ro'yxati ---
+GET /api/v1/sale-returns/
+Filter: ?status=pending|confirmed|cancelled  ?branch=1  ?smena=1
+
+-------------------------------------------
+
+--- Qaytarish detail ---
+GET /api/v1/sale-returns/{id}/
+
+-------------------------------------------
+
+--- Qaytarishni tasdiqlash ---
+PATCH /api/v1/sale-returns/{id}/confirm/
+Body: {} (bo'sh)
+  * StockMovement(IN) avtomatik yaratiladi
+  * Mijoz qarzi kamayadi (agar debt sotuv bo'lsa)
+  * Ruxsat: manager+
+
+-------------------------------------------
+
+--- Qaytarishni bekor qilish ---
+PATCH /api/v1/sale-returns/{id}/cancel/
+Body: {} (bo'sh)
+  * Ruxsat: manager+
+
+
+============================================================
+  22-BOSQICH — EXPENSE (XARAJATLAR)
+  Base URL: /api/v1/expense-categories/  va  /api/v1/expenses/
+============================================================
+
+--- Xarajat kategoriyasi yaratish ---
+POST /api/v1/expense-categories/
+Body (JSON):
+{
+    "name": "Kommunal",
+    "description": "Elektr, suv, gaz"
+}
+
+-------------------------------------------
+
+--- Xarajat kategoriyalari ro'yxati ---
+GET /api/v1/expense-categories/
+Filter: ?status=active|inactive
+
+-------------------------------------------
+
+--- Xarajat kategoriyasi yangilash ---
+PATCH /api/v1/expense-categories/{id}/
+{"status": "inactive"}
+
+-------------------------------------------
+
+--- Xarajat kategoriyasi o'chirish ---
+DELETE /api/v1/expense-categories/{id}/
+  * Soft delete
+
+-------------------------------------------
+
+--- Xarajat yaratish ---
+POST /api/v1/expenses/
+Body (form-data — chek rasmi yuklash uchun):
+  branch         [int]   MAJBURIY
+  category       [int]   MAJBURIY — ExpenseCategory ID
+  amount         [num]   MAJBURIY — musbat son
+  description    [str]   ixtiyoriy
+  receipt_image  [file]  ixtiyoriy — chek rasmi
+  smena          [int]   ixtiyoriy
+
+Misol (JSON):
+{
+    "branch": 1,
+    "category": 2,
+    "amount": "150000.00",
+    "description": "Elektr to'lovi"
+}
+
+-------------------------------------------
+
+--- Xarajatlar ro'yxati ---
+GET /api/v1/expenses/
+Filter: ?branch=1  ?category=1  ?smena=1  ?date=2026-03-19
+
+-------------------------------------------
+
+--- Xarajat yangilash ---
+PATCH /api/v1/expenses/{id}/
+{"amount": "200000.00"}
+
+-------------------------------------------
+
+--- Xarajat o'chirish ---
+DELETE /api/v1/expenses/{id}/
+  * Hard delete
+
+
+============================================================
+  23-BOSQICH — WORKER KPI
+  Base URL: /api/v1/kpi/
+============================================================
+
+--- KPI ro'yxati ---
+GET /api/v1/kpi/
+Filter: ?worker=1  ?month=3  ?year=2026
+
+Javob:
+[
+    {
+        "id": 1,
+        "worker_name": "Jasur Sobirov",
+        "month": 3,
+        "year": 2026,
+        "total_sales": 15,
+        "total_revenue": "750000.00",
+        "average_sale": "50000.00",
+        "target": null,
+        "bonus": null
+    }
+]
+
+-------------------------------------------
+
+--- KPI detail ---
+GET /api/v1/kpi/{id}/
+
+-------------------------------------------
+
+--- KPI maqsad va bonus belgilash ---
+PATCH /api/v1/kpi/{id}/set-target/
+Body (JSON):
+{
+    "target": "1000000.00",
+    "bonus": "200000.00"
+}
+
+
+============================================================
+  24-BOSQICH — DASHBOARD
+  Ruxsat: IsAuthenticated + SubscriptionRequired('has_dashboard')
+  Base URL: /api/v1/dashboard/
+============================================================
+
+--- Dashboard statistika ---
+GET /api/v1/dashboard/
+Filter:
+  ?date_from=2026-03-01
+  ?date_to=2026-03-19
+  ?branch=1
+  ?limit=30     ← chart uchun nuqtalar soni (default: 30)
+
+Javob (8 blok):
+{
+    "sales": {
+        "today_revenue": "250000.00",
+        "total_revenue": "5000000.00",
+        "sale_count": 45,
+        "average_check": "111111.00",
+        "growth_percent": 12.5
+    },
+    "products": {
+        "total": 50, "active": 48,
+        "low_stock": 3, "out_of_stock": 1
+    },
+    "customers": {
+        "total": 120, "new": 5, "returning": 115
+    },
+    "expenses": {
+        "total": "300000.00",
+        "by_category": [...]
+    },
+    "suppliers": {
+        "total": 8, "total_debt": "1500000.00"
+    },
+    "branches": [
+        {"branch_id": 1, "branch_name": "Filial 1", "today_revenue": "250000.00"}
+    ],
+    "current_smena": {
+        "id": 3, "sale_count": 10, "revenue": "150000.00"
+    },
+    "chart_data": [
+        {"date": "2026-03-19", "revenue": "250000.00", "count": 10}
+    ]
+}
+
+  * Redis kesh: 5 daqiqa TTL
+
+
+============================================================
+  25-BOSQICH — EXPORT / IMPORT (Excel va PDF)
+  Ruxsat: Export → IsAuthenticated | Import → IsManagerOrAbove
+  Throttling: minutiga 5 ta so'rov
+  Base URL: /api/v1/export/
+============================================================
+
+--- EXPORT (ma'lumotlarni yuklab olish) ---
+  ?format=excel  — .xlsx fayl (default)
+  ?format=pdf    — .pdf fayl
+
+GET /api/v1/export/sales/
+  Filter: ?date_from= ?date_to= ?branch=1 ?smena=1 ?status=completed
+
+GET /api/v1/export/expenses/
+  Filter: ?date_from= ?date_to= ?branch=1 ?smena=1 ?category=1
+
+GET /api/v1/export/stocks/
+  Filter: ?branch=1  ?warehouse=1
+
+GET /api/v1/export/stock-movements/
+  Filter: ?date_from= ?date_to= ?branch=1 ?warehouse=1 ?movement_type=in|out
+
+GET /api/v1/export/suppliers/
+  Filter: ?status=active
+
+Misol:
+GET /api/v1/export/sales/?format=excel&date_from=2026-03-01&date_to=2026-03-19
+  → .xlsx fayl yuklab olinadi
+
+-------------------------------------------
+
+--- IMPORT shablonini olish (GET) ---
+GET /api/v1/export/products/template/         → bo'sh products.xlsx
+GET /api/v1/export/customers/template/        → bo'sh customers.xlsx
+GET /api/v1/export/stock-movements/template/  → bo'sh movements.xlsx
+GET /api/v1/export/suppliers/template/        → bo'sh suppliers.xlsx
+GET /api/v1/export/subcategories/template/    → bo'sh subcategories.xlsx
+
+-------------------------------------------
+
+--- IMPORT (POST) ---
+POST /api/v1/export/products/import/
+Body (form-data):
+  file  [file]  MAJBURIY — to'ldirilgan .xlsx fayl
+
+Javob (200):
+{
+    "created": 10,
+    "skipped": 2,
+    "errors": ["3-qator: mahsulot nomi bo'sh"]
+}
+
+POST /api/v1/export/customers/import/
+POST /api/v1/export/stock-movements/import/
+POST /api/v1/export/suppliers/import/
+POST /api/v1/export/subcategories/import/
+
+
+============================================================
+  26-BOSQICH — AUDIT LOG
+  Ruxsat: faqat owner
+  Base URL: /api/v1/audit-logs/
+============================================================
+
+--- Audit log ro'yxati ---
+GET /api/v1/audit-logs/
+Filter: ?model=Product  ?action=create|update|delete
+        ?worker=1  ?date_from=2026-03-01  ?date_to=2026-03-19
+
+Javob:
+[
+    {
+        "id": 1,
+        "model": "Product",
+        "action": "create",
+        "description": "Mahsulot yaratildi: 'Coca-Cola 0.5L'",
+        "worker_name": "Jasur Sobirov",
+        "created_on": "2026-03-19 | 10:00"
+    }
+]
+
+-------------------------------------------
+
+--- Audit log detail ---
+GET /api/v1/audit-logs/{id}/
+
+
+============================================================
+  27-BOSQICH — SUBSCRIPTION (OBUNA)
+  Base URL: /api/v1/subscription/
+============================================================
+
+--- Joriy obuna holati ---
+GET /api/v1/subscription/
+
+Javob:
+{
+    "plan_name": "Pro",
+    "plan_type": "pro",
+    "status": "active",
+    "start_date": "2026-02-01",
+    "end_date": "2026-05-01",
+    "days_left": 42,
+    "features": {
+        "has_export": true,
+        "has_dashboard": true,
+        "has_audit_log": true,
+        "max_branches": 5,
+        "max_warehouses": 3,
+        "max_workers": 20,
+        "max_products": 0
+    }
+}
+
+-------------------------------------------
+
+--- Tarif rejalari ---
+GET /api/v1/subscription/plans/
+  * Javob: [{ plan nomi, narxi, limitlar, featurelar }, ...]
+
+-------------------------------------------
+
+--- To'lov tarixi ---
+GET /api/v1/subscription/invoices/
+
+-------------------------------------------
+
+--- SUPERADMIN: Obunarlar ro'yxati ---
+GET /api/v1/admin/subscriptions/
+Filter: ?status=trial|active|expired|cancelled  ?plan_type=trial|basic|pro|enterprise
+
+-------------------------------------------
+
+--- SUPERADMIN: Obuna detail ---
+GET /api/v1/admin/subscriptions/{id}/
+
+-------------------------------------------
+
+--- SUPERADMIN: Obunani o'zgartirish ---
+PATCH /api/v1/admin/subscriptions/{id}/
+Body (JSON):
+{
+    "plan": 2,
+    "status": "active",
+    "end_date": "2026-06-01"
+}
+
+-------------------------------------------
+
+--- SUPERADMIN: Muddat uzaytirish ---
+POST /api/v1/admin/subscriptions/{id}/extend/
+Body (JSON):
+{
+    "days": 30,
+    "note": "Bonus 1 oy"
+}
+
+-------------------------------------------
+
+--- SUPERADMIN: To'lov qo'shish ---
+POST /api/v1/admin/subscriptions/{id}/add-invoice/
+Body (JSON):
+{
+    "amount": "500000.00",
+    "is_yearly": false,
+    "note": "Oylik to'lov"
+}
+
+
+============================================================
+  QISQACHA ESLATMALAR
+============================================================
+
+1. branch YOKI warehouse — harakatlar, stock, transferlarda
+   faqat BITTASINI yuborasiz, ikkalasini emas!
+
+2. FIFO tartibi — OUT harakatda eng eski partiya avval chiqariladi.
+   unit_cost OUT da e'tiborsiz (avtomatik hisoblanadi).
+
+3. Bulk movement (atomic) — bitta xato bo'lsa barchasi bekor qilinadi.
+
+4. Transfer confirm — faqat shundan keyin stock o'zgaradi.
+   Pending holatda hech narsa o'zgarmaydi.
+
+5. StockAudit confirm — actual vs system farqiga qarab
+   avtomatik IN yoki OUT movement yaratiladi.
+
+6. Smena — shift_enabled=True bo'lsa sotuv uchun
+   ochiq smena bo'lishi shart.
+
+7. Kategoriya inactive → uning subkategoriyalari ro'yhatda
+   ko'rinmaydi (DB da o'zgarmaydi).
+
+8. currency_code ("UZS"/"USD"/"EUR") YOKI price_currency (ID) —
+   bittasini yuboring. Ikkalasi yuborilsa ID ustunlik qiladi.
+
+9. Supplier + kirim — StockMovement(IN, supplier=X) yaratilsa
+   debt_balance oshadi. SupplierPayment yaratilsa kamayadi.
+
+10. Soft delete — Category, SubCategory, Product, Customer,
+    Warehouse, Supplier, Branch, ExpenseCategory → status=inactive.
+    Hard delete — Stock, Expense → bazadan butunlay o'chadi.
+
+11. purchase_price (AVCO) — kirim(IN) qilinganda avtomatik
+    yangilanadi. Qo'lda o'zgartirilmaydi.
+
+12. Subscription (ReadOnlyIfExpired) — obuna tugagan do'kondan
+    faqat GET so'rovlari o'tadi. Yozish uchun obunani yangilash kerak.
+
+
+============================================================
+  TAVSIYA ETILGAN TEST TARTIBI — TO'LIQ (46 qadam)
+============================================================
+
+  [1]  POST /api/v1/auth/register/                    — Ro'yxatdan o'tish
+  [2]  POST /api/v1/auth/login/                        — Login, token olish
+  [3]  GET  /api/v1/stores/                            — Do'kon ro'yxati
+  [4]  GET  /api/v1/settings/                          — Sozlamalarni ko'rish
+  [5]  PATCH /api/v1/settings/{id}/                   — Sozlamalarni yangilash
+  [6]  POST /api/v1/branches/                          — Filial yaratish
+  [7]  POST /api/v1/workers/                           — Xodim qo'shish
+  [8]  GET  /api/v1/workers/me/                        — O'z profili
+  [9]  POST /api/v1/warehouse/currencies/              — Valyuta yaratish
+  [10] POST /api/v1/warehouse/exchange-rates/          — Kurs kiritish
+  [11] POST /api/v1/warehouse/categories/              — Kategoriya yaratish
+  [12] POST /api/v1/warehouse/subcategories/           — Subkategoriya yaratish
+  [13] POST /api/v1/warehouse/suppliers/               — Supplier yaratish
+  [14] POST /api/v1/warehouse/warehouses/              — Ombor yaratish
+  [15] POST /api/v1/warehouse/products/                — Mahsulot yaratish
+  [16] GET  /api/v1/warehouse/products/{id}/           — Detail (barcode_image_url, image)
+  [17] GET  /api/v1/warehouse/products/{id}/barcode/   — Barcode PNG rasmi
+  [18] GET  /api/v1/warehouse/products/{id}/qr/        — QR PNG rasmi
+  [19] GET  /api/v1/warehouse/products/scan/?code=...  — Barcode qidirish
+  [20] POST /api/v1/warehouse/products/bulk-qr/        — Bulk QR ZIP
+  [21] POST /api/v1/shifts/                            — Smena ochish
+  [22] POST /api/v1/warehouse/movements/               — Bitta kirim (IN)
+  [23] POST /api/v1/warehouse/movements/bulk/          — Guruhli kirim (bulk IN)
+  [24] GET  /api/v1/warehouse/stocks/                  — Qoldiqlar
+  [25] GET  /api/v1/warehouse/stocks/by-product/       — Mahsulot bo'yicha qoldiq
+  [26] GET  /api/v1/warehouse/stocks/low-stock/        — Kam qoldiqlilar
+  [27] GET  /api/v1/warehouse/batches/                 — FIFO partiyalar
+  [28] POST /api/v1/warehouse/movements/ (out)         — Chiqim
+  [29] POST /api/v1/warehouse/transfers/               — Transfer yaratish
+  [30] POST /api/v1/warehouse/transfers/{id}/confirm/  — Transfer tasdiqlash
+  [31] POST /api/v1/warehouse/wastages/                — Isrof
+  [32] POST /api/v1/warehouse/audits/                  — Inventarizatsiya yaratish
+  [33] PATCH /api/v1/warehouse/audits/{id}/items/{item_id}/ — Haqiqiy miqdor
+  [34] POST /api/v1/warehouse/audits/{id}/confirm/     — Inventarizatsiya tasdiqlash
+  [35] POST /api/v1/customer-groups/                   — Mijoz guruhi
+  [36] POST /api/v1/customers/                         — Mijoz yaratish
+  [37] POST /api/v1/sales/ (cash)                      — Naqd sotuv
+  [38] POST /api/v1/sales/ (debt)                      — Nasiya sotuv
+  [39] GET  /api/v1/sales/{id}/                        — Sotuv detail
+  [40] POST /api/v1/sale-returns/                      — Qaytarish yaratish
+  [41] PATCH /api/v1/sale-returns/{id}/confirm/        — Qaytarish tasdiqlash
+  [42] POST /api/v1/expense-categories/                — Xarajat kategoriyasi
+  [43] POST /api/v1/expenses/                          — Xarajat yaratish
+  [44] GET  /api/v1/shifts/{id}/x-report/              — X-Report
+  [45] PATCH /api/v1/shifts/{id}/close/                — Smena yopish
+  [46] GET  /api/v1/shifts/{id}/z-report/              — Z-Report
+  [47] GET  /api/v1/dashboard/                         — Dashboard statistika
+  [48] GET  /api/v1/export/sales/?format=excel         — Excel eksport
+  [49] GET  /api/v1/export/products/template/          — Import shabloni
+  [50] POST /api/v1/export/products/import/            — Excel import
+  [51] GET  /api/v1/kpi/                               — WorkerKPI
+  [52] PATCH /api/v1/kpi/{id}/set-target/              — KPI maqsad belgilash
+  [53] GET  /api/v1/audit-logs/                        — Audit log
+  [54] GET  /api/v1/subscription/                      — Obuna holati
+
+============================================================
+  Sana: 19.03.2026  |  Shop CRM System v1.0  |  54 test qadam
+============================================================
