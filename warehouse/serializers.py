@@ -462,12 +462,17 @@ class ProductDetailSerializer(serializers.ModelSerializer):
 
 
 class ProductCreateSerializer(serializers.ModelSerializer):
+    currency_code = serializers.CharField(
+        write_only=True, required=False, allow_null=True, allow_blank=True,
+        help_text="Valyuta kodi (masalan: UZS, USD, EUR)"
+    )
+
     class Meta:
         model  = Product
         fields = (
             'name', 'category', 'subcategory',
             'unit', 'purchase_price', 'sale_price',
-            'price_currency', 'barcode', 'image',
+            'price_currency', 'currency_code', 'barcode', 'image',
         )
         extra_kwargs = {
             'name': {
@@ -477,6 +482,7 @@ class ProductCreateSerializer(serializers.ModelSerializer):
                     'max_length': "Mahsulot nomi 300 belgidan oshmasligi kerak.",
                 }
             },
+            'price_currency': {'required': False},
         }
 
     def validate_category(self, value):
@@ -518,16 +524,29 @@ class ProductCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Subkategoriya tanlangan kategoriyaga tegishli emas."
             )
+        currency_code = data.pop('currency_code', None)
+        if currency_code and not data.get('price_currency'):
+            try:
+                data['price_currency'] = Currency.objects.get(code=currency_code.upper())
+            except Currency.DoesNotExist:
+                raise serializers.ValidationError(
+                    f"'{currency_code}' valyuta kodi topilmadi."
+                )
         return data
 
 
 class ProductUpdateSerializer(serializers.ModelSerializer):
+    currency_code = serializers.CharField(
+        write_only=True, required=False, allow_null=True, allow_blank=True,
+        help_text="Valyuta kodi (masalan: UZS, USD, EUR)"
+    )
+
     class Meta:
         model  = Product
         fields = (
             'name', 'category', 'subcategory',
             'unit', 'purchase_price', 'sale_price',
-            'price_currency', 'barcode', 'image', 'status',
+            'price_currency', 'currency_code', 'barcode', 'image', 'status',
         )
         extra_kwargs = {
             'name': {
@@ -536,6 +555,7 @@ class ProductUpdateSerializer(serializers.ModelSerializer):
                     'max_length': "Mahsulot nomi 300 belgidan oshmasligi kerak.",
                 }
             },
+            'price_currency': {'required': False},
         }
 
     def validate_category(self, value):
@@ -580,6 +600,14 @@ class ProductUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Subkategoriya tanlangan kategoriyaga tegishli emas."
             )
+        currency_code = data.pop('currency_code', None)
+        if currency_code and not data.get('price_currency'):
+            try:
+                data['price_currency'] = Currency.objects.get(code=currency_code.upper())
+            except Currency.DoesNotExist:
+                raise serializers.ValidationError(
+                    f"'{currency_code}' valyuta kodi topilmadi."
+                )
         return data
 
 
