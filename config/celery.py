@@ -15,8 +15,11 @@ Ishlatilish joylari:
   - Kechasi zaxira nusxa (backup)
 """
 
+import logging
 import os
 from celery import Celery
+
+logger = logging.getLogger(__name__)
 
 # Celery uchun Django settings modulini belgilash
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.local')
@@ -37,4 +40,4 @@ def debug_task(self):
     Test vazifasi — Celery ishlayotganini tekshirish uchun.
     Ishlatish: from config.celery import debug_task; debug_task.delay()
     """
-    print(f'Celery ishlayapti! Task ID: {self.request.id}')
+    logger.info('Celery ishlayapti! Task ID: %s', self.request.id)

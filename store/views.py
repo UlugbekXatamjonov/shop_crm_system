@@ -26,8 +26,11 @@ Smena qoidalari:
 """
 
 import io
+import logging
 
 from django.utils import timezone
+
+logger = logging.getLogger(__name__)
 
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -550,8 +553,8 @@ class SmenaViewSet(AuditMixin, viewsets.ModelViewSet):
                 headers = ['Ko\'rsatkich', 'Qiymat']
                 rows = [
                     ['Filial',          smena.branch.name],
-                    ['Kassir (ochgan)', smena.worker_open.get_full_name() if smena.worker_open_id else ''],
-                    ['Kassir (yopgan)', smena.worker_close.get_full_name() if smena.worker_close_id else ''],
+                    ['Kassir (ochgan)', smena.worker_open.user.get_full_name() if smena.worker_open_id else ''],
+                    ['Kassir (yopgan)', smena.worker_close.user.get_full_name() if smena.worker_close_id else ''],
                     ['Boshlanish',      smena.start_time.strftime('%d.%m.%Y %H:%M') if smena.start_time else ''],
                     ['Tugash',          smena.end_time.strftime('%d.%m.%Y %H:%M') if smena.end_time else ''],
                     ['Naqd (ochilish)', str(smena.cash_start or 0)],
@@ -574,8 +577,8 @@ class SmenaViewSet(AuditMixin, viewsets.ModelViewSet):
                 import base64
                 pdf_bytes = b''.join(pdf_response.streaming_content) if hasattr(pdf_response, 'streaming_content') else pdf_response.content
                 pdf_url = 'data:application/pdf;base64,' + base64.b64encode(pdf_bytes).decode('utf-8')
-            except Exception:
-                pass  # PDF generatsiya xatosi — asosiy javobga ta'sir qilmasin
+            except Exception as exc:
+                logger.warning("auto_pdf_on_smena_close: PDF generatsiya xatosi smena_id=%s: %s", smena.pk, exc)
 
         response_data = {
             'message': 'Smena muvaffaqiyatli yopildi.',
