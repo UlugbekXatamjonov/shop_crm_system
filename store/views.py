@@ -649,7 +649,7 @@ class SmenaViewSet(AuditMixin, viewsets.ModelViewSet):
         )
 
         sale_agg = completed_sales.aggregate(
-            total=Coalesce(Sum('total_price'), Value(0, output_field=Sum('total_price').output_field)),
+            total=Sum('total_price'),
             count=Count('id'),
         )
         sales_total = sale_agg['total'] or 0
