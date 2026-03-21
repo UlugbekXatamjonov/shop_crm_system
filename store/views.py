@@ -707,7 +707,13 @@ class SmenaViewSet(AuditMixin, viewsets.ModelViewSet):
         ]
 
         # ── Isroflar ──────────────────────────────────────────────────────────
-        wastage_agg = WastageRecord.objects.filter(smena=smena).aggregate(
+        # WastageRecord da smena FK yo'q — sana oralig'i bo'yicha filtr
+        wastage_filter = {'store': smena.store}
+        if smena.start_time:
+            wastage_filter['date__gte'] = smena.start_time.date()
+        if smena.end_time:
+            wastage_filter['date__lte'] = smena.end_time.date()
+        wastage_agg = WastageRecord.objects.filter(**wastage_filter).aggregate(
             count=Count('id'),
         )
         wastage_count = wastage_agg['count'] or 0
