@@ -214,7 +214,7 @@ class ExpenseExportView(APIView):
                 exp.branch.name if exp.branch_id else '',
                 exp.worker.user.get_full_name() if exp.worker_id else '',
                 float(exp.amount),
-                exp.note,
+                exp.description,
                 f'#{exp.smena_id}' if exp.smena_id else '',
             ])
 
