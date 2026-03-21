@@ -128,7 +128,7 @@ class SaleExportView(APIView):
         qs = (
             Sale.objects
             .filter(store=worker.store)
-            .select_related('branch', 'worker', 'customer', 'smena')
+            .select_related('branch', 'worker__user', 'customer', 'smena')
             .prefetch_related('items__product')
         )
 
@@ -154,7 +154,7 @@ class SaleExportView(APIView):
                 i,
                 _fmt_dt(sale.created_on),
                 sale.branch.name if sale.branch else '',
-                sale.worker.get_full_name() if sale.worker else '',
+                sale.worker.user.get_full_name() if sale.worker else '',
                 sale.customer.name if sale.customer_id else '',
                 sale.get_payment_type_display(),
                 float(sale.total_price),
@@ -190,7 +190,7 @@ class ExpenseExportView(APIView):
         qs = (
             Expense.objects
             .filter(store=worker.store)
-            .select_related('branch', 'worker', 'category', 'smena')
+            .select_related('branch', 'worker__user', 'category', 'smena')
         )
 
         qs = _filter_date(qs, 'date', request)
@@ -212,7 +212,7 @@ class ExpenseExportView(APIView):
                 _fmt_d(exp.date),
                 exp.category.name if exp.category_id else '',
                 exp.branch.name if exp.branch_id else '',
-                exp.worker.get_full_name() if exp.worker_id else '',
+                exp.worker.user.get_full_name() if exp.worker_id else '',
                 float(exp.amount),
                 exp.note,
                 f'#{exp.smena_id}' if exp.smena_id else '',
@@ -288,7 +288,7 @@ class StockMovementExportView(APIView):
         qs = (
             StockMovement.objects
             .filter(product__store=worker.store)
-            .select_related('product', 'branch', 'warehouse', 'worker', 'supplier')
+            .select_related('product', 'branch', 'warehouse', 'worker__user', 'supplier')
         )
 
         qs = _filter_date(qs, 'created_on', request)
@@ -316,7 +316,7 @@ class StockMovementExportView(APIView):
                 mv.product.get_unit_display(),
                 float(mv.unit_cost) if mv.unit_cost else '',
                 loc,
-                mv.worker.get_full_name() if mv.worker_id else '',
+                mv.worker.user.get_full_name() if mv.worker_id else '',
                 mv.supplier.name if mv.supplier_id else '',
                 mv.note,
             ])

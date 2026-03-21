@@ -474,7 +474,7 @@ def calc_current_smena(store_id: int, branch_id=None) -> dict:
     qs = Smena.objects.filter(
         store_id=store_id,
         status=SmenaStatus.OPEN,
-    ).select_related('branch', 'worker_open')
+    ).select_related('branch', 'worker_open__user')
     if branch_id:
         qs = qs.filter(branch_id=branch_id)
 
@@ -506,7 +506,7 @@ def calc_current_smena(store_id: int, branch_id=None) -> dict:
         open_smenas.append({
             'smena_id':    smena.id,
             'branch':      smena.branch.name,
-            'worker':      smena.worker_open.get_full_name() if smena.worker_open_id else '',
+            'worker':      smena.worker_open.user.get_full_name() if smena.worker_open_id else '',
             'start_time':  smena.start_time.strftime('%d.%m.%Y %H:%M') if smena.start_time else '',
             'sales_count': data.get('count') or 0,
             'sales_total': _d(data.get('revenue') or 0),
