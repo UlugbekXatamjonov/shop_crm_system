@@ -672,8 +672,9 @@ class SmenaViewSet(AuditMixin, viewsets.ModelViewSet):
         }
 
         # ── Qaytarishlar (confirmed) ───────────────────────────────────────────
+        # SaleReturn.smena yo'q — sale__smena orqali bog'laymiz
         confirmed_returns = SaleReturn.objects.filter(
-            smena=smena,
+            sale__smena=smena,
             status=SaleReturnStatus.CONFIRMED,
         )
         return_agg = confirmed_returns.aggregate(
