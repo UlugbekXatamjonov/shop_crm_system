@@ -142,6 +142,10 @@ class SubscriptionRequired(BasePermission):
             "Rejangizni yangilang."
         )
 
+    def __call__(self):
+        # DRF permission_classes da instance ishlatilganda qayta chaqiriladi — o'zini qaytarsin
+        return self
+
     def has_permission(self, request: Request, view) -> bool:
         worker = _get_worker(request)
         if not worker:
