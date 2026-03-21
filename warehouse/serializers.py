@@ -1013,7 +1013,7 @@ class MovementDetailSerializer(serializers.ModelSerializer):
             'branch_id', 'branch_name',
             'warehouse_id', 'warehouse_name',
             'movement_type', 'movement_type_display',
-            'quantity', 'unit_cost', 'note',
+            'quantity', 'unit_cost', 'description',
             'supplier_id', 'supplier_name',
             'worker_name', 'created_on',
         )
@@ -1039,7 +1039,7 @@ class MovementCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = StockMovement
-        fields = ('product', 'branch', 'warehouse', 'movement_type', 'quantity', 'unit_cost', 'note', 'supplier')
+        fields = ('product', 'branch', 'warehouse', 'movement_type', 'quantity', 'unit_cost', 'description', 'supplier')
         extra_kwargs = {
             'product': {
                 'error_messages': {
@@ -1157,7 +1157,7 @@ class MovementBulkCreateSerializer(serializers.Serializer):
     {
         "movement_type": "in",
         "branch": 1,
-        "note": "Maysaradan kirim",
+        "description": "Maysaradan kirim",
         "items": [
             {"product": 5, "quantity": 100, "unit_cost": 12000, "supplier": 2},
             {"product": 8, "quantity": 50,  "unit_cost": 8000}
@@ -1167,7 +1167,7 @@ class MovementBulkCreateSerializer(serializers.Serializer):
     movement_type = serializers.ChoiceField(choices=MovementType.choices)
     branch        = serializers.PrimaryKeyRelatedField(queryset=Branch.objects.all(), required=False, allow_null=True)
     warehouse     = serializers.PrimaryKeyRelatedField(queryset=Warehouse.objects.all(), required=False, allow_null=True)
-    note          = serializers.CharField(required=False, allow_blank=True, default='')
+    description   = serializers.CharField(required=False, allow_blank=True, default='')
     items         = MovementBulkItemSerializer(many=True)
 
     def validate_items(self, value):
@@ -1199,7 +1199,7 @@ class TransferItemReadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = TransferItem
-        fields = ('id', 'product_id', 'product_name', 'product_unit', 'quantity', 'note')
+        fields = ('id', 'product_id', 'product_name', 'product_unit', 'quantity', 'description')
 
 
 class TransferItemWriteSerializer(serializers.Serializer):
@@ -1228,7 +1228,7 @@ class TransferItemWriteSerializer(serializers.Serializer):
             'invalid' : "Miqdor raqam bo'lishi kerak.",
         }
     )
-    note     = serializers.CharField(required=False, allow_blank=True, default='')
+    description = serializers.CharField(required=False, allow_blank=True, default='')
 
     def validate_product(self, value):
         """Do'kon tegishliligi tekshiruvi — context validation paytida mavjud."""
@@ -1317,7 +1317,7 @@ class TransferDetailSerializer(serializers.ModelSerializer):
             'to_branch_id',       'to_warehouse_id',
             'store_name',
             'status', 'status_display',
-            'note', 'confirmed_at',
+            'description', 'confirmed_at',
             'worker_name', 'created_on',
             'items',
         )
@@ -1399,8 +1399,8 @@ class TransferCreateSerializer(serializers.Serializer):
             'incorrect_type': "Ombor ID butun son bo'lishi kerak.",
         }
     )
-    note  = serializers.CharField(required=False, allow_blank=True, default='')
-    items = TransferItemWriteSerializer(many=True)
+    description = serializers.CharField(required=False, allow_blank=True, default='')
+    items       = TransferItemWriteSerializer(many=True)
 
     def validate_from_branch(self, value):
         store = self.context.get('store')
@@ -1595,7 +1595,7 @@ class WastageRecordDetailSerializer(serializers.ModelSerializer):
             'branch', 'branch_name',
             'warehouse', 'warehouse_name',
             'reason', 'reason_display',
-            'quantity', 'note', 'date',
+            'quantity', 'description', 'date',
             'worker_name', 'created_on',
         )
 
@@ -1613,7 +1613,7 @@ class WastageRecordCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = WastageRecord
-        fields = ('product', 'branch', 'warehouse', 'quantity', 'reason', 'note', 'date')
+        fields = ('product', 'branch', 'warehouse', 'quantity', 'reason', 'description', 'date')
         extra_kwargs = {
             'product': {
                 'error_messages': {
@@ -1774,7 +1774,7 @@ class StockAuditDetailSerializer(serializers.ModelSerializer):
             'location_type',
             'branch', 'branch_name',
             'warehouse', 'warehouse_name',
-            'note', 'worker_name',
+            'description', 'worker_name',
             'created_on', 'confirmed_on',
             'items',
         )
@@ -1799,7 +1799,7 @@ class StockAuditCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = StockAudit
-        fields = ('branch', 'warehouse', 'note')
+        fields = ('branch', 'warehouse', 'description')
         extra_kwargs = {
             'branch': {
                 'error_messages': {
@@ -1917,7 +1917,7 @@ class SupplierDetailSerializer(serializers.ModelSerializer):
         model  = Supplier
         fields = (
             'id', 'name', 'phone', 'company', 'address',
-            'debt_balance', 'note',
+            'debt_balance', 'description',
             'status', 'status_display',
             'store_name', 'created_on', 'updated_on',
         )
@@ -1928,7 +1928,7 @@ class SupplierCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = Supplier
-        fields = ('name', 'phone', 'company', 'address', 'note')
+        fields = ('name', 'phone', 'company', 'address', 'description')
         extra_kwargs = {
             'name': {
                 'error_messages': {
@@ -1952,7 +1952,7 @@ class SupplierUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = Supplier
-        fields = ('name', 'phone', 'company', 'address', 'note')
+        fields = ('name', 'phone', 'company', 'address', 'description')
 
     def validate_name(self, value):
         store = self.context.get('store')
@@ -1984,7 +1984,7 @@ class SupplierPaymentSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'supplier', 'supplier_name',
             'amount', 'payment_type', 'payment_type_display',
-            'note', 'smena',
+            'description', 'smena',
             'worker_name', 'created_on',
         )
         extra_kwargs = {

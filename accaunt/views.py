@@ -30,6 +30,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from .audit_mixin import AuditMixin
 from .models import CustomUser, Worker, WorkerKPI, AuditLog, WorkerStatus
 from .permissions import IsManagerOrAbove, IsOwner, SubscriptionRequired, WorkerLimitPermission
+from .throttles import LoginThrottle, PasswordResetThrottle, RegisterThrottle
 from .serializers import (
     UserRegistrationSerializer,
     UserLoginSerializer,
@@ -78,9 +79,11 @@ class UserRegistrationView(APIView):
     POST /api/v1/auth/register/
 
     Ruxsat: hamma (AllowAny)
+    Throttle: minutiga 3 ta (spam/bot himoya)
     Javob: JWT tokenlar + muvaffaqiyat xabari
     """
-    permission_classes = [AllowAny]
+    permission_classes  = [AllowAny]
+    throttle_classes    = [RegisterThrottle]
 
     def post(self, request):
         serializer = UserRegistrationSerializer(data=request.data)
@@ -102,9 +105,11 @@ class UserLoginView(APIView):
     POST /api/v1/auth/login/
 
     Ruxsat: hamma (AllowAny)
+    Throttle: minutiga 5 ta (brute-force himoya)
     Javob: JWT tokenlar + foydalanuvchi profili (permission'lar bilan)
     """
-    permission_classes = [AllowAny]
+    permission_classes  = [AllowAny]
+    throttle_classes    = [LoginThrottle]
 
     def post(self, request):
         serializer = UserLoginSerializer(data=request.data)
@@ -227,9 +232,11 @@ class SendPasswordResetEmailView(APIView):
     POST /api/v1/auth/send-reset-email/
 
     Ruxsat: hamma (AllowAny)
+    Throttle: soatiga 3 ta (email spam himoya)
     So'rov tanasi: {"email": "user@example.com"}
     """
-    permission_classes = [AllowAny]
+    permission_classes  = [AllowAny]
+    throttle_classes    = [PasswordResetThrottle]
 
     def post(self, request):
         serializer = SendPasswordResetEmailSerializer(data=request.data)

@@ -478,7 +478,7 @@ class SmenaDetailSerializer(serializers.ModelSerializer):
             'worker_close', 'worker_close_name',
             'start_time', 'end_time',
             'cash_start', 'cash_end',
-            'note',
+            'description',
         )
 
     def get_worker_open_name(self, obj: Smena) -> str | None:
@@ -504,7 +504,7 @@ class SmenaOpenSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = Smena
-        fields = ('branch', 'cash_start', 'note')
+        fields = ('branch', 'cash_start', 'description')
         extra_kwargs = {
             'branch': {
                 'error_messages': {
@@ -519,7 +519,7 @@ class SmenaOpenSerializer(serializers.ModelSerializer):
                     'invalid': "To'g'ri pul miqdori kiritilishi shart.",
                 }
             },
-            'note': {'required': False},
+            'description': {'required': False},
         }
 
 
@@ -538,8 +538,8 @@ class SmenaCloseSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = Smena
-        fields = ('cash_end', 'note')
+        fields = ('cash_end', 'description')
         extra_kwargs = {
-            'cash_end': {'required': False},
-            'note':     {'required': False},
+            'cash_end':    {'required': False},
+            'description': {'required': False},
         }

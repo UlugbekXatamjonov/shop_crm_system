@@ -255,7 +255,7 @@ class SubscriptionInvoice(models.Model):
     )
     period_from = models.DateField(verbose_name="Davr boshi")
     period_to   = models.DateField(verbose_name="Davr oxiri")
-    note        = models.TextField(blank=True, verbose_name="Izoh")
+    description = models.TextField(blank=True, verbose_name="Izoh")
     created_by  = models.ForeignKey(
         'accaunt.Worker',
         on_delete=models.SET_NULL,
@@ -325,7 +325,7 @@ class SubscriptionDowngradeLog(models.Model):
         null=True, blank=True,
         verbose_name="Qayta faollashtirilgan vaqt",
     )
-    note            = models.TextField(
+    description     = models.TextField(
         blank=True,
         verbose_name="Izoh",
     )

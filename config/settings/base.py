@@ -181,11 +181,13 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle',  # Autentifikatsiya qilinganlar
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '20/min',      # Anonim: minutiga 20 so'rov
-        'user': '200/min',     # Foydalanuvchi: minutiga 200 so'rov
-        'login': '5/min',      # Login: minutiga 5 urinish
-        'register': '3/min',   # Ro'yxatdan o'tish: minutiga 3 ta
-        'export': '5/min',     # Export: minutiga 5 ta
+        'anon':           '20/min',   # Anonim: minutiga 20 so'rov
+        'user':           '200/min',  # Foydalanuvchi: minutiga 200 so'rov
+        'login':          '5/min',    # Login: minutiga 5 urinish (brute-force himoya)
+        'register':       '3/min',    # Ro'yxatdan o'tish: minutiga 3 ta (spam himoya)
+        'password_reset': '3/hour',   # Parol tiklash: soatiga 3 ta (email spam himoya)
+        'export':         '10/min',   # Export Excel/PDF: minutiga 10 ta
+        'bulk':           '20/min',   # Bulk operatsiyalar: minutiga 20 ta
     },
 
     # Filtrlar backend'i
@@ -375,3 +377,10 @@ SUBSCRIPTION_EXPIRY_NOTIFY = [10, 3, 1]
 
 # Redis kesh TTL (soniya) — cache_utils.py da ishlatiladi
 SUBSCRIPTION_CACHE_TTL = 3600  # 1 soat
+
+# ============================================================
+# UMUMIY CHEKLOVLAR
+# ============================================================
+
+# Bir so'rovda maksimal QR/barcode bosib chiqarish soni — warehouse/views.py
+QR_BULK_MAX_PRODUCTS = 500

@@ -218,7 +218,7 @@ class AdminSubscriptionViewSet(AuditMixin, viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
 
         days = serializer.validated_data['days']
-        note = serializer.validated_data.get('note', '')
+        description = serializer.validated_data.get('description', '')
 
         # end_date uzaytirish (hozirdan kichik bo'lsa hozirdan boshlanadi)
         base_date   = max(sub.end_date, date.today())
@@ -241,7 +241,7 @@ class AdminSubscriptionViewSet(AuditMixin, viewsets.GenericViewSet):
             description=(
                 f"Obuna muddati uzaytirildi: '{sub.store.name}' — "
                 f"+{days} kun, yangi tugash: {sub.end_date}"
-                + (f", izoh: {note}" if note else "")
+                + (f", izoh: {description}" if description else "")
             )
         )
         return Response({
@@ -269,7 +269,7 @@ class AdminSubscriptionViewSet(AuditMixin, viewsets.GenericViewSet):
 
         amount    = serializer.validated_data['amount']
         is_yearly = serializer.validated_data['is_yearly']
-        note      = serializer.validated_data.get('note', '')
+        description = serializer.validated_data.get('description', '')
 
         with transaction.atomic():
             # Davr hisoblash
@@ -286,7 +286,7 @@ class AdminSubscriptionViewSet(AuditMixin, viewsets.GenericViewSet):
                 is_yearly    = is_yearly,
                 period_from  = period_from,
                 period_to    = period_to,
-                note         = note,
+                description  = description,
                 created_by   = request.user.worker,
             )
 

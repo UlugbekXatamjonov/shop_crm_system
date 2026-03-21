@@ -106,7 +106,7 @@ class SubscriptionInvoiceSerializer(serializers.ModelSerializer):
         model  = SubscriptionInvoice
         fields = [
             'id', 'plan_name', 'amount', 'is_yearly',
-            'period_from', 'period_to', 'note',
+            'period_from', 'period_to', 'description',
             'created_by', 'paid_at',
         ]
 
@@ -171,7 +171,7 @@ class AdminInvoiceCreateSerializer(serializers.Serializer):
     """
     amount      = serializers.DecimalField(max_digits=15, decimal_places=2, min_value=1)
     is_yearly   = serializers.BooleanField(default=False)
-    note        = serializers.CharField(max_length=500, required=False, allow_blank=True)
+    description = serializers.CharField(max_length=500, required=False, allow_blank=True)
 
     def validate_amount(self, value):
         if value <= 0:
@@ -181,5 +181,5 @@ class AdminInvoiceCreateSerializer(serializers.Serializer):
 
 class AdminExtendSerializer(serializers.Serializer):
     """SuperAdmin: muddatni uzaytirish."""
-    days = serializers.IntegerField(min_value=1, max_value=3650)
-    note = serializers.CharField(max_length=500, required=False, allow_blank=True)
+    days        = serializers.IntegerField(min_value=1, max_value=3650)
+    description = serializers.CharField(max_length=500, required=False, allow_blank=True)

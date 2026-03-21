@@ -349,7 +349,7 @@ class SaleDetailSerializer(serializers.ModelSerializer):
             'payment_type', 'payment_type_display',
             'total_price', 'discount_amount', 'paid_amount', 'debt_amount',
             'status', 'status_display',
-            'note', 'created_on',
+            'description', 'created_on',
             'items',
         )
 
@@ -431,7 +431,7 @@ class SaleCreateSerializer(serializers.Serializer):
             'min_value': "To'lov miqdori manfiy bo'lishi mumkin emas.",
         }
     )
-    note            = serializers.CharField(
+    description     = serializers.CharField(
         required=False,
         allow_blank=True,
         default='',

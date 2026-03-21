@@ -576,7 +576,7 @@ class StockMovement(models.Model):
         blank=True,
         verbose_name="Tannarx (birlik)"
     )
-    note          = models.TextField(
+    description   = models.TextField(
         blank=True,
         verbose_name="Izoh"
     )
@@ -703,7 +703,7 @@ class Transfer(models.Model):
         default=TransferStatus.PENDING,
         verbose_name="Holati"
     )
-    note           = models.TextField(
+    description    = models.TextField(
         blank=True,
         verbose_name="Izoh"
     )
@@ -772,7 +772,7 @@ class TransferItem(models.Model):
         decimal_places=3,
         verbose_name="Miqdori"
     )
-    note      = models.TextField(
+    description = models.TextField(
         blank=True,
         verbose_name="Izoh"
     )
@@ -957,7 +957,7 @@ class WastageRecord(models.Model):
         default=WastageReason.OTHER,
         verbose_name='Sababi',
     )
-    note      = models.TextField(
+    description = models.TextField(
         blank=True,
         verbose_name='Izoh',
     )
@@ -1041,7 +1041,7 @@ class StockAudit(models.Model):
         default=AuditStatus.DRAFT,
         verbose_name='Holat',
     )
-    note         = models.TextField(
+    description  = models.TextField(
         blank=True,
         verbose_name='Izoh',
     )
@@ -1184,7 +1184,7 @@ class Supplier(models.Model):
         default=0,
         verbose_name="Qarz balansi"
     )
-    note         = models.TextField(
+    description  = models.TextField(
         blank=True,
         verbose_name="Izoh"
     )
@@ -1239,7 +1239,7 @@ class SupplierPayment(models.Model):
         default=SupplierPaymentType.CASH,
         verbose_name="To'lov turi"
     )
-    note         = models.TextField(
+    description  = models.TextField(
         blank=True,
         verbose_name="Izoh"
     )

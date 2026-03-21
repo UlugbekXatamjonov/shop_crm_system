@@ -235,7 +235,7 @@ class Sale(models.Model):
         default=SaleStatus.COMPLETED,
         verbose_name='Holat',
     )
-    note            = models.TextField(
+    description     = models.TextField(
         blank=True,
         verbose_name='Izoh',
     )

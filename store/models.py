@@ -454,7 +454,7 @@ class Smena(models.Model):
         blank=True,
         verbose_name="Yakuniy naqd (so'm)",
     )
-    note = models.TextField(
+    description = models.TextField(
         blank=True,
         verbose_name='Izoh',
     )

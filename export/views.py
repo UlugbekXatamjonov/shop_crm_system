@@ -46,6 +46,7 @@ from rest_framework.views import APIView
 from rest_framework import status
 
 from accaunt.permissions import IsManagerOrAbove, SubscriptionRequired
+from accaunt.throttles import BulkOperationThrottle, ExportThrottle
 
 from expense.models import Expense, ExpenseCategory
 from store.models import Branch
@@ -124,7 +125,8 @@ class SaleExportView(APIView):
     GET /api/v1/export/sales/
     Filtrlar: format, date_from, date_to, branch, smena, status
     """
-    permission_classes = [IsAuthenticated, SubscriptionRequired('has_export')]
+    permission_classes  = [IsAuthenticated, SubscriptionRequired('has_export')]
+    throttle_classes    = [ExportThrottle]
 
     def get(self, request):
         worker = request.user.worker
@@ -186,7 +188,8 @@ class ExpenseExportView(APIView):
     GET /api/v1/export/expenses/
     Filtrlar: format, date_from, date_to, branch, smena, category
     """
-    permission_classes = [IsAuthenticated, SubscriptionRequired('has_export')]
+    permission_classes  = [IsAuthenticated, SubscriptionRequired('has_export')]
+    throttle_classes    = [ExportThrottle]
 
     def get(self, request):
         worker = request.user.worker
@@ -238,7 +241,8 @@ class StockExportView(APIView):
     Filtrlar: branch, warehouse
     Format: faqat excel (qoldig' PDF uchun foydali emas)
     """
-    permission_classes = [IsAuthenticated, SubscriptionRequired('has_export')]
+    permission_classes  = [IsAuthenticated, SubscriptionRequired('has_export')]
+    throttle_classes    = [ExportThrottle]
 
     def get(self, request):
         worker = request.user.worker
@@ -284,7 +288,8 @@ class StockMovementExportView(APIView):
     GET /api/v1/export/stock-movements/
     Filtrlar: format, date_from, date_to, branch, warehouse, movement_type
     """
-    permission_classes = [IsAuthenticated, SubscriptionRequired('has_export')]
+    permission_classes  = [IsAuthenticated, SubscriptionRequired('has_export')]
+    throttle_classes    = [ExportThrottle]
 
     def get(self, request):
         worker = request.user.worker
@@ -321,7 +326,7 @@ class StockMovementExportView(APIView):
                 loc,
                 mv.worker.user.get_full_name() if mv.worker_id else '',
                 mv.supplier.name if mv.supplier_id else '',
-                mv.note,
+                mv.description,
             ])
 
         fmt = _get_format(request)
@@ -341,7 +346,8 @@ class SupplierExportView(APIView):
     GET /api/v1/export/suppliers/
     Filtrlar: format, status
     """
-    permission_classes = [IsAuthenticated, SubscriptionRequired('has_export')]
+    permission_classes  = [IsAuthenticated, SubscriptionRequired('has_export')]
+    throttle_classes    = [ExportThrottle]
 
     def get(self, request):
         worker = request.user.worker
@@ -364,7 +370,7 @@ class SupplierExportView(APIView):
                 sup.address,
                 float(sup.debt_balance),
                 sup.get_status_display(),
-                sup.note,
+                sup.description,
             ])
 
         fmt = _get_format(request)
@@ -396,7 +402,8 @@ VALID_UNITS = [u.value for u in ProductUnit]
 
 
 class ProductImportView(APIView):
-    permission_classes = [IsManagerOrAbove, SubscriptionRequired('has_export')]
+    permission_classes  = [IsManagerOrAbove, SubscriptionRequired('has_export')]
+    throttle_classes    = [BulkOperationThrottle]
 
     def get(self, request):
         """GET → bo'sh shablon .xlsx"""
@@ -491,7 +498,8 @@ CUSTOMER_NOTES = {
 
 
 class CustomerImportView(APIView):
-    permission_classes = [IsManagerOrAbove, SubscriptionRequired('has_export')]
+    permission_classes  = [IsManagerOrAbove, SubscriptionRequired('has_export')]
+    throttle_classes    = [BulkOperationThrottle]
 
     def get(self, request):
         return make_template('mijozlar_shablon.xlsx', CUSTOMER_HEADERS, CUSTOMER_NOTES)
@@ -566,7 +574,8 @@ MOVEMENT_NOTES = {
 
 
 class StockMovementImportView(APIView):
-    permission_classes = [IsManagerOrAbove, SubscriptionRequired('has_export')]
+    permission_classes  = [IsManagerOrAbove, SubscriptionRequired('has_export')]
+    throttle_classes    = [BulkOperationThrottle]
 
     def get(self, request):
         return make_template('harakatlar_shablon.xlsx', MOVEMENT_HEADERS, MOVEMENT_NOTES)
@@ -646,7 +655,7 @@ class StockMovementImportView(APIView):
                         unit_cost=unit_cost,
                         worker=worker,
                         supplier=supplier,
-                        note=row.get('izoh', '').strip(),
+                        description=row.get('izoh', '').strip(),
                     )
                     # Stock qoldig'ini yangilash
                     stock, _ = Stock.objects.get_or_create(
@@ -688,7 +697,8 @@ SUPPLIER_NOTES = {
 
 
 class SupplierImportView(APIView):
-    permission_classes = [IsManagerOrAbove, SubscriptionRequired('has_export')]
+    permission_classes  = [IsManagerOrAbove, SubscriptionRequired('has_export')]
+    throttle_classes    = [BulkOperationThrottle]
 
     def get(self, request):
         return make_template('yetkazibberuvchilar_shablon.xlsx', SUPPLIER_HEADERS, SUPPLIER_NOTES)
@@ -728,7 +738,7 @@ class SupplierImportView(APIView):
                     company=row.get('kompaniya', '').strip(),
                     phone=row.get('telefon', '').strip(),
                     address=row.get('manzil', '').strip(),
-                    note=row.get('izoh', '').strip(),
+                    description=row.get('izoh', '').strip(),
                 )
                 created += 1
             except Exception as e:
@@ -749,7 +759,8 @@ SUBCAT_NOTES = {
 
 
 class SubCategoryImportView(APIView):
-    permission_classes = [IsManagerOrAbove, SubscriptionRequired('has_export')]
+    permission_classes  = [IsManagerOrAbove, SubscriptionRequired('has_export')]
+    throttle_classes    = [BulkOperationThrottle]
 
     def get(self, request):
         return make_template('subkategoriyalar_shablon.xlsx', SUBCAT_HEADERS, SUBCAT_NOTES)

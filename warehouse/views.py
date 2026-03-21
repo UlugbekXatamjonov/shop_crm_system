@@ -32,6 +32,7 @@ StockMovement:
 
 from decimal import Decimal
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import F, Sum
 from django.http import HttpResponse
@@ -45,6 +46,7 @@ from rest_framework.response import Response
 
 from accaunt.audit_mixin import AuditMixin
 from accaunt.models import AuditLog
+from accaunt.throttles import BulkOperationThrottle
 from accaunt.permissions import (
     CanAccess,
     IsManagerOrAbove,
@@ -790,8 +792,8 @@ class ProductViewSet(AuditMixin, viewsets.ModelViewSet):
 
         if not product_ids:
             raise ValidationError({'product_ids': "Mahsulotlar ro'yxati bo'sh."})
-        if len(product_ids) > 500:
-            raise ValidationError({'product_ids': "Bir vaqtda maksimal 500 ta mahsulot."})
+        if len(product_ids) > settings.QR_BULK_MAX_PRODUCTS:
+            raise ValidationError({'product_ids': f"Bir vaqtda maksimal {settings.QR_BULK_MAX_PRODUCTS} ta mahsulot."})
 
         worker   = request.user.worker
         products = (
@@ -1322,12 +1324,18 @@ class StockMovementViewSet(AuditMixin, viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED,
         )
 
+    def get_throttles(self):
+        if self.action == 'bulk_create':
+            return [BulkOperationThrottle()]
+        return super().get_throttles()
+
     @action(detail=False, methods=['post'], url_path='bulk')
     @transaction.atomic
     def bulk_create(self, request):
         """
         Bir vaqtda bir necha mahsulot kirim/chiqim.
         Bitta item xato bo'lsa — barchasi rollback qilinadi.
+        Throttle: BulkOperationThrottle (minutiga 20 ta)
 
         POST /api/v1/warehouse/movements/bulk/
         """
@@ -1343,7 +1351,7 @@ class StockMovementViewSet(AuditMixin, viewsets.ModelViewSet):
         movement_type = data['movement_type']
         branch        = data.get('branch')
         warehouse     = data.get('warehouse')
-        note          = data.get('note', '')
+        description   = data.get('description', '')
         items         = data['items']
 
         # 1. Avval barcha itemlarni validatsiya qilamiz (qoldiq yetarliligi)
@@ -1382,7 +1390,7 @@ class StockMovementViewSet(AuditMixin, viewsets.ModelViewSet):
                 movement_type = movement_type,
                 quantity      = item['quantity'],
                 unit_cost     = unit_cost,
-                note          = note,
+                description   = description,
                 supplier      = supplier,
                 worker        = worker,
             )
@@ -1594,7 +1602,7 @@ class TransferViewSet(AuditMixin, viewsets.ModelViewSet):
                 quantity      = item.quantity,
                 unit_cost     = avg_cost,
                 worker        = worker,
-                note          = f"Transfer #{transfer.id} chiqim",
+                description   = f"Transfer #{transfer.id} chiqim",
             )
             Stock.objects.filter(pk=from_stock.pk).update(
                 quantity   = F('quantity') - item.quantity,
@@ -1610,7 +1618,7 @@ class TransferViewSet(AuditMixin, viewsets.ModelViewSet):
                 quantity      = item.quantity,
                 unit_cost     = avg_cost,
                 worker        = worker,
-                note          = f"Transfer #{transfer.id} kirim",
+                description   = f"Transfer #{transfer.id} kirim",
             )
             if to_branch:
                 to_stock, _ = Stock.objects.select_for_update().get_or_create(
@@ -1853,7 +1861,7 @@ class WastageRecordViewSet(AuditMixin, viewsets.ModelViewSet):
             warehouse     = instance.warehouse,
             movement_type = MovementType.OUT,
             quantity      = instance.quantity,
-            note          = f"Isrof: {instance.get_reason_display()}. {instance.note}".strip('. '),
+            description   = f"Isrof: {instance.get_reason_display()}. {instance.description}".strip('. '),
             worker        = worker,
         )
 
@@ -2103,7 +2111,7 @@ class StockAuditViewSet(AuditMixin, viewsets.ModelViewSet):
 
             movement_type = MovementType.IN if diff > 0 else MovementType.OUT
             qty           = abs(diff)
-            note_text     = (
+            description_text = (
                 'Inventarizatsiya: oshiqcha' if diff > 0 else 'Inventarizatsiya: kamomad'
             )
 
@@ -2114,7 +2122,7 @@ class StockAuditViewSet(AuditMixin, viewsets.ModelViewSet):
                 movement_type = movement_type,
                 quantity      = qty,
                 unit_cost     = item.product.purchase_price,
-                note          = note_text,
+                description   = description_text,
                 worker        = worker,
             )
 

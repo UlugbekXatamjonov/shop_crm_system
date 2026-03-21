@@ -84,7 +84,7 @@ class StockMovementAdmin(admin.ModelAdmin):
 class TransferItemInline(admin.TabularInline):
     model           = TransferItem
     extra           = 0
-    readonly_fields = ('product', 'quantity', 'note')
+    readonly_fields = ('product', 'quantity', 'description')
     can_delete      = False
 
 
@@ -97,7 +97,7 @@ class TransferAdmin(admin.ModelAdmin):
         'worker', 'confirmed_at', 'created_on',
     )
     list_filter     = ('status', 'store')
-    search_fields   = ('id', 'note')
+    search_fields   = ('id', 'description')
     readonly_fields = ('status', 'confirmed_at', 'created_on', 'worker')
     inlines         = [TransferItemInline]
 
@@ -139,7 +139,7 @@ class WastageRecordAdmin(admin.ModelAdmin):
     search_fields   = ('product__name',)
     readonly_fields = (
         'product', 'branch', 'warehouse', 'store',
-        'worker', 'smena', 'quantity', 'reason', 'note',
+        'worker', 'smena', 'quantity', 'reason', 'description',
         'date', 'created_on',
     )
     ordering        = ['-date', '-created_on']
@@ -164,7 +164,7 @@ class StockAuditAdmin(admin.ModelAdmin):
         'worker', 'created_on', 'confirmed_on',
     )
     list_filter     = ('status', 'store', 'branch', 'warehouse')
-    search_fields   = ('id', 'note')
+    search_fields   = ('id', 'description')
     readonly_fields = ('status', 'confirmed_on', 'created_on', 'worker', 'store')
     inlines         = [StockAuditItemInline]
 
@@ -173,7 +173,7 @@ class SupplierPaymentInline(admin.TabularInline):
     """Yetkazib beruvchi tafsilotida to'lovlar inline ko'rinishi."""
     model           = SupplierPayment
     extra           = 0
-    readonly_fields = ('amount', 'payment_type', 'note', 'smena', 'worker', 'created_on')
+    readonly_fields = ('amount', 'payment_type', 'description', 'smena', 'worker', 'created_on')
     can_delete      = False
 
 
@@ -200,5 +200,5 @@ class SupplierPaymentAdmin(admin.ModelAdmin):
     search_fields   = ('supplier__name',)
     readonly_fields = (
         'supplier', 'amount', 'payment_type',
-        'note', 'smena', 'worker', 'created_on',
+        'description', 'smena', 'worker', 'created_on',
     )

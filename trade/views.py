@@ -471,7 +471,7 @@ class SaleViewSet(AuditMixin, viewsets.ModelViewSet):
         discount_amount = data.get('discount_amount', Decimal('0'))
         paid_amount     = data['paid_amount']
         items_data      = data['items']
-        note            = data.get('note', '')
+        description     = data.get('description', '')
 
         # --------------------------------------------------
         # 1. Branch do'konga tegishliligini tekshirish
@@ -644,7 +644,7 @@ class SaleViewSet(AuditMixin, viewsets.ModelViewSet):
             paid_amount     = paid_amount,
             debt_amount     = debt_amount,
             status          = SaleStatus.COMPLETED,
-            note            = note,
+            description     = description,
         )
 
         # --------------------------------------------------
@@ -680,7 +680,7 @@ class SaleViewSet(AuditMixin, viewsets.ModelViewSet):
                 quantity      = quantity,
                 unit_cost     = avg_cost,
                 worker        = worker,
-                note          = f"Sotuv #{sale.id}",
+                description   = f"Sotuv #{sale.id}",
             )
 
             # Stock yangilash — F() bilan race condition yo'q
@@ -771,7 +771,7 @@ class SaleViewSet(AuditMixin, viewsets.ModelViewSet):
                 movement_type = MovementType.IN,
                 quantity      = quantity,
                 worker        = worker,
-                note          = f"Sotuv #{sale.id} bekor qilindi",
+                description   = f"Sotuv #{sale.id} bekor qilindi",
             )
 
             # Stock yangilash
@@ -1010,7 +1010,7 @@ class SaleReturnViewSet(AuditMixin, viewsets.ModelViewSet):
                 quantity      = quantity,
                 unit_cost     = item.unit_price,
                 worker        = worker,
-                note          = f"Qaytarish #{sale_return.id} tasdiqlandi",
+                description   = f"Qaytarish #{sale_return.id} tasdiqlandi",
             )
 
             # Stock yangilash

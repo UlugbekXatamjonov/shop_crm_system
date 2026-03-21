@@ -218,8 +218,8 @@ def reactivate_downgraded_objects(subscription) -> dict:
 def _mark_log_done(entry, note: str = '') -> None:
     entry.reactivated_at = timezone.now()
     if note:
-        entry.note = note
-    entry.save(update_fields=['reactivated_at', 'note'])
+        entry.description = note
+    entry.save(update_fields=['reactivated_at', 'description'])
 
 
 # ============================================================
@@ -245,8 +245,8 @@ def close_open_smenas(store) -> int:
         smena.worker_close = None
         smena.end_time     = timezone.now()
         smena.status       = SmenaStatus.CLOSED
-        smena.note         = (
-            smena.note + "\n" if smena.note else ""
+        smena.description  = (
+            smena.description + "\n" if smena.description else ""
         ) + "Tizim tomonidan yopildi: obuna cheklovi"
         smena.save()
         count += 1
@@ -267,7 +267,7 @@ def _close_branch_smenas(branch) -> None:
         worker_close = None,
         end_time     = timezone.now(),
         status       = SmenaStatus.CLOSED,
-        note         = "Tizim tomonidan yopildi: filial deaktiv (obuna cheklovi)",
+        description  = "Tizim tomonidan yopildi: filial deaktiv (obuna cheklovi)",
     )
 
 
