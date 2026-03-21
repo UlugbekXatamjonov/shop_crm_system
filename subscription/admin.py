@@ -1,5 +1,6 @@
 from django.contrib import admin
 from .models import SubscriptionPlan, Subscription, SubscriptionInvoice, SubscriptionDowngradeLog
+from config.cache_utils import invalidate_subscription_cache
 
 
 @admin.register(SubscriptionPlan)
@@ -20,6 +21,10 @@ class SubscriptionAdmin(admin.ModelAdmin):
     list_filter   = ['status', 'plan']
     search_fields = ['store__name']
     inlines       = [SubscriptionInvoiceInline]
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        invalidate_subscription_cache(obj.store_id)
 
 
 @admin.register(SubscriptionInvoice)
