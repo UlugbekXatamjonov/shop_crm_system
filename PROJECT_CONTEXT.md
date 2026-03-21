@@ -1,5 +1,72 @@
 # CLAUDE UCHUN ESLATMA — Yangi chatda bu faylni o'qi va davom et
 
+## 📅 21.03.2026 SESSION — QILINGAN ISHLAR
+
+### 1. `note` → `description` — to'liq o'zgartirish ✅
+
+Barcha modellarda `note` maydoni `description` ga o'zgartirildi:
+- **Store:** `Smena.description`
+- **Warehouse:** `StockMovement`, `Transfer`, `TransferItem`, `WastageRecord`, `StockAudit`, `Supplier`, `SupplierPayment`
+- **Trade:** `Sale.description`
+- **Subscription:** `SubscriptionInvoice`, `SubscriptionDowngradeLog`
+
+Migration fayllari: `RenameField` (ma'lumot yo'qotilmaydi)
+Serializer, view, utils — barcha joyda yangilandi.
+
+### 2. API Throttling — professional darajada ✅
+
+**Yangi fayl:** `accaunt/throttles.py`
+- `LoginThrottle` (5/min), `RegisterThrottle` (3/min), `PasswordResetThrottle` (3/hour)
+- `ExportThrottle` (10/min), `BulkOperationThrottle` (20/min)
+
+**Qo'llanilgan joylari:**
+- `accaunt/views.py` — Login, Register, PasswordReset
+- `export/views.py` — barcha 5 ta export va 5 ta import view
+- `warehouse/views.py` — `bulk_qr`, `bulk_price_update` (get_throttles override)
+
+**config/settings/base.py** — `DEFAULT_THROTTLE_RATES` yangilandi.
+
+### 3. `QR_BULK_MAX_PRODUCTS = 500` settings ga ko'chirildi ✅
+
+`warehouse/views.py` da hardcoded `500` → `settings.QR_BULK_MAX_PRODUCTS`
+
+### 4. Bulk mahsulot narxi yangilash ✅
+
+**Yangi endpoint:**
+```
+PATCH /api/v1/warehouse/products/bulk-price-update/
+Body: {"items": [{"id": 5, "sale_price": 15000}, {"id": 8, "sale_price": 22000}]}
+```
+- Atomic transaction — xato bo'lsa rollback
+- Har mahsulot uchun AuditLog (`field: sale_price`, `old/new`, `bulk: true`)
+- BulkOperationThrottle orqali himoyalangan
+
+### 5. Sotuv chek PDF ✅
+
+**Yangi endpoint:**
+```
+GET /api/v1/sales/{id}/receipt/
+```
+- 80 mm termik printer uslubi (narrow format)
+- Sarlavha: Do'kon nomi, filial, kassir, sana
+- Mahsulotlar jadvali (nomi, miqdor, narx, jami)
+- Jami, chegirma, to'lov summasi, qarz
+- Yaratilgan: `export/utils/pdf.py` → `make_receipt_pdf()` funksiyasi
+
+### 6. Django admin panels yaxshilandi ✅
+
+`store/admin.py` — to'liq qayta yozildi:
+- `StoreAdmin` — search, filter, ordering
+- `BranchAdmin` — store autocomplete
+- `StoreSettingsAdmin` — 8 ta grouped fieldsets (Funksiyalar, To'lov, Valyuta, Chek, Smena, Soliq, Telegram, OFD)
+- `SmenaAdmin` — date_hierarchy, readonly_fields
+
+### 7. config/celery.py — print→logger ✅
+
+`print(f'Celery...')` → `logger.info('Celery...')` (professional logging)
+
+---
+
 ## 📅 19.03.2026 SESSION #2 — QILINGAN ISHLAR
 
 ### 1. postman_test_guide.txt → PROJECT_CONTEXT.md ga ko'chirildi ✅

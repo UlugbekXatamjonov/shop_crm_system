@@ -820,6 +820,91 @@ class ProductViewSet(AuditMixin, viewsets.ModelViewSet):
         )
         return response
 
+    # ── BULK PRICE UPDATE ACTION ─────────────────────────────
+    @action(methods=['patch'], detail=False, url_path='bulk-price-update')
+    @transaction.atomic
+    def bulk_price_update(self, request):
+        """
+        Bir nechta mahsulot sotish narxini birdaniga yangilash.
+
+        PATCH /api/v1/warehouse/products/bulk-price-update/
+        Body: {"items": [{"id": 5, "sale_price": 15000}, {"id": 8, "sale_price": 22000}]}
+
+        - Faqat o'z do'koniga tegishli mahsulotlar yangilanadi
+        - Atomic: bitta xato bo'lsa hammasi rollback
+        - Har bir mahsulot uchun AuditLog yoziladi
+        """
+        items = request.data.get('items', [])
+        if not items:
+            raise ValidationError({'items': "Mahsulotlar ro'yxati bo'sh."})
+        if len(items) > settings.QR_BULK_MAX_PRODUCTS:
+            raise ValidationError(
+                {'items': f"Bir vaqtda maksimal {settings.QR_BULK_MAX_PRODUCTS} ta mahsulot."}
+            )
+
+        worker  = request.user.worker
+        updated = []
+
+        for item in items:
+            product_id = item.get('id')
+            sale_price = item.get('sale_price')
+
+            if product_id is None:
+                raise ValidationError({'items': "Har bir elementda 'id' bo'lishi shart."})
+            if sale_price is None:
+                raise ValidationError(
+                    {'items': f"id={product_id}: 'sale_price' maydoni bo'lishi shart."}
+                )
+
+            try:
+                product = Product.objects.get(pk=product_id, store=worker.store)
+            except Product.DoesNotExist:
+                raise ValidationError(
+                    {'items': f"id={product_id}: Mahsulot topilmadi yoki ruxsat yo'q."}
+                )
+
+            try:
+                new_price = Decimal(str(sale_price))
+                if new_price < 0:
+                    raise ValueError
+            except (ValueError, TypeError):
+                raise ValidationError(
+                    {'items': f"id={product_id}: Noto'g'ri narx qiymati."}
+                )
+
+            old_price          = product.sale_price
+            product.sale_price = new_price
+            product.save(update_fields=['sale_price'])
+
+            AuditLog.objects.create(
+                user=request.user,
+                store=worker.store,
+                action='update',
+                model_name='Product',
+                object_id=product.pk,
+                details={
+                    'field': 'sale_price',
+                    'old':   str(old_price),
+                    'new':   str(new_price),
+                    'bulk':  True,
+                },
+            )
+            updated.append({
+                'id':         product.pk,
+                'name':       product.name,
+                'sale_price': str(new_price),
+            })
+
+        return Response(
+            {'updated': len(updated), 'items': updated},
+            status=status.HTTP_200_OK,
+        )
+
+    def get_throttles(self):
+        if self.action in ('bulk_qr', 'bulk_price_update'):
+            return [BulkOperationThrottle()]
+        return super().get_throttles()
+
 
 # ============================================================
 # OMBOR (WAREHOUSE) VIEWSET
