@@ -85,8 +85,8 @@ def calc_sales(store_id: int, date_from: date, date_to: date, branch_id=None) ->
         agg = qs.aggregate(
             revenue=Sum('total_price'),
             discount=Sum('discount_amount'),
-            cash=Sum('cash_amount'),
-            card=Sum('card_amount'),
+            cash=Sum('paid_amount', filter=Q(payment_type='cash')),
+            card=Sum('paid_amount', filter=Q(payment_type='card')),
             debt=Sum('debt_amount'),
             count=Count('id'),
         )
@@ -570,8 +570,8 @@ def calc_chart_data(store_id: int, date_from: date, date_to: date, branch_id=Non
 
     # 2. To'lov turi taqsimoti
     pay_agg = Sale.objects.filter(sale_filter).aggregate(
-        cash=Sum('cash_amount'),
-        card=Sum('card_amount'),
+        cash=Sum('paid_amount', filter=Q(payment_type='cash')),
+        card=Sum('paid_amount', filter=Q(payment_type='card')),
         debt=Sum('debt_amount'),
     )
     cash = _d(pay_agg['cash'] or 0)

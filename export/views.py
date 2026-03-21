@@ -148,6 +148,8 @@ class SaleExportView(APIView):
         ]
         rows = []
         for i, sale in enumerate(qs, start=1):
+            is_cash = sale.payment_type == 'cash'
+            is_card = sale.payment_type == 'card'
             rows.append([
                 i,
                 _fmt_dt(sale.created_on),
@@ -155,10 +157,10 @@ class SaleExportView(APIView):
                 sale.worker.get_full_name() if sale.worker else '',
                 sale.customer.name if sale.customer_id else '',
                 sale.get_payment_type_display(),
-                float(sale.total_amount),
+                float(sale.total_price),
                 float(sale.discount_amount),
-                float(sale.cash_amount),
-                float(sale.card_amount),
+                float(sale.paid_amount) if is_cash else 0.0,
+                float(sale.paid_amount) if is_card else 0.0,
                 float(sale.debt_amount),
                 sale.get_status_display(),
                 f'#{sale.smena_id}' if sale.smena_id else '',
