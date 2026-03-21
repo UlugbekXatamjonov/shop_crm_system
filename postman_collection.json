@@ -1,0 +1,2352 @@
+{
+  "info": {
+    "name": "Shop CRM System API",
+    "_postman_id": "shop-crm-system-api-v1",
+    "description": "Complete API collection for Shop CRM System. Base URL: https://shopcrmsystem-production.up.railway.app/api/v1\n\nTest credentials: username=ulugbek17, password=npassword\nStore ID: 16, Branch ID: 24, Worker ID: 15",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://shopcrmsystem-production.up.railway.app/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refresh",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. AUTH",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "pm.collectionVariables.set(\"token\", json.access);",
+                  "pm.collectionVariables.set(\"refresh\", json.refresh);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"ulugbek17\",\n  \"password\": \"npassword\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login/",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login", ""]
+            },
+            "description": "Login and get JWT tokens. Test script automatically saves access and refresh tokens to collection variables."
+          },
+          "response": []
+        },
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"testuser99\",\n  \"password\": \"Test1234!\",\n  \"password2\": \"Test1234!\",\n  \"first_name\": \"Test\",\n  \"last_name\": \"User\",\n  \"phone1\": \"+998901234599\",\n  \"store_name\": \"Test Do'kon\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register/",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register", ""]
+            },
+            "description": "Register a new user and create a store."
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{refresh}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout/",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "logout", ""]
+            },
+            "description": "Logout and blacklist the refresh token."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/profil/",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "profil", ""]
+            },
+            "description": "Get current user profile."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Ulug'bek\",\n  \"last_name\": \"Xatamjonov\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/profil/",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "profil", ""]
+            },
+            "description": "Update current user profile."
+          },
+          "response": []
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"npassword\",\n  \"password\": \"npassword\",\n  \"password2\": \"npassword\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/change-password/",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "change-password", ""]
+            },
+            "description": "Change current user password."
+          },
+          "response": []
+        },
+        {
+          "name": "Send Reset Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"yangirrr@gmail.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/send-reset-email/",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "send-reset-email", ""]
+            },
+            "description": "Send password reset email."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. WORKERS",
+      "item": [
+        {
+          "name": "List Workers",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/workers/",
+              "host": ["{{baseUrl}}"],
+              "path": ["workers", ""]
+            },
+            "description": "List all workers in the store."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Worker",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"testworker01\",\n  \"password\": \"testpass123\",\n  \"first_name\": \"Test\",\n  \"last_name\": \"Worker\",\n  \"role\": \"seller\",\n  \"branch\": 24,\n  \"phone1\": \"+998901234555\",\n  \"permissions\": [\"savdolar\", \"sotuv\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/workers/",
+              "host": ["{{baseUrl}}"],
+              "path": ["workers", ""]
+            },
+            "description": "Create a new worker."
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Worker Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/workers/me/",
+              "host": ["{{baseUrl}}"],
+              "path": ["workers", "me", ""]
+            },
+            "description": "Get current worker's own profile."
+          },
+          "response": []
+        },
+        {
+          "name": "Update My Worker Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone1\": \"+998993207410\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/workers/me/",
+              "host": ["{{baseUrl}}"],
+              "path": ["workers", "me", ""]
+            },
+            "description": "Update current worker's own profile."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Worker by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/workers/20/",
+              "host": ["{{baseUrl}}"],
+              "path": ["workers", "20", ""]
+            },
+            "description": "Get a specific worker by ID."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Worker by ID",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"seller\",\n  \"salary\": \"9000000\",\n  \"status\": \"active\",\n  \"permissions\": [\"sotuv\", \"savdolar\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/workers/20/",
+              "host": ["{{baseUrl}}"],
+              "path": ["workers", "20", ""]
+            },
+            "description": "Update a worker's role, salary, status and permissions."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Worker by ID",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/workers/20/",
+              "host": ["{{baseUrl}}"],
+              "path": ["workers", "20", ""]
+            },
+            "description": "Delete a worker by ID."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. STORE SETTINGS",
+      "item": [
+        {
+          "name": "Get All Settings",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/",
+              "host": ["{{baseUrl}}"],
+              "path": ["settings", ""]
+            },
+            "description": "Get store settings list."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Settings by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/2/",
+              "host": ["{{baseUrl}}"],
+              "path": ["settings", "2", ""]
+            },
+            "description": "Get store settings by ID."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Settings by ID",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"low_stock_threshold\": 10,\n  \"receipt_header\": \"Xush kelibsiz!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/settings/2/",
+              "host": ["{{baseUrl}}"],
+              "path": ["settings", "2", ""]
+            },
+            "description": "Update store settings. All fields are optional (partial update)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. BRANCHES",
+      "item": [
+        {
+          "name": "List Branches",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/branches/",
+              "host": ["{{baseUrl}}"],
+              "path": ["branches", ""]
+            },
+            "description": "List all branches."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Branch",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Yangi filial\",\n  \"address\": \"Namangan shahar\",\n  \"phone\": \"+998901234567\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/branches/",
+              "host": ["{{baseUrl}}"],
+              "path": ["branches", ""]
+            },
+            "description": "Create a new branch."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Branch by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/branches/24/",
+              "host": ["{{baseUrl}}"],
+              "path": ["branches", "24", ""]
+            },
+            "description": "Get a specific branch by ID."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Branch by ID",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"address\": \"Yangi manzil 1\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/branches/24/",
+              "host": ["{{baseUrl}}"],
+              "path": ["branches", "24", ""]
+            },
+            "description": "Update branch details."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Branch by ID",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/branches/26/",
+              "host": ["{{baseUrl}}"],
+              "path": ["branches", "26", ""]
+            },
+            "description": "Delete a branch by ID."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. SHIFTS (Smena)",
+      "item": [
+        {
+          "name": "List Shifts",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shifts/",
+              "host": ["{{baseUrl}}"],
+              "path": ["shifts", ""]
+            },
+            "description": "List all shifts."
+          },
+          "response": []
+        },
+        {
+          "name": "Open Shift",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branch\": 25,\n  \"cash_start\": \"50000\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/shifts/",
+              "host": ["{{baseUrl}}"],
+              "path": ["shifts", ""]
+            },
+            "description": "Open a new shift for a branch."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Shift by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shifts/2/",
+              "host": ["{{baseUrl}}"],
+              "path": ["shifts", "2", ""]
+            },
+            "description": "Get shift details by ID."
+          },
+          "response": []
+        },
+        {
+          "name": "Close Shift",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cash_counted\": 8000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/shifts/2/close/",
+              "host": ["{{baseUrl}}"],
+              "path": ["shifts", "2", "close", ""]
+            },
+            "description": "Close a shift with cash count."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Shift X-Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shifts/2/x-report/",
+              "host": ["{{baseUrl}}"],
+              "path": ["shifts", "2", "x-report", ""]
+            },
+            "description": "Get X-report for a shift."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. CATEGORIES",
+      "item": [
+        {
+          "name": "List Categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/categories/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "categories", ""]
+            },
+            "description": "List all product categories."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Category",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Yangi kategoriya\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/categories/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "categories", ""]
+            },
+            "description": "Create a new product category."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Category by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/categories/12/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "categories", "12", ""]
+            },
+            "description": "Get category details by ID."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Category by ID",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Mevalar yangilangan\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/categories/12/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "categories", "12", ""]
+            },
+            "description": "Update category name and status."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Category by ID",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/categories/17/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "categories", "17", ""]
+            },
+            "description": "Delete a category by ID."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. SUBCATEGORIES",
+      "item": [
+        {
+          "name": "List Subcategories",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/subcategories/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "subcategories", ""]
+            },
+            "description": "List all subcategories."
+          },
+          "response": []
+        },
+        {
+          "name": "List Subcategories by Category",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/subcategories/?category=12",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "subcategories", ""],
+              "query": [
+                { "key": "category", "value": "12" }
+              ]
+            },
+            "description": "List subcategories filtered by category ID."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Subcategory",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Yangi subkategoriya\",\n  \"category\": 12\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/subcategories/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "subcategories", ""]
+            },
+            "description": "Create a new subcategory under a parent category."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Subcategory by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/subcategories/1/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "subcategories", "1", ""]
+            },
+            "description": "Get subcategory details by ID."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Subcategory by ID",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Yangilangan sub\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/subcategories/1/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "subcategories", "1", ""]
+            },
+            "description": "Update subcategory name."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Subcategory by ID",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/subcategories/1/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "subcategories", "1", ""]
+            },
+            "description": "Delete a subcategory by ID."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "8. CURRENCIES & EXCHANGE RATES",
+      "item": [
+        {
+          "name": "List Currencies",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/currencies/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "currencies", ""]
+            },
+            "description": "List all available currencies."
+          },
+          "response": []
+        },
+        {
+          "name": "List Exchange Rates",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/exchange-rates/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "exchange-rates", ""]
+            },
+            "description": "List all exchange rates."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Exchange Rate",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currency\": 1,\n  \"rate\": \"12800\",\n  \"date\": \"2026-03-21\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/exchange-rates/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "exchange-rates", ""]
+            },
+            "description": "Create a new exchange rate for a currency."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "9. PRODUCTS",
+      "item": [
+        {
+          "name": "List Products",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/products/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "products", ""]
+            },
+            "description": "List all products."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Product",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Yangi mahsulot\",\n  \"category\": 12,\n  \"unit\": \"dona\",\n  \"sale_price\": \"15000\",\n  \"currency_code\": \"UZS\",\n  \"barcode\": \"2000016000200\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/products/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "products", ""]
+            },
+            "description": "Create a new product."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/products/9/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "products", "9", ""]
+            },
+            "description": "Get product details by ID."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Product by ID",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sale_price\": \"13000\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/products/9/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "products", "9", ""]
+            },
+            "description": "Update product sale price."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Product by ID",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/products/99/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "products", "99", ""]
+            },
+            "description": "Delete a product by ID. Change ID to a test product."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product Barcode",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/products/9/barcode/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "products", "9", "barcode", ""]
+            },
+            "description": "Get barcode image for a product."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product QR Code",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/products/9/qr/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "products", "9", "qr", ""]
+            },
+            "description": "Get QR code image for a product."
+          },
+          "response": []
+        },
+        {
+          "name": "Scan Product by Code",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/products/scan/?code=2000016000023",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "products", "scan", ""],
+              "query": [
+                { "key": "code", "value": "2000016000023" }
+              ]
+            },
+            "description": "Scan product by barcode or QR code."
+          },
+          "response": []
+        },
+        {
+          "name": "Bulk QR Codes",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_ids\": [9, 10],\n  \"copies\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/products/bulk-qr/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "products", "bulk-qr", ""]
+            },
+            "description": "Generate bulk QR codes for multiple products."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "10. WAREHOUSES",
+      "item": [
+        {
+          "name": "List Warehouses",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/warehouses/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "warehouses", ""]
+            },
+            "description": "List all warehouses."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Warehouse",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"3-ombor\",\n  \"address\": \"Namangan ko'chasi 5\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/warehouses/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "warehouses", ""]
+            },
+            "description": "Create a new warehouse."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Warehouse by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/warehouses/7/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "warehouses", "7", ""]
+            },
+            "description": "Get warehouse details by ID."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Warehouse by ID",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"address\": \"Yangi manzil\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/warehouses/7/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "warehouses", "7", ""]
+            },
+            "description": "Update warehouse address."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Warehouse by ID",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/warehouses/9/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "warehouses", "9", ""]
+            },
+            "description": "Delete a warehouse by ID."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "11. SUPPLIERS",
+      "item": [
+        {
+          "name": "List Suppliers",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/suppliers/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "suppliers", ""]
+            },
+            "description": "List all suppliers."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Supplier",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Baraka yetkazuvchi\",\n  \"phone\": \"+998901234567\",\n  \"company\": \"Baraka LLC\",\n  \"payment_type\": \"cash\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/suppliers/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "suppliers", ""]
+            },
+            "description": "Create a new supplier."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Supplier by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/suppliers/1/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "suppliers", "1", ""]
+            },
+            "description": "Get supplier details by ID."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Supplier by ID",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company\": \"Yangi LLC\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/suppliers/1/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "suppliers", "1", ""]
+            },
+            "description": "Update supplier company name."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Supplier by ID",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/suppliers/1/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "suppliers", "1", ""]
+            },
+            "description": "Delete a supplier by ID."
+          },
+          "response": []
+        },
+        {
+          "name": "List Supplier Payments",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/supplier-payments/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "supplier-payments", ""]
+            },
+            "description": "List all supplier payments."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Supplier Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"supplier\": 1,\n  \"amount\": \"500000\",\n  \"note\": \"To'lov\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/supplier-payments/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "supplier-payments", ""]
+            },
+            "description": "Record a payment to a supplier."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "12. STOCK MOVEMENTS",
+      "item": [
+        {
+          "name": "List Stock Movements",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/movements/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "movements", ""]
+            },
+            "description": "List all stock movements."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Stock Movement",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"warehouse\": 7,\n  \"movement_type\": \"in\",\n  \"product\": 9,\n  \"quantity\": 5,\n  \"unit_cost\": \"8000\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/movements/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "movements", ""]
+            },
+            "description": "Create a single stock movement (in/out)."
+          },
+          "response": []
+        },
+        {
+          "name": "Bulk Stock Movement",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"movement_type\": \"in\",\n  \"warehouse\": 7,\n  \"items\": [\n    {\n      \"product\": 9,\n      \"quantity\": \"10\",\n      \"unit_cost\": \"10000\"\n    },\n    {\n      \"product\": 10,\n      \"quantity\": \"5\",\n      \"unit_cost\": \"7000\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/movements/bulk/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "movements", "bulk", ""]
+            },
+            "description": "Create multiple stock movements at once."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "13. STOCKS",
+      "item": [
+        {
+          "name": "List Stocks",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/stocks/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "stocks", ""]
+            },
+            "description": "List all stock levels."
+          },
+          "response": []
+        },
+        {
+          "name": "Stocks by Product",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/stocks/by-product/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "stocks", "by-product", ""]
+            },
+            "description": "Get stock levels grouped by product."
+          },
+          "response": []
+        },
+        {
+          "name": "Low Stock Alert",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/stocks/low-stock/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "stocks", "low-stock", ""]
+            },
+            "description": "Get products with stock below the low stock threshold."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "14. STOCK BATCHES",
+      "item": [
+        {
+          "name": "List Stock Batches",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/batches/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "batches", ""]
+            },
+            "description": "List all stock batches (FIFO)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Stock Batch by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/batches/1/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "batches", "1", ""]
+            },
+            "description": "Get stock batch details by ID."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "15. TRANSFERS",
+      "item": [
+        {
+          "name": "List Transfers",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/transfers/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "transfers", ""]
+            },
+            "description": "List all stock transfers."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Transfer",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from_warehouse\": 7,\n  \"to_branch\": 24,\n  \"items\": [\n    {\n      \"product\": 9,\n      \"quantity\": \"5\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/transfers/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "transfers", ""]
+            },
+            "description": "Create a new stock transfer from warehouse to branch."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Transfer by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/transfers/1/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "transfers", "1", ""]
+            },
+            "description": "Get transfer details by ID."
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm Transfer",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/transfers/3/confirm/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "transfers", "3", "confirm", ""]
+            },
+            "description": "Confirm a pending transfer."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Transfer",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/transfers/3/cancel/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "transfers", "3", "cancel", ""]
+            },
+            "description": "Cancel a pending transfer."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "16. WASTAGE",
+      "item": [
+        {
+          "name": "List Wastages",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/wastages/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "wastages", ""]
+            },
+            "description": "List all wastage records."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Wastage",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"warehouse\": 7,\n  \"product\": 9,\n  \"quantity\": 1,\n  \"reason\": \"damaged\",\n  \"date\": \"2026-03-21\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/wastages/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "wastages", ""]
+            },
+            "description": "Record a wastage for a product."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Wastage by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/wastages/1/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "wastages", "1", ""]
+            },
+            "description": "Get wastage record details by ID."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "17. STOCK AUDIT",
+      "item": [
+        {
+          "name": "List Stock Audits",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/audits/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "audits", ""]
+            },
+            "description": "List all stock audits."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Stock Audit",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"warehouse\": 7,\n  \"items\": [\n    {\n      \"product\": 9,\n      \"actual_quantity\": \"100\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/audits/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "audits", ""]
+            },
+            "description": "Create a new stock audit for a warehouse."
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm Stock Audit",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/audits/1/confirm/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "audits", "1", "confirm", ""]
+            },
+            "description": "Confirm a stock audit and apply adjustments."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "18. CUSTOMER GROUPS & CUSTOMERS",
+      "item": [
+        {
+          "name": "List Customer Groups",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customer-groups/",
+              "host": ["{{baseUrl}}"],
+              "path": ["customer-groups", ""]
+            },
+            "description": "List all customer groups."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Customer Group",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"VIP mijozlar\",\n  \"discount\": \"5\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/customer-groups/",
+              "host": ["{{baseUrl}}"],
+              "path": ["customer-groups", ""]
+            },
+            "description": "Create a new customer group with discount."
+          },
+          "response": []
+        },
+        {
+          "name": "List Customers",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/",
+              "host": ["{{baseUrl}}"],
+              "path": ["customers", ""]
+            },
+            "description": "List all customers."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Mijoz\",\n  \"phone\": \"+998901234599\",\n  \"group\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/customers/",
+              "host": ["{{baseUrl}}"],
+              "path": ["customers", ""]
+            },
+            "description": "Create a new customer."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Customer by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/7/",
+              "host": ["{{baseUrl}}"],
+              "path": ["customers", "7", ""]
+            },
+            "description": "Get customer details including debt sales."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Customer by ID",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Muhsinbek yangilangan\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/customers/7/",
+              "host": ["{{baseUrl}}"],
+              "path": ["customers", "7", ""]
+            },
+            "description": "Update customer information."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Customer by ID",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/7/",
+              "host": ["{{baseUrl}}"],
+              "path": ["customers", "7", ""]
+            },
+            "description": "Delete a customer by ID."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "19. SALES",
+      "item": [
+        {
+          "name": "List Sales",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sales/",
+              "host": ["{{baseUrl}}"],
+              "path": ["sales", ""]
+            },
+            "description": "List all sales."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Sale",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branch\": 24,\n  \"smena\": 2,\n  \"payment_type\": \"cash\",\n  \"paid_amount\": \"15000\",\n  \"items\": [\n    {\n      \"product\": 9,\n      \"quantity\": \"1\",\n      \"unit_price\": \"12000\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sales/",
+              "host": ["{{baseUrl}}"],
+              "path": ["sales", ""]
+            },
+            "description": "Create a new sale. payment_type: cash | card | debt"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Sale by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sales/1/",
+              "host": ["{{baseUrl}}"],
+              "path": ["sales", "1", ""]
+            },
+            "description": "Get sale details including items."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Sale",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sales/2/cancel/",
+              "host": ["{{baseUrl}}"],
+              "path": ["sales", "2", "cancel", ""]
+            },
+            "description": "Cancel a sale and restore stock."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "20. SALE RETURNS",
+      "item": [
+        {
+          "name": "List Sale Returns",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sale-returns/",
+              "host": ["{{baseUrl}}"],
+              "path": ["sale-returns", ""]
+            },
+            "description": "List all sale returns."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Sale Return",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sale\": 1,\n  \"reason\": \"Sifatsiz\",\n  \"items\": [\n    {\n      \"product\": 9,\n      \"quantity\": \"1\",\n      \"unit_price\": \"12000\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sale-returns/",
+              "host": ["{{baseUrl}}"],
+              "path": ["sale-returns", ""]
+            },
+            "description": "Create a new sale return."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Sale Return by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sale-returns/1/",
+              "host": ["{{baseUrl}}"],
+              "path": ["sale-returns", "1", ""]
+            },
+            "description": "Get sale return details."
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm Sale Return",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sale-returns/1/confirm/",
+              "host": ["{{baseUrl}}"],
+              "path": ["sale-returns", "1", "confirm", ""]
+            },
+            "description": "Confirm a pending sale return."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Sale Return",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sale-returns/1/cancel/",
+              "host": ["{{baseUrl}}"],
+              "path": ["sale-returns", "1", "cancel", ""]
+            },
+            "description": "Cancel a pending sale return."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "21. EXPENSES",
+      "item": [
+        {
+          "name": "List Expense Categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/expense-categories/",
+              "host": ["{{baseUrl}}"],
+              "path": ["expense-categories", ""]
+            },
+            "description": "List all expense categories."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Expense Category",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Kommunal xarajatlar\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/expense-categories/",
+              "host": ["{{baseUrl}}"],
+              "path": ["expense-categories", ""]
+            },
+            "description": "Create a new expense category."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Expense Category by ID",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Kommunal yangilangan\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/expense-categories/1/",
+              "host": ["{{baseUrl}}"],
+              "path": ["expense-categories", "1", ""]
+            },
+            "description": "Update expense category name."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Expense Category by ID",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/expense-categories/1/",
+              "host": ["{{baseUrl}}"],
+              "path": ["expense-categories", "1", ""]
+            },
+            "description": "Delete an expense category by ID."
+          },
+          "response": []
+        },
+        {
+          "name": "List Expenses",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/expenses/",
+              "host": ["{{baseUrl}}"],
+              "path": ["expenses", ""]
+            },
+            "description": "List all expenses."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Expense",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": 3,\n  \"amount\": \"50000\",\n  \"description\": \"Test xarajat\",\n  \"branch\": 24,\n  \"date\": \"2026-03-21\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/expenses/",
+              "host": ["{{baseUrl}}"],
+              "path": ["expenses", ""]
+            },
+            "description": "Create a new expense record."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Expense by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/expenses/1/",
+              "host": ["{{baseUrl}}"],
+              "path": ["expenses", "1", ""]
+            },
+            "description": "Get expense details by ID."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Expense by ID",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/expenses/1/",
+              "host": ["{{baseUrl}}"],
+              "path": ["expenses", "1", ""]
+            },
+            "description": "Delete an expense by ID."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "22. WORKER KPI",
+      "item": [
+        {
+          "name": "List All Worker KPIs",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/workers/kpi/",
+              "host": ["{{baseUrl}}"],
+              "path": ["workers", "kpi", ""]
+            },
+            "description": "List KPI data for all workers."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Worker KPI by Worker ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/workers/15/kpi/",
+              "host": ["{{baseUrl}}"],
+              "path": ["workers", "15", "kpi", ""]
+            },
+            "description": "Get KPI data for a specific worker."
+          },
+          "response": []
+        },
+        {
+          "name": "Set Worker KPI Target",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"target_sales_count\": 50,\n  \"target_revenue\": \"5000000\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/workers/kpi/1/set-target/",
+              "host": ["{{baseUrl}}"],
+              "path": ["workers", "kpi", "1", "set-target", ""]
+            },
+            "description": "Set KPI targets for a worker."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "23. DASHBOARD",
+      "item": [
+        {
+          "name": "Get Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/",
+              "host": ["{{baseUrl}}"],
+              "path": ["dashboard", ""]
+            },
+            "description": "Get dashboard summary statistics."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Dashboard with Filters",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/?date_from=2026-03-01&date_to=2026-03-21&branch=24",
+              "host": ["{{baseUrl}}"],
+              "path": ["dashboard", ""],
+              "query": [
+                { "key": "date_from", "value": "2026-03-01" },
+                { "key": "date_to", "value": "2026-03-21" },
+                { "key": "branch", "value": "24" }
+              ]
+            },
+            "description": "Get dashboard with date range and branch filter."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "24. EXPORT",
+      "item": [
+        {
+          "name": "Export Sales (Excel)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/export/sales/?format=excel",
+              "host": ["{{baseUrl}}"],
+              "path": ["export", "sales", ""],
+              "query": [
+                { "key": "format", "value": "excel" }
+              ]
+            },
+            "description": "Export sales data as Excel file."
+          },
+          "response": []
+        },
+        {
+          "name": "Export Expenses (Excel)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/export/expenses/?format=excel&date_from=2026-03-01&date_to=2026-03-21",
+              "host": ["{{baseUrl}}"],
+              "path": ["export", "expenses", ""],
+              "query": [
+                { "key": "format", "value": "excel" },
+                { "key": "date_from", "value": "2026-03-01" },
+                { "key": "date_to", "value": "2026-03-21" }
+              ]
+            },
+            "description": "Export expenses data as Excel file."
+          },
+          "response": []
+        },
+        {
+          "name": "Export Stocks (Excel)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/export/stocks/?format=excel",
+              "host": ["{{baseUrl}}"],
+              "path": ["export", "stocks", ""],
+              "query": [
+                { "key": "format", "value": "excel" }
+              ]
+            },
+            "description": "Export stock levels as Excel file."
+          },
+          "response": []
+        },
+        {
+          "name": "Export Stock Movements (Excel)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/export/stock-movements/?format=excel",
+              "host": ["{{baseUrl}}"],
+              "path": ["export", "stock-movements", ""],
+              "query": [
+                { "key": "format", "value": "excel" }
+              ]
+            },
+            "description": "Export stock movements as Excel file."
+          },
+          "response": []
+        },
+        {
+          "name": "Export Suppliers (Excel)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/export/suppliers/?format=excel",
+              "host": ["{{baseUrl}}"],
+              "path": ["export", "suppliers", ""],
+              "query": [
+                { "key": "format", "value": "excel" }
+              ]
+            },
+            "description": "Export suppliers as Excel file."
+          },
+          "response": []
+        },
+        {
+          "name": "Download Products Import Template",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/export/products/template/",
+              "host": ["{{baseUrl}}"],
+              "path": ["export", "products", "template", ""]
+            },
+            "description": "Download Excel template for importing products."
+          },
+          "response": []
+        },
+        {
+          "name": "Download Customers Import Template",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/export/customers/template/",
+              "host": ["{{baseUrl}}"],
+              "path": ["export", "customers", "template", ""]
+            },
+            "description": "Download Excel template for importing customers."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "25. SUBSCRIPTION",
+      "item": [
+        {
+          "name": "Get Subscription Info",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscription/",
+              "host": ["{{baseUrl}}"],
+              "path": ["subscription", ""]
+            },
+            "description": "Get current subscription details."
+          },
+          "response": []
+        },
+        {
+          "name": "List Subscription Plans",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscription/plans/",
+              "host": ["{{baseUrl}}"],
+              "path": ["subscription", "plans", ""]
+            },
+            "description": "List all available subscription plans."
+          },
+          "response": []
+        },
+        {
+          "name": "List Subscription Invoices",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscription/invoices/",
+              "host": ["{{baseUrl}}"],
+              "path": ["subscription", "invoices", ""]
+            },
+            "description": "List all subscription invoices."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "26. AUDIT LOGS",
+      "item": [
+        {
+          "name": "List Audit Logs",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/workers/audit-logs/",
+              "host": ["{{baseUrl}}"],
+              "path": ["workers", "audit-logs", ""]
+            },
+            "description": "List all worker audit logs."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Audit Log by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/workers/audit-logs/1/",
+              "host": ["{{baseUrl}}"],
+              "path": ["workers", "audit-logs", "1", ""]
+            },
+            "description": "Get audit log details by ID."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
