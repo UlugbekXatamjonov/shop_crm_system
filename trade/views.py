@@ -378,6 +378,7 @@ class SaleViewSet(AuditMixin, viewsets.ModelViewSet):
       GET   /api/v1/sales/                — ro'yxat (?date, ?branch, ?payment_type, ?status)
       POST  /api/v1/sales/                — sotuv yaratish (atomic transaction)
       GET   /api/v1/sales/{id}/           — to'liq ma'lumot
+      GET   /api/v1/sales/{id}/receipt/   — chek PDF (80mm termik uslub)
       PATCH /api/v1/sales/{id}/cancel/    — bekor qilish (manager+)
 
     Ruxsatlar:
@@ -731,6 +732,33 @@ class SaleViewSet(AuditMixin, viewsets.ModelViewSet):
             },
             status=status.HTTP_201_CREATED,
         )
+
+    # ----------------------------------------------------------
+    # CANCEL action — sotuv bekor qilish (@transaction.atomic)
+    # ----------------------------------------------------------
+
+    # ----------------------------------------------------------
+    # RECEIPT action — sotuv cheki PDF
+    # ----------------------------------------------------------
+
+    @action(methods=['get'], detail=True, url_path='receipt')
+    def receipt(self, request, pk=None):
+        """
+        Sotuv cheki PDF ko'rinishda (80 mm termik printer uslubi).
+
+        GET /api/v1/sales/{id}/receipt/
+
+        Ruxsatlar: CanAccess('sotuv') — kassir ham yuklab olishi mumkin.
+        """
+        from export.utils.pdf import make_receipt_pdf
+
+        sale = (
+            self.get_queryset()
+            .prefetch_related('items__product')
+            .select_related('store', 'branch', 'worker__user', 'customer')
+            .get(pk=pk)
+        )
+        return make_receipt_pdf(sale, request)
 
     # ----------------------------------------------------------
     # CANCEL action — sotuv bekor qilish (@transaction.atomic)

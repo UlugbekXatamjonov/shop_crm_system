@@ -178,3 +178,166 @@ def make_pdf_response(
     response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
+
+
+# ============================================================
+# SOTUV CHEK PDF
+# ============================================================
+
+def make_receipt_pdf(sale, request=None) -> HttpResponse:
+    """
+    Sotuv cheki PDF.
+
+    sale — trade.models.Sale instance (items prefetch_related bo'lishi kerak)
+    request — optional, URL qurilishi uchun
+
+    Chek formati: 80mm termik printer uslubida (tor sahifa)
+    """
+    from reportlab.lib.pagesizes import mm as mm_unit
+    from reportlab.platypus import HRFlowable
+
+    _try_register_font()
+    fn = _FONT_NAME
+
+    # 80 mm termik printer eni
+    PAGE_W = 80 * mm_unit
+    PAGE_H = 297 * mm_unit   # yetarlicha baland; platypus avtomatik qisqartiradi
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=(PAGE_W, PAGE_H),
+        leftMargin=4 * mm,
+        rightMargin=4 * mm,
+        topMargin=6 * mm,
+        bottomMargin=6 * mm,
+    )
+
+    styles  = getSampleStyleSheet()
+    W       = PAGE_W - 8 * mm   # foydalanilgan kenglik
+
+    # --- Yordamchi uslublar ---
+    def _style(size=8, bold=False, align='LEFT', color=COLOR_BLACK):
+        return ParagraphStyle(
+            f'custom_{size}_{bold}_{align}',
+            fontName=fn,
+            fontSize=size,
+            leading=size + 3,
+            alignment={'LEFT': 0, 'CENTER': 1, 'RIGHT': 2}[align],
+            textColor=color,
+        )
+
+    def _p(text, **kw):
+        return Paragraph(text, _style(**kw))
+
+    def _hr():
+        return HRFlowable(width='100%', thickness=0.4, color=colors.grey, spaceAfter=3)
+
+    # --- Ma'lumotlar ---
+    store_name  = sale.store.name if sale.store else ''
+    branch_name = sale.branch.name if sale.branch else ''
+    cashier     = sale.worker.user.get_full_name() if sale.worker_id else ''
+    created_on  = sale.created_on.strftime('%d.%m.%Y %H:%M') if sale.created_on else ''
+    payment_map = {
+        'cash':  'Naqd',
+        'card':  'Karta',
+        'mixed': 'Aralash',
+        'debt':  'Nasiya',
+    }
+    payment_label = payment_map.get(sale.payment_type, sale.payment_type)
+
+    net_total = sale.total_price - sale.discount_amount
+
+    items_qs = sale.items.select_related('product').all()
+
+    # --- Elementlar ---
+    elements = [
+        _p(store_name,  size=11, bold=True, align='CENTER', color=COLOR_HEADER),
+        _p(branch_name, size=8,  align='CENTER'),
+        Spacer(1, 2 * mm),
+        _hr(),
+        _p(f"Chek #: <b>{sale.pk}</b>", size=8),
+        _p(f"Sana: {created_on}",        size=8),
+        _p(f"Kassir: {cashier}",         size=8),
+    ]
+
+    if sale.customer_id:
+        customer_name = sale.customer.name if sale.customer else ''
+        elements.append(_p(f"Mijoz: {customer_name}", size=8))
+
+    elements += [
+        _hr(),
+        # --- Mahsulotlar jadvali ---
+        Table(
+            [
+                [
+                    Paragraph('<b>Mahsulot</b>',  _style(size=7, bold=True)),
+                    Paragraph('<b>Miqdor</b>',    _style(size=7, bold=True, align='RIGHT')),
+                    Paragraph('<b>Narx</b>',       _style(size=7, bold=True, align='RIGHT')),
+                    Paragraph('<b>Jami</b>',       _style(size=7, bold=True, align='RIGHT')),
+                ]
+            ] + [
+                [
+                    Paragraph(item.product.name[:30], _style(size=7)),
+                    Paragraph(
+                        f"{item.quantity:g}",
+                        _style(size=7, align='RIGHT'),
+                    ),
+                    Paragraph(
+                        f"{item.unit_price:,.0f}",
+                        _style(size=7, align='RIGHT'),
+                    ),
+                    Paragraph(
+                        f"{item.total_price:,.0f}",
+                        _style(size=7, align='RIGHT'),
+                    ),
+                ]
+                for item in items_qs
+            ],
+            colWidths=[W * 0.44, W * 0.14, W * 0.20, W * 0.22],
+            style=TableStyle([
+                ('VALIGN',       (0, 0), (-1, -1), 'TOP'),
+                ('LINEBELOW',    (0, 0), (-1, 0),  0.4, colors.grey),
+                ('TOPPADDING',   (0, 0), (-1, -1), 2),
+                ('BOTTOMPADDING',(0, 0), (-1, -1), 2),
+                ('LEFTPADDING',  (0, 0), (-1, -1), 0),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ]),
+        ),
+        _hr(),
+    ]
+
+    # --- Summa bloki ---
+    def _sum_row(label, value, bold=False):
+        return Table(
+            [[_p(label, size=8, bold=bold), _p(value, size=8, bold=bold, align='RIGHT')]],
+            colWidths=[W * 0.55, W * 0.45],
+            style=TableStyle([
+                ('TOPPADDING',    (0, 0), (-1, -1), 1),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+                ('LEFTPADDING',   (0, 0), (-1, -1), 0),
+                ('RIGHTPADDING',  (0, 0), (-1, -1), 0),
+            ]),
+        )
+
+    elements.append(_sum_row('JAMI (chegirmasiz):', f"{sale.total_price:,.0f}"))
+    if sale.discount_amount:
+        elements.append(_sum_row(f"Chegirma:", f"-{sale.discount_amount:,.0f}"))
+    elements.append(_sum_row("TO'LOV:", f"{net_total:,.0f}", bold=True))
+    elements.append(Spacer(1, 2 * mm))
+    elements.append(_sum_row(f"To'lov turi:", payment_label))
+    elements.append(_sum_row("To'langan:", f"{sale.paid_amount:,.0f}"))
+    if sale.debt_amount:
+        elements.append(_sum_row("Qarz:", f"{sale.debt_amount:,.0f}"))
+
+    elements += [
+        _hr(),
+        _p("Xarid uchun rahmat!", size=9, align='CENTER'),
+    ]
+
+    doc.build(elements)
+    buffer.seek(0)
+
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'inline; filename="receipt_{sale.pk}.pdf"'
+    return response
