@@ -75,18 +75,21 @@ def _get_format(request) -> str:
     return request.query_params.get('format', 'excel').lower()
 
 
-def _filter_date(qs, field: str, request):
-    """date_from / date_to ni queryset ga qo'llash."""
+def _filter_date(qs, field: str, request, is_date_field=False):
+    """date_from / date_to ni queryset ga qo'llash.
+    is_date_field=True bo'lsa DateField (gte/lte), aks holda DateTimeField (date__gte/date__lte)."""
     date_from = request.query_params.get('date_from')
     date_to   = request.query_params.get('date_to')
+    suffix_gte = '__gte' if is_date_field else '__date__gte'
+    suffix_lte = '__lte' if is_date_field else '__date__lte'
     if date_from:
         d = parse_date(date_from)
         if d:
-            qs = qs.filter(**{f'{field}__date__gte': d})
+            qs = qs.filter(**{f'{field}{suffix_gte}': d})
     if date_to:
         d = parse_date(date_to)
         if d:
-            qs = qs.filter(**{f'{field}__date__lte': d})
+            qs = qs.filter(**{f'{field}{suffix_lte}': d})
     return qs
 
 
@@ -193,7 +196,7 @@ class ExpenseExportView(APIView):
             .select_related('branch', 'worker__user', 'category', 'smena')
         )
 
-        qs = _filter_date(qs, 'date', request)
+        qs = _filter_date(qs, 'date', request, is_date_field=True)
         branch   = request.query_params.get('branch')
         smena    = request.query_params.get('smena')
         category = request.query_params.get('category')
