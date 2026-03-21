@@ -9,9 +9,9 @@ class SubscriptionPlanAdmin(admin.ModelAdmin):
 
 
 class SubscriptionInvoiceInline(admin.TabularInline):
-    model  = SubscriptionInvoice
-    extra  = 0
-    readonly_fields = ['amount', 'created_on']
+    model         = SubscriptionInvoice
+    extra         = 0
+    readonly_fields = ['amount', 'paid_at']
 
 
 @admin.register(Subscription)
@@ -24,11 +24,11 @@ class SubscriptionAdmin(admin.ModelAdmin):
 
 @admin.register(SubscriptionInvoice)
 class SubscriptionInvoiceAdmin(admin.ModelAdmin):
-    list_display = ['subscription', 'amount', 'created_on']
-    readonly_fields = ['created_on']
+    list_display    = ['subscription', 'amount', 'paid_at']
+    readonly_fields = ['paid_at']
 
 
 @admin.register(SubscriptionDowngradeLog)
 class SubscriptionDowngradeLogAdmin(admin.ModelAdmin):
-    list_display = ['subscription', 'object_type', 'object_id', 'previous_status', 'created_on']
-    readonly_fields = ['created_on']
+    list_display    = ['subscription', 'object_type', 'object_id', 'previous_status', 'deactivated_at']
+    readonly_fields = ['deactivated_at']
