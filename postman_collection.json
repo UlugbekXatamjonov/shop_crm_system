@@ -991,6 +991,27 @@
             "description": "Generate bulk QR codes for multiple products."
           },
           "response": []
+        },
+        {
+          "name": "Bulk Price Update",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\"id\": 5, \"sale_price\": 15000},\n    {\"id\": 8, \"sale_price\": 22000}\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/products/bulk-price-update/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "products", "bulk-price-update", ""]
+            },
+            "description": "Bulk update sale prices for multiple products in a single atomic transaction. AuditLog yozadi (field: sale_price, bulk: true)."
+          },
+          "response": []
         }
       ]
     },
@@ -1208,7 +1229,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"supplier\": 1,\n  \"amount\": \"500000\",\n  \"note\": \"To'lov\"\n}"
+              "raw": "{\n  \"supplier\": 1,\n  \"amount\": \"500000\",\n  \"description\": \"To'lov\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/supplier-payments/",
@@ -1781,6 +1802,22 @@
               "path": ["sales", "2", "cancel", ""]
             },
             "description": "Cancel a sale and restore stock."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Sale Receipt PDF",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sales/1/receipt/",
+              "host": ["{{baseUrl}}"],
+              "path": ["sales", "1", "receipt", ""]
+            },
+            "description": "Download sale receipt as PDF (80mm thermal printer format). Sarlavha: do'kon nomi, filial, kassir, sana. Mahsulotlar jadvali, jami, chegirma, to'lov, qarz."
           },
           "response": []
         }
