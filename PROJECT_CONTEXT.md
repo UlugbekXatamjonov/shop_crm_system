@@ -1,5 +1,93 @@
 # CLAUDE UCHUN ESLATMA — Yangi chatda bu faylni o'qi va davom et
 
+## 📅 22.03.2026 SESSION — QILINGAN ISHLAR
+
+### 1. SaleItem — Ikki qatlamli chegirma arxitekturasi ✅
+
+**Muammo:** SaleItem.unit_price va total_price chegirmasiz original narxda saqlanayotgan edi.
+Bu holda foyda hisobi, margin %, top mahsulotlar hisoboti — hammasi noto'g'ri edi.
+
+**Yechim — Variant B (Proportional Distribution):**
+Savdo chegirmasi (Sale.discount_amount) har bir SaleItem ga proporsional taqsimlanadi.
+
+**Qo'shimcha yechim — Katalog chegirma tracking:**
+Mahsulotga xos katalog chegirmasini (20% kabi) alohida saqlash imkoniyati qo'shildi.
+
+#### O'zgartirilgan fayllar:
+
+**`trade/models.py`** — SaleItem ga 3 yangi maydon:
+```python
+original_price    # katalog narxi (chegirmasiz asl narx), null=True
+item_discount_pct # mahsulot chegirma %, default=0
+item_discount_amt # chegirma summasi (birlik uchun), null=True
+unit_price        # YAKUNIY narx (barcha chegirmalardan keyin) — o'zgartirildi
+total_price       # YAKUNIY jami (qty × unit_price) — o'zgartirildi
+```
+
+**`trade/serializers.py`** — ikki joyda o'zgartirish:
+- `SaleItemInputSerializer` — `original_price` va `item_discount_pct` optional qo'shildi + validate()
+- `SaleItemListSerializer` — yangi maydonlar response da ko'rinadi
+
+**`trade/views.py`** — `SaleViewSet.create()` da narx hisoblash logikasi:
+```
+1-qatlam (katalog chegirma):
+  original_price berilsa → item_discount_amt = original_price × pct / 100
+                           unit_price_before_sale = original_price - item_discount_amt
+  berilmasa           → unit_price frontenddan yoki product.sale_price
+
+2-qatlam (savdo chegirma — Variant B):
+  ratio = net_price / total_price
+  Har item: eff_total = item_total × ratio  (oxirgi item = net_price - running_total)
+  unit_price = eff_total / quantity
+```
+
+**`store/views.py`** — Z-report fix:
+```python
+# OLDIN (NOTO'G'RI):
+sales_total = Sum('total_price')                    # 100k gross ❌
+
+# KEYIN (TO'G'RI):
+sales_total = Sum(F('total_price') - F('discount_amount'))  # 90k real ✅
+```
+
+#### Yangi migration:
+- `trade/migrations/0005_saleitem_discount_fields.py`
+  - AddField: `item_discount_amt`, `item_discount_pct`, `original_price`
+  - AlterField: `unit_price`, `total_price` (verbose_name yangilandi)
+
+#### Postmanda o'zgarish:
+
+**Katalog chegirmali mahsulot (yangi variant):**
+```json
+{
+  "product": 1, "quantity": 1,
+  "original_price": 30000,
+  "item_discount_pct": 20
+}
+```
+
+**Oddiy mahsulot (oldingi kabi ishlaydi):**
+```json
+{
+  "product": 2, "quantity": 1,
+  "unit_price": 20000
+}
+```
+
+#### Hisobotlarda nima yaxshilandi:
+- Foyda hisobi to'g'ri (SaleItem.total_price endi real narx)
+- Margin % to'g'ri
+- Top foydali mahsulotlar to'g'ri
+- Z-report tushum to'g'ri (discount ayiriladi)
+- Qaytarishda xaridorga to'g'ri summa qaytariladi
+
+### 2. Muammo analizi — aralash to'lov (MIXED) ✅
+
+**Qaror:** MIXED to'lov faqat naqd + karta (debt aralashtirmaymiz).
+Hozirgi kod to'g'ri — MIXED da `debt_amount = 0` qoladi.
+
+---
+
 ## 📅 21.03.2026 SESSION — QILINGAN ISHLAR
 
 ### 1. `note` → `description` — to'liq o'zgartirish ✅

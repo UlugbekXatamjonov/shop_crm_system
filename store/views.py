@@ -651,8 +651,16 @@ class SmenaViewSet(AuditMixin, viewsets.ModelViewSet):
             status=SaleStatus.COMPLETED,
         )
 
+        # sales_total = chegirma ayirilgan haqiqiy tushum
+        # (total_price — gross katalog narx, discount_amount — savdo chegirmasi)
+        from django.db.models import ExpressionWrapper, F, DecimalField as DField
         sale_agg = completed_sales.aggregate(
-            total=Sum('total_price'),
+            total=Sum(
+                ExpressionWrapper(
+                    F('total_price') - F('discount_amount'),
+                    output_field=DField(),
+                )
+            ),
             count=Count('id'),
         )
         sales_total = sale_agg['total'] or 0

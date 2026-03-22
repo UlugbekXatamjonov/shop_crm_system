@@ -239,6 +239,13 @@ class SaleItemListSerializer(serializers.ModelSerializer):
     """
     Sotuv elementlari (SaleDetail ichida nested ko'rsatish).
     Read-only.
+
+    Narx maydonlari:
+      original_price    — katalog narxi (chegirmasiz). null bo'lishi mumkin.
+      item_discount_pct — mahsulotga xos katalog chegirma %. 0 bo'lsa chegirma yo'q.
+      item_discount_amt — katalog chegirma summasi (birlik uchun). null bo'lishi mumkin.
+      unit_price        — yakuniy birlik narxi (barcha chegirmalardan keyin).
+      total_price       — yakuniy jami (quantity × unit_price).
     """
     product_name = serializers.CharField(source='product.name', read_only=True)
     unit         = serializers.CharField(source='product.get_unit_display', read_only=True)
@@ -247,7 +254,9 @@ class SaleItemListSerializer(serializers.ModelSerializer):
         model  = SaleItem
         fields = (
             'id', 'product', 'product_name', 'unit',
-            'quantity', 'unit_price', 'total_price',
+            'quantity',
+            'original_price', 'item_discount_pct', 'item_discount_amt',
+            'unit_price', 'total_price',
         )
 
 
@@ -256,9 +265,19 @@ class SaleItemInputSerializer(serializers.Serializer):
     Sotuv yaratishda har bir mahsulot uchun input.
     SaleCreateSerializer.items da ishlatiladi.
 
-    unit_price berilmasa → product.sale_price ishlatiladi (views.py da).
+    Narx mantiqi (ikki variant):
+
+    Variant A — faqat unit_price (katalog chegirmasi yo'q yoki frontend hisoblagan):
+      { "product": 1, "quantity": 2, "unit_price": 24000 }
+      → original_price = null, item_discount_pct = 0
+
+    Variant B — original_price + item_discount_pct (katalog chegirmasi aniq ko'rsatiladi):
+      { "product": 1, "quantity": 2, "original_price": 30000, "item_discount_pct": 20 }
+      → unit_price_before_sale = 30000 - 6000 = 24000 (views.py da hisoblanadi)
+
+    Savdo chegirmasi (Sale.discount_amount) ikkala variantda ham avtomatik taqsimlanadi.
     """
-    product    = serializers.PrimaryKeyRelatedField(
+    product           = serializers.PrimaryKeyRelatedField(
         queryset=Product.objects.filter(status='active'),
         error_messages={
             'required':       "Mahsulot tanlanishi shart.",
@@ -266,7 +285,7 @@ class SaleItemInputSerializer(serializers.Serializer):
             'incorrect_type': "Mahsulot ID butun son bo'lishi kerak.",
         }
     )
-    quantity   = serializers.DecimalField(
+    quantity          = serializers.DecimalField(
         max_digits=10,
         decimal_places=3,
         min_value=Decimal('0.001'),
@@ -277,7 +296,32 @@ class SaleItemInputSerializer(serializers.Serializer):
             'max_digits': "Miqdor juda katta.",
         }
     )
-    unit_price = serializers.DecimalField(
+    original_price    = serializers.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        min_value=Decimal('0'),
+        required=False,
+        allow_null=True,
+        default=None,
+        error_messages={
+            'invalid':   "To'g'ri katalog narxi kiritilishi shart.",
+            'min_value': "Katalog narxi manfiy bo'lishi mumkin emas.",
+        }
+    )
+    item_discount_pct = serializers.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        min_value=Decimal('0'),
+        max_value=Decimal('100'),
+        required=False,
+        default=Decimal('0'),
+        error_messages={
+            'invalid':    "To'g'ri chegirma foizi kiritilishi shart.",
+            'min_value':  "Chegirma foizi manfiy bo'lishi mumkin emas.",
+            'max_value':  "Chegirma foizi 100% dan oshmasligi kerak.",
+        }
+    )
+    unit_price        = serializers.DecimalField(
         max_digits=15,
         decimal_places=2,
         min_value=Decimal('0'),
@@ -289,6 +333,22 @@ class SaleItemInputSerializer(serializers.Serializer):
             'min_value': "Narx manfiy bo'lishi mumkin emas.",
         }
     )
+
+    def validate(self, data):
+        original_price    = data.get('original_price')
+        item_discount_pct = data.get('item_discount_pct', Decimal('0'))
+        unit_price        = data.get('unit_price')
+
+        # original_price berilgan bo'lsa unit_price shart emas (views.py hisoblab oladi)
+        # original_price berilmasa unit_price ham null — product.sale_price ishlatiladi
+        if original_price is not None and item_discount_pct > 0:
+            effective = original_price * (1 - item_discount_pct / 100)
+            if unit_price is not None and abs(unit_price - effective) > Decimal('1'):
+                raise serializers.ValidationError(
+                    "unit_price original_price va item_discount_pct bilan mos kelmayapti. "
+                    "original_price berilganda unit_price ni tushirib qoldiring."
+                )
+        return data
 
 
 class SaleListSerializer(serializers.ModelSerializer):

@@ -261,35 +261,72 @@ class SaleItem(models.Model):
     """
     Sotuv tarkibidagi bitta mahsulot.
     O'zgartirilmaydi (immutable) — sotuv bekor qilinganda butun savdo bekor qilinadi.
+
+    Narx mantiqi (ikki qatlamli chegirma):
+      original_price    — katalog narxi (har qanday chegirmadan oldin).
+                          Agar frontend yubormasa — null (chegirma yo'q deb qabul qilinadi).
+      item_discount_pct — mahsulotga xos katalog chegirmasi (%).
+      item_discount_amt — katalog chegirma summasi (original_price × item_discount_pct / 100).
+      unit_price        — YAKUNIY birlik narxi (katalog chegirma + savdo chegirmasi taqsimlangandan keyin).
+      total_price       — YAKUNIY jami (quantity × unit_price).
+
+    Hisoblash ketma-ketligi (views.py da):
+      1. Katalog chegirma:  effective = original_price - item_discount_amt
+      2. Savdo chegirmasi:  unit_price = effective × (net_price / gross_total)   [Variant B]
+      3. total_price        = quantity × unit_price
+
+    Chegirma bo'lmasa:
+      original_price = null, item_discount_pct = 0, item_discount_amt = null
+      unit_price = frontenddan kelgan narx yoki product.sale_price
     """
-    sale        = models.ForeignKey(
+    sale              = models.ForeignKey(
         Sale,
         on_delete=models.CASCADE,
         related_name='items',
         verbose_name='Sotuv',
     )
-    product     = models.ForeignKey(
+    product           = models.ForeignKey(
         'warehouse.Product',
         on_delete=models.PROTECT,
         related_name='sale_items',
         verbose_name='Mahsulot',
     )
-    quantity    = models.DecimalField(
+    quantity          = models.DecimalField(
         max_digits=10,
         decimal_places=3,
         verbose_name='Miqdori',
     )
-    unit_price  = models.DecimalField(
+    original_price    = models.DecimalField(
         max_digits=15,
         decimal_places=2,
-        verbose_name='Savdo narxi (savdo paytida)',
+        null=True,
+        blank=True,
+        verbose_name='Katalog narxi (chegirmasiz asl narx)',
     )
-    total_price = models.DecimalField(
+    item_discount_pct = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        verbose_name='Mahsulot chegirmasi (%)',
+    )
+    item_discount_amt = models.DecimalField(
         max_digits=15,
         decimal_places=2,
-        verbose_name='Jami (miqdor × narx)',
+        null=True,
+        blank=True,
+        verbose_name='Mahsulot chegirma summasi (birlik uchun)',
     )
-    unit_cost   = models.DecimalField(
+    unit_price        = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        verbose_name='Yakuniy birlik narxi (barcha chegirmalardan keyin)',
+    )
+    total_price       = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        verbose_name='Yakuniy jami (miqdor × yakuniy birlik narxi)',
+    )
+    unit_cost         = models.DecimalField(
         max_digits=15,
         decimal_places=2,
         null=True,

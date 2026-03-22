@@ -525,21 +525,40 @@ class SaleViewSet(AuditMixin, viewsets.ModelViewSet):
                 })
 
         # --------------------------------------------------
-        # 5. Jami narxni hisoblash
+        # 5. Jami narxni hisoblash (katalog chegirmasi bilan birga)
         # --------------------------------------------------
         total_price = Decimal('0')
         items_prepared = []
         for item_data in items_data:
-            product    = item_data['product']
-            quantity   = item_data['quantity']
-            unit_price = item_data.get('unit_price') or product.sale_price
-            item_total = quantity * unit_price
+            product           = item_data['product']
+            quantity          = item_data['quantity']
+            original_price    = item_data.get('original_price')       # katalog narxi (ixtiyoriy)
+            item_discount_pct = item_data.get('item_discount_pct') or Decimal('0')
+
+            if original_price is not None:
+                # Katalog chegirmasi aniq berilgan:
+                #   item_discount_amt = original_price × pct / 100
+                #   unit_price_before_sale = original_price - item_discount_amt
+                item_discount_amt      = (original_price * item_discount_pct / 100).quantize(Decimal('0.01'))
+                unit_price_before_sale = original_price - item_discount_amt
+            else:
+                # Katalog chegirmasi yo'q yoki frontend allaqachon hisoblagan:
+                #   unit_price frontenddan olinadi yoki product.sale_price
+                unit_price_before_sale = item_data.get('unit_price') or product.sale_price
+                item_discount_pct      = Decimal('0')
+                item_discount_amt      = None  # null — katalog chegirmasi kuzatilmaydi
+
+            item_total   = quantity * unit_price_before_sale
             total_price += item_total
+
             items_prepared.append({
-                'product':    product,
-                'quantity':   quantity,
-                'unit_price': unit_price,
-                'total_price': item_total,
+                'product':            product,
+                'quantity':           quantity,
+                'original_price':     original_price,       # null yoki katalog narxi
+                'item_discount_pct':  item_discount_pct,    # 0 yoki katalog chegirma %
+                'item_discount_amt':  item_discount_amt,    # null yoki katalog chegirma summasi
+                'unit_price':         unit_price_before_sale,  # savdo chegirmasidan oldingi narx
+                'total_price':        item_total,
             })
 
         # --------------------------------------------------
@@ -564,6 +583,37 @@ class SaleViewSet(AuditMixin, viewsets.ModelViewSet):
                 })
 
         net_price = total_price - discount_amount
+
+        # --------------------------------------------------
+        # 6b. Savdo chegirmasini itemlarga proporsional taqsimlash (Variant B)
+        #
+        # Har bir item:
+        #   effective_total = item.total_price × (net_price / total_price)
+        #   effective_unit  = effective_total  / quantity
+        #
+        # Oxirgi item yaxlitlash farqini oladi:
+        #   effective_total[-1] = net_price - SUM(effective_total[:-1])
+        #
+        # Chegirma bo'lmasa (discount_amount == 0) → ratio = 1 → hech narsa o'zgarmaydi.
+        # --------------------------------------------------
+        if discount_amount > 0 and total_price > 0:
+            ratio   = net_price / total_price
+            running = Decimal('0')
+            for idx, item in enumerate(items_prepared):
+                if idx < len(items_prepared) - 1:
+                    eff_total = (item['total_price'] * ratio).quantize(Decimal('0.01'))
+                    running  += eff_total
+                else:
+                    # Oxirgi item — yaxlitlash farqini o'z ichiga oladi
+                    eff_total = net_price - running
+
+                eff_unit = (
+                    (eff_total / item['quantity']).quantize(Decimal('0.01'))
+                    if item['quantity']
+                    else Decimal('0')
+                )
+                item['unit_price']  = eff_unit
+                item['total_price'] = eff_total
 
         # --------------------------------------------------
         # 7. To'lov summasi validatsiya
@@ -665,12 +715,15 @@ class SaleViewSet(AuditMixin, viewsets.ModelViewSet):
             )
 
             sale_item = SaleItem.objects.create(
-                sale        = sale,
-                product     = product,
-                quantity    = quantity,
-                unit_price  = item_data['unit_price'],
-                total_price = item_data['total_price'],
-                unit_cost   = avg_cost,
+                sale              = sale,
+                product           = product,
+                quantity          = quantity,
+                original_price    = item_data['original_price'],
+                item_discount_pct = item_data['item_discount_pct'],
+                item_discount_amt = item_data['item_discount_amt'],
+                unit_price        = item_data['unit_price'],
+                total_price       = item_data['total_price'],
+                unit_cost         = avg_cost,
             )
 
             # StockMovement(OUT) — FIFO narxi bilan
