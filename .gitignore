@@ -61,3 +61,8 @@ htmlcov/
 # ============================================================
 # PROJECT_CONTEXT.md
 # project_problems.txt
+
+# ============================================================
+# CLAUDE WORKTREES (vaqtinchalik, track qilinmasin)
+# ============================================================
+.claude/worktrees/
