@@ -2,8 +2,12 @@
 
 
 ------ Qilish kerak ---------
-1) 
-2) 
+1) Aralash to'lov bo'lsa(naxt va plastig) dastur qanday yo'l tutadi ?
+2) Soliq bilan integratsiya bo'lsa, do'konning balansi(naxt/online) maydoni bo'ladimi ?
+3) chek aparat va terminalni surishtirish
+4) soliq bilan integratsiyani o'rganib chiqish
+5) bir nechta tovarlarga birdaniga chegirma berish hususiyatini berish kertak 
+6) Local migrationlarni to'g'irlash
 
 ------ Tugadi ---------
 
@@ -12,5 +16,9 @@
 
 
 ------ keyinchalik ---------
-1)
-
+1) kiberxujumga qarshi ishlar
+2) SMS habarnomalar
+3) Telegram Bot bilan integratsiya
+4) Click/Payme bilan integratsiya
+5) Soliq bilan integratsiya
+6) 
