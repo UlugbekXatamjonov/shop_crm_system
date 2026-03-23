@@ -4519,3 +4519,131 @@ Body (JSON):
 ============================================================
   Sana: 19.03.2026  |  Shop CRM System v1.0  |  54 test qadam
 ============================================================
+
+
+============================================================
+  SOLIQ INTEGRATSIYASI — BOSQICHMA-BOSQICH REJA (8 BOSQICH)
+  Sana: 23.03.2026
+============================================================
+
+  Maqsad: Shop CRM tizimini O'zbekiston soliq tizimi (OFD, MXIK,
+  E-IMZO, Markirovka) bilan integratsiya qilish.
+
+  ┌─────────┬──────────────────────────────────────────────────┬──────────────┐
+  │ Bosqich │ Vazifa                                           │ Murakkablik  │
+  ├─────────┼──────────────────────────────────────────────────┼──────────────┤
+  │    1    │ Product ga mxik_code maydoni qo'shish            │ ★ Oson       │
+  │    2    │ tasnif.soliq.uz API integratsiyasi (MXIK qidirish)│ ★★ O'rta    │
+  │    3    │ OFD sandbox kalitlarini olish va test qilish      │ ★★ O'rta    │
+  │    4    │ Sale ga fiskal maydonlar qo'shish                 │ ★ Oson       │
+  │    5    │ OFD API integratsiyasi (chek yuborish)            │ ★★★ Qiyin   │
+  │    6    │ E-IMZO integratsiyasi                             │ ★★★ Qiyin   │
+  │    7    │ Markirovka (DataMatrix) integratsiyasi            │ ★★★ Qiyin   │
+  │    8    │ YaTT/MCHJ ochish + sertifikatsiya                 │ Huquqiy      │
+  └─────────┴──────────────────────────────────────────────────┴──────────────┘
+
+  BOSQICH 1 — Product ga mxik_code maydoni qo'shish  [★ Oson]
+  ─────────────────────────────────────────────────────────────
+  Nima: Product modeliga mxik_code (17 xonali IKPU kod) maydoni qo'shish
+  Nima uchun: Soliq tizimi har bir tovarni MXIK kodi orqali taniydi.
+              Kodsiz tovar OFDga yuborib bo'lmaydi.
+  Qanday:
+    - warehouse/models.py → Product modeliga CharField(max_length=17, blank=True)
+    - Migration yaratish
+    - Serializer va admin panelga qo'shish
+    - Postman collection yangilash
+
+  BOSQICH 2 — tasnif.soliq.uz API integratsiyasi  [★★ O'rta]
+  ─────────────────────────────────────────────────────────────
+  Nima: Mahsulot nomiga qarab MXIK kodni avtomatik topish
+  Nima uchun: Har bir tovar uchun qo'lda 17 xonali kod kiritish
+              noqulay va xatolarga olib keladi.
+  Qanday:
+    - tasnif.soliq.uz API hujjatlarini o'rganish
+    - /warehouse/products/search-mxik/ endpoint yaratish
+    - Foydalanuvchi nom kiritsа → API natijalarni qaytaradi
+    - Tanlangan kodni mahsulotga saqlash
+
+  BOSQICH 3 — OFD sandbox kalitlarini olish va test qilish  [★★ O'rta]
+  ─────────────────────────────────────────────────────────────
+  Nima: OFD (Soliq qo'mitasi) test muhitida hisob ochish
+  Nima uchun: Real OFDga ulanishdan oldin sandbox da test qilish shart.
+  Qanday:
+    - ofd.uz yoki soliq.uz developer portalida ro'yxatdan o'tish
+    - Test API kalitlari (login, password, device_id) olish
+    - Postman orqali test so'rovlar yuborish
+    - Django settings ga OFD_* konfiguratsiyalari qo'shish
+
+  BOSQICH 4 — Sale ga fiskal maydonlar qo'shish  [★ Oson]
+  ─────────────────────────────────────────────────────────────
+  Nima: Sale (sotuv) modeliga OFD javobini saqlash uchun maydonlar
+  Nima uchun: Har bir chek yuborilgandan keyin OFD javobini (chek raqami,
+              QR kod, vaqt) bazada saqlash kerak.
+  Qanday:
+    - trade/models.py → Sale modeliga:
+        fiscal_sign      = CharField (fiskal belgi)
+        fiscal_number    = CharField (chek raqami)
+        fiscal_qr_url    = URLField  (QR kod URL)
+        ofd_sent_at      = DateTimeField (yuborilgan vaqt)
+        ofd_status       = CharField (pending/success/failed)
+    - Migration yaratish
+    - Serializer va admin yangilash
+
+  BOSQICH 5 — OFD API integratsiyasi (chek yuborish)  [★★★ Qiyin]
+  ─────────────────────────────────────────────────────────────
+  Nima: Har bir sotuv yaratilganda OFDga avtomatik chek yuborish
+  Nima uchun: 2025-yildan barcha savdo nuqtalari real vaqtda elektron
+              chek yuborishi majburiy.
+  Qanday:
+    - warehouse/services/ofd_service.py → OFDService class
+    - trade/views.py → SaleViewSet.create() da OFD chaqirish
+    - Muvaffaqiyatli bo'lsa → fiscal_* maydonlarni saqlash
+    - Muvaffaqiyatsiz bo'lsa → ofd_status='failed', qayta urinish
+    - Celery task → muvaffaqiyatsiz cheklarni qayta yuborish
+    - Sotuv chekida QR kod ko'rsatish (PDF yangilash)
+
+  BOSQICH 6 — E-IMZO integratsiyasi  [★★★ Qiyin]
+  ─────────────────────────────────────────────────────────────
+  Nima: Elektron imzo (E-IMZO) orqali hujjatlarni tasdiqlash
+  Nima uchun: OFDga yuborilayotgan ma'lumotlar E-IMZO bilan
+              imzolanishi shart (2026-yildan qat'iy talab).
+  Qanday:
+    - e-imzo.soliq.uz developer hujjatlarini o'rganish
+    - PKCS#7 format imzolash mexanizmini qo'shish
+    - Har bir OFD so'roviga imzo qo'shish
+    - Sertifikat yangilanishini monitoring qilish
+
+  BOSQICH 7 — Markirovka (DataMatrix) integratsiyasi  [★★★ Qiyin]
+  ─────────────────────────────────────────────────────────────
+  Nima: Belgilangan tovarlar (dori, alkogol, tamaki, texnika) uchun
+        DataMatrix kod o'qish va tasdiqlash
+  Nima uchun: Markirovka majburiy tovarlar uchun "Asl Belgisi" tizimi
+              bilan integratsiya 2026-yildan qat'iy.
+  Qanday:
+    - SaleItem modeliga datamatrix_code maydoni qo'shish
+    - Skaner orqali o'qilgan kodni "aslbelgisi.uz" API da tekshirish
+    - Tasdiqlangan tovar sotilishi mumkin, tasdiqlanmagan — blok
+    - Sotuv chekida DataMatrix ko'rsatish
+
+  BOSQICH 8 — YaTT/MCHJ ochish + sertifikatsiya  [Huquqiy]
+  ─────────────────────────────────────────────────────────────
+  Nima: Dasturni rasmiy "Virtual kassa" sifatida ro'yxatdan o'tkazish
+  Nima uchun: Jismoniy shaxs sifatida virtual kassa reestridan o'tib
+              bo'lmaydi. Mijozlar dasturni rasmiy qabul qilishi uchun
+              sertifikat kerak.
+  Qanday:
+    - YaTT yoki MCHJ ro'yxatdan o'tish (soliq.uz)
+    - soliq.uz → "Ishlab chiqaruvchilar" bo'limiga ariza topshirish
+    - Virtual kassa sertifikati olish
+    - Operatorlar (ofd.uz, soliqservis.uz) bilan shartnoma tuzish
+
+  ─────────────────────────────────────────────────────────────
+  XULOSA: Eng avval 1-2-3-4 bosqichlar — MXIK kodlari va OFD
+  sandbox bilan boshlash mumkin. Bu dasturning asosiy
+  funksionalligiga ta'sir qilmaydi, lekin soliqqa
+  tayyorgarlikni boshlaydi.
+  ─────────────────────────────────────────────────────────────
+
+============================================================
+  Sana: 23.03.2026  |  Soliq integratsiya rejasi  |  8 bosqich
+============================================================
