@@ -90,6 +90,9 @@ urlpatterns = [
     # Subscription: /api/v1/subscription/ + /api/v1/admin/subscriptions/
     path('api/v1/', include('subscription.api_urls')),
 
+    # Super Admin Panel: /api/v1/superadmin/
+    path('api/v1/superadmin/', include('superadmin.api_urls')),
+
     # --- API Dokumentatsiya ---
     path('swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path('swagger/',         schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),

@@ -18,6 +18,8 @@ SUPERADMIN:
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
+from superadmin.views import ApplyCouponView
+
 from .views import (
     AdminSubscriptionViewSet,
     MyInvoiceListView,
@@ -27,9 +29,10 @@ from .views import (
 
 # Owner endpointlar
 owner_urlpatterns = [
-    path('subscription/',          MySubscriptionView.as_view(), name='my-subscription'),
-    path('subscription/plans/',    PlanListView.as_view(),        name='subscription-plans'),
-    path('subscription/invoices/', MyInvoiceListView.as_view(),   name='subscription-invoices'),
+    path('subscription/',              MySubscriptionView.as_view(), name='my-subscription'),
+    path('subscription/plans/',        PlanListView.as_view(),        name='subscription-plans'),
+    path('subscription/invoices/',     MyInvoiceListView.as_view(),   name='subscription-invoices'),
+    path('subscription/apply-coupon/', ApplyCouponView.as_view(),     name='apply-coupon'),
 ]
 
 # SuperAdmin endpointlar

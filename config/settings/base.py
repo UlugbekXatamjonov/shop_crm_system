@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'export',       # Export / Import (B16)
     'dashboard',    # Dashboard (B17)
     'subscription', # Obuna tizimi (B20)
+    'superadmin',   # Super Admin Panel (B21-B23)
 ]
 
 

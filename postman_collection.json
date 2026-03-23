@@ -44,7 +44,10 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -52,8 +55,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/login/",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "login", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login",
+                ""
+              ]
             },
             "description": "Login and get JWT tokens. Test script automatically saves access and refresh tokens to collection variables."
           },
@@ -64,7 +73,10 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -72,8 +84,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/register/",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "register", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register",
+                ""
+              ]
             },
             "description": "Register a new user and create a store."
           },
@@ -84,8 +102,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -93,8 +117,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/logout/",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "logout", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout",
+                ""
+              ]
             },
             "description": "Logout and blacklist the refresh token."
           },
@@ -105,12 +135,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/auth/profil/",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "profil", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "profil",
+                ""
+              ]
             },
             "description": "Get current user profile."
           },
@@ -121,8 +160,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -130,8 +175,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/profil/",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "profil", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "profil",
+                ""
+              ]
             },
             "description": "Update current user profile."
           },
@@ -142,8 +193,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -151,8 +208,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/change-password/",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "change-password", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "change-password",
+                ""
+              ]
             },
             "description": "Change current user password."
           },
@@ -163,7 +226,10 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -171,8 +237,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/send-reset-email/",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "send-reset-email", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "send-reset-email",
+                ""
+              ]
             },
             "description": "Send password reset email."
           },
@@ -188,12 +260,20 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/workers/",
-              "host": ["{{baseUrl}}"],
-              "path": ["workers", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workers",
+                ""
+              ]
             },
             "description": "List all workers in the store."
           },
@@ -204,8 +284,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -213,8 +299,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/workers/",
-              "host": ["{{baseUrl}}"],
-              "path": ["workers", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workers",
+                ""
+              ]
             },
             "description": "Create a new worker."
           },
@@ -225,12 +316,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/workers/me/",
-              "host": ["{{baseUrl}}"],
-              "path": ["workers", "me", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workers",
+                "me",
+                ""
+              ]
             },
             "description": "Get current worker's own profile."
           },
@@ -241,8 +341,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -250,8 +356,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/workers/me/",
-              "host": ["{{baseUrl}}"],
-              "path": ["workers", "me", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workers",
+                "me",
+                ""
+              ]
             },
             "description": "Update current worker's own profile."
           },
@@ -262,12 +374,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/workers/20/",
-              "host": ["{{baseUrl}}"],
-              "path": ["workers", "20", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workers",
+                "20",
+                ""
+              ]
             },
             "description": "Get a specific worker by ID."
           },
@@ -278,8 +399,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -287,8 +414,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/workers/20/",
-              "host": ["{{baseUrl}}"],
-              "path": ["workers", "20", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workers",
+                "20",
+                ""
+              ]
             },
             "description": "Update a worker's role, salary, status and permissions."
           },
@@ -299,12 +432,21 @@
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/workers/20/",
-              "host": ["{{baseUrl}}"],
-              "path": ["workers", "20", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workers",
+                "20",
+                ""
+              ]
             },
             "description": "Delete a worker by ID."
           },
@@ -320,12 +462,20 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/settings/",
-              "host": ["{{baseUrl}}"],
-              "path": ["settings", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                ""
+              ]
             },
             "description": "Get store settings list."
           },
@@ -336,12 +486,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/settings/2/",
-              "host": ["{{baseUrl}}"],
-              "path": ["settings", "2", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "2",
+                ""
+              ]
             },
             "description": "Get store settings by ID."
           },
@@ -352,8 +511,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -361,8 +526,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/settings/2/",
-              "host": ["{{baseUrl}}"],
-              "path": ["settings", "2", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "2",
+                ""
+              ]
             },
             "description": "Update store settings. All fields are optional (partial update)."
           },
@@ -378,12 +549,20 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/branches/",
-              "host": ["{{baseUrl}}"],
-              "path": ["branches", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "branches",
+                ""
+              ]
             },
             "description": "List all branches."
           },
@@ -394,8 +573,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -403,8 +588,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/branches/",
-              "host": ["{{baseUrl}}"],
-              "path": ["branches", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "branches",
+                ""
+              ]
             },
             "description": "Create a new branch."
           },
@@ -415,12 +605,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/branches/24/",
-              "host": ["{{baseUrl}}"],
-              "path": ["branches", "24", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "branches",
+                "24",
+                ""
+              ]
             },
             "description": "Get a specific branch by ID."
           },
@@ -431,8 +630,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -440,8 +645,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/branches/24/",
-              "host": ["{{baseUrl}}"],
-              "path": ["branches", "24", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "branches",
+                "24",
+                ""
+              ]
             },
             "description": "Update branch details."
           },
@@ -452,12 +663,21 @@
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/branches/26/",
-              "host": ["{{baseUrl}}"],
-              "path": ["branches", "26", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "branches",
+                "26",
+                ""
+              ]
             },
             "description": "Delete a branch by ID."
           },
@@ -473,12 +693,20 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/shifts/",
-              "host": ["{{baseUrl}}"],
-              "path": ["shifts", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shifts",
+                ""
+              ]
             },
             "description": "List all shifts."
           },
@@ -489,8 +717,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -498,8 +732,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/shifts/",
-              "host": ["{{baseUrl}}"],
-              "path": ["shifts", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shifts",
+                ""
+              ]
             },
             "description": "Open a new shift for a branch."
           },
@@ -510,12 +749,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/shifts/2/",
-              "host": ["{{baseUrl}}"],
-              "path": ["shifts", "2", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shifts",
+                "2",
+                ""
+              ]
             },
             "description": "Get shift details by ID."
           },
@@ -526,8 +774,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -535,8 +789,15 @@
             },
             "url": {
               "raw": "{{baseUrl}}/shifts/2/close/",
-              "host": ["{{baseUrl}}"],
-              "path": ["shifts", "2", "close", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shifts",
+                "2",
+                "close",
+                ""
+              ]
             },
             "description": "Close a shift with cash count."
           },
@@ -547,12 +808,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/shifts/2/x-report/",
-              "host": ["{{baseUrl}}"],
-              "path": ["shifts", "2", "x-report", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shifts",
+                "2",
+                "x-report",
+                ""
+              ]
             },
             "description": "Get X-report for a shift."
           },
@@ -568,12 +839,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/categories/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "categories", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "categories",
+                ""
+              ]
             },
             "description": "List all product categories."
           },
@@ -584,8 +864,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -593,8 +879,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/categories/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "categories", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "categories",
+                ""
+              ]
             },
             "description": "Create a new product category."
           },
@@ -605,12 +897,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/categories/12/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "categories", "12", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "categories",
+                "12",
+                ""
+              ]
             },
             "description": "Get category details by ID."
           },
@@ -621,8 +923,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -630,8 +938,15 @@
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/categories/12/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "categories", "12", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "categories",
+                "12",
+                ""
+              ]
             },
             "description": "Update category name and status."
           },
@@ -642,12 +957,22 @@
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/categories/17/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "categories", "17", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "categories",
+                "17",
+                ""
+              ]
             },
             "description": "Delete a category by ID."
           },
@@ -663,12 +988,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/subcategories/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "subcategories", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "subcategories",
+                ""
+              ]
             },
             "description": "List all subcategories."
           },
@@ -679,14 +1013,26 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/subcategories/?category=12",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "subcategories", ""],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "subcategories",
+                ""
+              ],
               "query": [
-                { "key": "category", "value": "12" }
+                {
+                  "key": "category",
+                  "value": "12"
+                }
               ]
             },
             "description": "List subcategories filtered by category ID."
@@ -698,8 +1044,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -707,8 +1059,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/subcategories/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "subcategories", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "subcategories",
+                ""
+              ]
             },
             "description": "Create a new subcategory under a parent category."
           },
@@ -719,12 +1077,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/subcategories/1/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "subcategories", "1", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "subcategories",
+                "1",
+                ""
+              ]
             },
             "description": "Get subcategory details by ID."
           },
@@ -735,8 +1103,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -744,8 +1118,15 @@
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/subcategories/1/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "subcategories", "1", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "subcategories",
+                "1",
+                ""
+              ]
             },
             "description": "Update subcategory name."
           },
@@ -756,12 +1137,22 @@
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/subcategories/1/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "subcategories", "1", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "subcategories",
+                "1",
+                ""
+              ]
             },
             "description": "Delete a subcategory by ID."
           },
@@ -777,12 +1168,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/currencies/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "currencies", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "currencies",
+                ""
+              ]
             },
             "description": "List all available currencies."
           },
@@ -793,12 +1193,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/exchange-rates/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "exchange-rates", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "exchange-rates",
+                ""
+              ]
             },
             "description": "List all exchange rates."
           },
@@ -809,8 +1218,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -818,8 +1233,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/exchange-rates/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "exchange-rates", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "exchange-rates",
+                ""
+              ]
             },
             "description": "Create a new exchange rate for a currency."
           },
@@ -835,12 +1256,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/products/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "products", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "products",
+                ""
+              ]
             },
             "description": "List all products."
           },
@@ -851,8 +1281,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -860,8 +1296,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/products/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "products", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "products",
+                ""
+              ]
             },
             "description": "Create a new product."
           },
@@ -872,12 +1314,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/products/9/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "products", "9", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "products",
+                "9",
+                ""
+              ]
             },
             "description": "Get product details by ID."
           },
@@ -888,8 +1340,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -897,8 +1355,15 @@
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/products/9/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "products", "9", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "products",
+                "9",
+                ""
+              ]
             },
             "description": "Update product sale price."
           },
@@ -909,12 +1374,22 @@
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/products/99/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "products", "99", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "products",
+                "99",
+                ""
+              ]
             },
             "description": "Delete a product by ID. Change ID to a test product."
           },
@@ -925,12 +1400,23 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/products/9/barcode/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "products", "9", "barcode", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "products",
+                "9",
+                "barcode",
+                ""
+              ]
             },
             "description": "Get barcode image for a product."
           },
@@ -941,12 +1427,23 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/products/9/qr/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "products", "9", "qr", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "products",
+                "9",
+                "qr",
+                ""
+              ]
             },
             "description": "Get QR code image for a product."
           },
@@ -957,14 +1454,27 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/products/scan/?code=2000016000023",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "products", "scan", ""],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "products",
+                "scan",
+                ""
+              ],
               "query": [
-                { "key": "code", "value": "2000016000023" }
+                {
+                  "key": "code",
+                  "value": "2000016000023"
+                }
               ]
             },
             "description": "Scan product by barcode or QR code."
@@ -976,8 +1486,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -985,8 +1501,15 @@
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/products/bulk-qr/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "products", "bulk-qr", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "products",
+                "bulk-qr",
+                ""
+              ]
             },
             "description": "Generate bulk QR codes for multiple products."
           },
@@ -997,8 +1520,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1006,8 +1535,15 @@
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/products/bulk-price-update/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "products", "bulk-price-update", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "products",
+                "bulk-price-update",
+                ""
+              ]
             },
             "description": "Bulk update sale prices for multiple products in a single atomic transaction. AuditLog yozadi (field: sale_price, bulk: true)."
           },
@@ -1023,12 +1559,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/warehouses/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "warehouses", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "warehouses",
+                ""
+              ]
             },
             "description": "List all warehouses."
           },
@@ -1039,8 +1584,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1048,8 +1599,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/warehouses/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "warehouses", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "warehouses",
+                ""
+              ]
             },
             "description": "Create a new warehouse."
           },
@@ -1060,12 +1617,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/warehouses/7/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "warehouses", "7", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "warehouses",
+                "7",
+                ""
+              ]
             },
             "description": "Get warehouse details by ID."
           },
@@ -1076,8 +1643,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1085,8 +1658,15 @@
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/warehouses/7/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "warehouses", "7", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "warehouses",
+                "7",
+                ""
+              ]
             },
             "description": "Update warehouse address."
           },
@@ -1097,12 +1677,22 @@
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/warehouses/9/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "warehouses", "9", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "warehouses",
+                "9",
+                ""
+              ]
             },
             "description": "Delete a warehouse by ID."
           },
@@ -1118,12 +1708,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/suppliers/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "suppliers", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "suppliers",
+                ""
+              ]
             },
             "description": "List all suppliers."
           },
@@ -1134,8 +1733,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1143,8 +1748,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/suppliers/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "suppliers", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "suppliers",
+                ""
+              ]
             },
             "description": "Create a new supplier."
           },
@@ -1155,12 +1766,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/suppliers/1/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "suppliers", "1", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "suppliers",
+                "1",
+                ""
+              ]
             },
             "description": "Get supplier details by ID."
           },
@@ -1171,8 +1792,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1180,8 +1807,15 @@
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/suppliers/1/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "suppliers", "1", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "suppliers",
+                "1",
+                ""
+              ]
             },
             "description": "Update supplier company name."
           },
@@ -1192,12 +1826,22 @@
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/suppliers/1/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "suppliers", "1", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "suppliers",
+                "1",
+                ""
+              ]
             },
             "description": "Delete a supplier by ID."
           },
@@ -1208,12 +1852,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/supplier-payments/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "supplier-payments", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "supplier-payments",
+                ""
+              ]
             },
             "description": "List all supplier payments."
           },
@@ -1224,8 +1877,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1233,8 +1892,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/supplier-payments/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "supplier-payments", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "supplier-payments",
+                ""
+              ]
             },
             "description": "Record a payment to a supplier."
           },
@@ -1250,12 +1915,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/movements/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "movements", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "movements",
+                ""
+              ]
             },
             "description": "List all stock movements."
           },
@@ -1266,8 +1940,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1275,8 +1955,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/movements/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "movements", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "movements",
+                ""
+              ]
             },
             "description": "Create a single stock movement (in/out)."
           },
@@ -1287,8 +1973,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1296,8 +1988,15 @@
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/movements/bulk/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "movements", "bulk", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "movements",
+                "bulk",
+                ""
+              ]
             },
             "description": "Create multiple stock movements at once."
           },
@@ -1313,12 +2012,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/stocks/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "stocks", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "stocks",
+                ""
+              ]
             },
             "description": "List all stock levels."
           },
@@ -1329,12 +2037,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/stocks/by-product/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "stocks", "by-product", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "stocks",
+                "by-product",
+                ""
+              ]
             },
             "description": "Get stock levels grouped by product."
           },
@@ -1345,12 +2063,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/stocks/low-stock/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "stocks", "low-stock", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "stocks",
+                "low-stock",
+                ""
+              ]
             },
             "description": "Get products with stock below the low stock threshold."
           },
@@ -1366,12 +2094,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/batches/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "batches", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "batches",
+                ""
+              ]
             },
             "description": "List all stock batches (FIFO)."
           },
@@ -1382,12 +2119,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/batches/1/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "batches", "1", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "batches",
+                "1",
+                ""
+              ]
             },
             "description": "Get stock batch details by ID."
           },
@@ -1403,12 +2150,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/transfers/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "transfers", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "transfers",
+                ""
+              ]
             },
             "description": "List all stock transfers."
           },
@@ -1419,8 +2175,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1428,8 +2190,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/transfers/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "transfers", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "transfers",
+                ""
+              ]
             },
             "description": "Create a new stock transfer from warehouse to branch."
           },
@@ -1440,12 +2208,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/transfers/1/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "transfers", "1", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "transfers",
+                "1",
+                ""
+              ]
             },
             "description": "Get transfer details by ID."
           },
@@ -1456,12 +2234,23 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/transfers/3/confirm/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "transfers", "3", "confirm", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "transfers",
+                "3",
+                "confirm",
+                ""
+              ]
             },
             "description": "Confirm a pending transfer."
           },
@@ -1472,12 +2261,23 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/transfers/3/cancel/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "transfers", "3", "cancel", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "transfers",
+                "3",
+                "cancel",
+                ""
+              ]
             },
             "description": "Cancel a pending transfer."
           },
@@ -1493,12 +2293,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/wastages/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "wastages", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "wastages",
+                ""
+              ]
             },
             "description": "List all wastage records."
           },
@@ -1509,8 +2318,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1518,8 +2333,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/wastages/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "wastages", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "wastages",
+                ""
+              ]
             },
             "description": "Record a wastage for a product."
           },
@@ -1530,12 +2351,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/wastages/1/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "wastages", "1", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "wastages",
+                "1",
+                ""
+              ]
             },
             "description": "Get wastage record details by ID."
           },
@@ -1551,12 +2382,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/audits/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "audits", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "audits",
+                ""
+              ]
             },
             "description": "List all stock audits."
           },
@@ -1567,8 +2407,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1576,8 +2422,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/audits/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "audits", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "audits",
+                ""
+              ]
             },
             "description": "Create a new stock audit for a warehouse."
           },
@@ -1588,12 +2440,23 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/audits/1/confirm/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "audits", "1", "confirm", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "audits",
+                "1",
+                "confirm",
+                ""
+              ]
             },
             "description": "Confirm a stock audit and apply adjustments."
           },
@@ -1609,12 +2472,20 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/customer-groups/",
-              "host": ["{{baseUrl}}"],
-              "path": ["customer-groups", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customer-groups",
+                ""
+              ]
             },
             "description": "List all customer groups."
           },
@@ -1625,8 +2496,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1634,8 +2511,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/customer-groups/",
-              "host": ["{{baseUrl}}"],
-              "path": ["customer-groups", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customer-groups",
+                ""
+              ]
             },
             "description": "Create a new customer group with discount."
           },
@@ -1646,12 +2528,20 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/customers/",
-              "host": ["{{baseUrl}}"],
-              "path": ["customers", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                ""
+              ]
             },
             "description": "List all customers."
           },
@@ -1662,8 +2552,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1671,8 +2567,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/customers/",
-              "host": ["{{baseUrl}}"],
-              "path": ["customers", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                ""
+              ]
             },
             "description": "Create a new customer."
           },
@@ -1683,12 +2584,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/customers/7/",
-              "host": ["{{baseUrl}}"],
-              "path": ["customers", "7", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "7",
+                ""
+              ]
             },
             "description": "Get customer details including debt sales."
           },
@@ -1699,8 +2609,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1708,8 +2624,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/customers/7/",
-              "host": ["{{baseUrl}}"],
-              "path": ["customers", "7", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "7",
+                ""
+              ]
             },
             "description": "Update customer information."
           },
@@ -1720,12 +2642,21 @@
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/customers/7/",
-              "host": ["{{baseUrl}}"],
-              "path": ["customers", "7", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "7",
+                ""
+              ]
             },
             "description": "Delete a customer by ID."
           },
@@ -1741,12 +2672,20 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/sales/",
-              "host": ["{{baseUrl}}"],
-              "path": ["sales", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                ""
+              ]
             },
             "description": "List all sales."
           },
@@ -1757,8 +2696,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1766,8 +2711,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/sales/",
-              "host": ["{{baseUrl}}"],
-              "path": ["sales", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                ""
+              ]
             },
             "description": "Oddiy naqd to'lov. paid_amount = items jami narxi bilan teng bo'lishi shart."
           },
@@ -1778,8 +2728,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1787,8 +2743,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/sales/",
-              "host": ["{{baseUrl}}"],
-              "path": ["sales", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                ""
+              ]
             },
             "description": "Savdo darajasida chegirma. 10 000 so'm chegirma 3 ta mahsulotga proporsional taqsimlanadi:\n- A (30k → 27k), B (20k → 18k), C (50k → 45k)\npaid_amount = total_price - discount_amount = 100k - 10k = 90k"
           },
@@ -1799,8 +2760,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1808,8 +2775,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/sales/",
-              "host": ["{{baseUrl}}"],
-              "path": ["sales", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                ""
+              ]
             },
             "description": "Ikki qatlamli chegirma:\n1-qatlam (katalog): A mahsulot 30k → 10% → 27k; B mahsulot 50k → 20% → 40k\n2-qatlam (savdo): 9k chegirma 3 ta mahsulotga proporsional taqsimlanadi\n\noriginal_price + item_discount_pct berilsa — unit_price backend hisoblaydi.\nunit_price berilsa — original_price shart emas (oddiy mahsulot)."
           },
@@ -1820,8 +2792,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1829,8 +2807,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/sales/",
-              "host": ["{{baseUrl}}"],
-              "path": ["sales", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                ""
+              ]
             },
             "description": "Aralash to'lov: naqd + karta.\ncash_amount + card_amount = paid_amount (net narx) bo'lishi SHART.\nIkkalasi ham 0 dan katta bo'lishi kerak.\nDebt (nasiya) MIXED ga qo'shilmaydi."
           },
@@ -1841,8 +2824,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1850,8 +2839,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/sales/",
-              "host": ["{{baseUrl}}"],
-              "path": ["sales", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                ""
+              ]
             },
             "description": "Nasiya to'lov. paid_amount <= net_price. debt_amount = net_price - paid_amount.\ncustomer majburiy (nasiya kimga?). Customer.debt_balance avtomatik yangilanadi."
           },
@@ -1862,12 +2856,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/sales/1/",
-              "host": ["{{baseUrl}}"],
-              "path": ["sales", "1", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "1",
+                ""
+              ]
             },
             "description": "Get sale details including items."
           },
@@ -1878,12 +2881,22 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/sales/2/cancel/",
-              "host": ["{{baseUrl}}"],
-              "path": ["sales", "2", "cancel", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "2",
+                "cancel",
+                ""
+              ]
             },
             "description": "Cancel a sale and restore stock."
           },
@@ -1894,12 +2907,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/sales/1/receipt/",
-              "host": ["{{baseUrl}}"],
-              "path": ["sales", "1", "receipt", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "1",
+                "receipt",
+                ""
+              ]
             },
             "description": "Download sale receipt as PDF (80mm thermal printer format). Sarlavha: do'kon nomi, filial, kassir, sana. Mahsulotlar jadvali, jami, chegirma, to'lov, qarz."
           },
@@ -1915,12 +2938,20 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/sale-returns/",
-              "host": ["{{baseUrl}}"],
-              "path": ["sale-returns", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sale-returns",
+                ""
+              ]
             },
             "description": "List all sale returns."
           },
@@ -1931,8 +2962,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1940,8 +2977,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/sale-returns/",
-              "host": ["{{baseUrl}}"],
-              "path": ["sale-returns", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sale-returns",
+                ""
+              ]
             },
             "description": "Create a new sale return."
           },
@@ -1952,12 +2994,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/sale-returns/1/",
-              "host": ["{{baseUrl}}"],
-              "path": ["sale-returns", "1", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sale-returns",
+                "1",
+                ""
+              ]
             },
             "description": "Get sale return details."
           },
@@ -1968,12 +3019,22 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/sale-returns/1/confirm/",
-              "host": ["{{baseUrl}}"],
-              "path": ["sale-returns", "1", "confirm", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sale-returns",
+                "1",
+                "confirm",
+                ""
+              ]
             },
             "description": "Confirm a pending sale return."
           },
@@ -1984,12 +3045,22 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/sale-returns/1/cancel/",
-              "host": ["{{baseUrl}}"],
-              "path": ["sale-returns", "1", "cancel", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sale-returns",
+                "1",
+                "cancel",
+                ""
+              ]
             },
             "description": "Cancel a pending sale return."
           },
@@ -2005,12 +3076,20 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/expense-categories/",
-              "host": ["{{baseUrl}}"],
-              "path": ["expense-categories", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "expense-categories",
+                ""
+              ]
             },
             "description": "List all expense categories."
           },
@@ -2021,8 +3100,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -2030,8 +3115,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/expense-categories/",
-              "host": ["{{baseUrl}}"],
-              "path": ["expense-categories", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "expense-categories",
+                ""
+              ]
             },
             "description": "Create a new expense category."
           },
@@ -2042,8 +3132,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -2051,8 +3147,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/expense-categories/1/",
-              "host": ["{{baseUrl}}"],
-              "path": ["expense-categories", "1", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "expense-categories",
+                "1",
+                ""
+              ]
             },
             "description": "Update expense category name."
           },
@@ -2063,12 +3165,21 @@
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/expense-categories/1/",
-              "host": ["{{baseUrl}}"],
-              "path": ["expense-categories", "1", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "expense-categories",
+                "1",
+                ""
+              ]
             },
             "description": "Delete an expense category by ID."
           },
@@ -2079,12 +3190,20 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/expenses/",
-              "host": ["{{baseUrl}}"],
-              "path": ["expenses", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "expenses",
+                ""
+              ]
             },
             "description": "List all expenses."
           },
@@ -2095,8 +3214,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -2104,8 +3229,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/expenses/",
-              "host": ["{{baseUrl}}"],
-              "path": ["expenses", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "expenses",
+                ""
+              ]
             },
             "description": "Create a new expense record."
           },
@@ -2116,12 +3246,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/expenses/1/",
-              "host": ["{{baseUrl}}"],
-              "path": ["expenses", "1", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "expenses",
+                "1",
+                ""
+              ]
             },
             "description": "Get expense details by ID."
           },
@@ -2132,12 +3271,21 @@
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/expenses/1/",
-              "host": ["{{baseUrl}}"],
-              "path": ["expenses", "1", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "expenses",
+                "1",
+                ""
+              ]
             },
             "description": "Delete an expense by ID."
           },
@@ -2153,12 +3301,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/workers/kpi/",
-              "host": ["{{baseUrl}}"],
-              "path": ["workers", "kpi", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workers",
+                "kpi",
+                ""
+              ]
             },
             "description": "List KPI data for all workers."
           },
@@ -2169,12 +3326,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/workers/15/kpi/",
-              "host": ["{{baseUrl}}"],
-              "path": ["workers", "15", "kpi", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workers",
+                "15",
+                "kpi",
+                ""
+              ]
             },
             "description": "Get KPI data for a specific worker."
           },
@@ -2185,8 +3352,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -2194,8 +3367,16 @@
             },
             "url": {
               "raw": "{{baseUrl}}/workers/kpi/1/set-target/",
-              "host": ["{{baseUrl}}"],
-              "path": ["workers", "kpi", "1", "set-target", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workers",
+                "kpi",
+                "1",
+                "set-target",
+                ""
+              ]
             },
             "description": "Set KPI targets for a worker."
           },
@@ -2211,12 +3392,20 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/dashboard/",
-              "host": ["{{baseUrl}}"],
-              "path": ["dashboard", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                ""
+              ]
             },
             "description": "Get dashboard summary statistics."
           },
@@ -2227,16 +3416,33 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/dashboard/?date_from=2026-03-01&date_to=2026-03-21&branch=24",
-              "host": ["{{baseUrl}}"],
-              "path": ["dashboard", ""],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                ""
+              ],
               "query": [
-                { "key": "date_from", "value": "2026-03-01" },
-                { "key": "date_to", "value": "2026-03-21" },
-                { "key": "branch", "value": "24" }
+                {
+                  "key": "date_from",
+                  "value": "2026-03-01"
+                },
+                {
+                  "key": "date_to",
+                  "value": "2026-03-21"
+                },
+                {
+                  "key": "branch",
+                  "value": "24"
+                }
               ]
             },
             "description": "Get dashboard with date range and branch filter."
@@ -2253,14 +3459,26 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/export/sales/?format=excel",
-              "host": ["{{baseUrl}}"],
-              "path": ["export", "sales", ""],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "export",
+                "sales",
+                ""
+              ],
               "query": [
-                { "key": "format", "value": "excel" }
+                {
+                  "key": "format",
+                  "value": "excel"
+                }
               ]
             },
             "description": "Export sales data as Excel file."
@@ -2272,16 +3490,34 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/export/expenses/?format=excel&date_from=2026-03-01&date_to=2026-03-21",
-              "host": ["{{baseUrl}}"],
-              "path": ["export", "expenses", ""],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "export",
+                "expenses",
+                ""
+              ],
               "query": [
-                { "key": "format", "value": "excel" },
-                { "key": "date_from", "value": "2026-03-01" },
-                { "key": "date_to", "value": "2026-03-21" }
+                {
+                  "key": "format",
+                  "value": "excel"
+                },
+                {
+                  "key": "date_from",
+                  "value": "2026-03-01"
+                },
+                {
+                  "key": "date_to",
+                  "value": "2026-03-21"
+                }
               ]
             },
             "description": "Export expenses data as Excel file."
@@ -2293,14 +3529,26 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/export/stocks/?format=excel",
-              "host": ["{{baseUrl}}"],
-              "path": ["export", "stocks", ""],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "export",
+                "stocks",
+                ""
+              ],
               "query": [
-                { "key": "format", "value": "excel" }
+                {
+                  "key": "format",
+                  "value": "excel"
+                }
               ]
             },
             "description": "Export stock levels as Excel file."
@@ -2312,14 +3560,26 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/export/stock-movements/?format=excel",
-              "host": ["{{baseUrl}}"],
-              "path": ["export", "stock-movements", ""],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "export",
+                "stock-movements",
+                ""
+              ],
               "query": [
-                { "key": "format", "value": "excel" }
+                {
+                  "key": "format",
+                  "value": "excel"
+                }
               ]
             },
             "description": "Export stock movements as Excel file."
@@ -2331,14 +3591,26 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/export/suppliers/?format=excel",
-              "host": ["{{baseUrl}}"],
-              "path": ["export", "suppliers", ""],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "export",
+                "suppliers",
+                ""
+              ],
               "query": [
-                { "key": "format", "value": "excel" }
+                {
+                  "key": "format",
+                  "value": "excel"
+                }
               ]
             },
             "description": "Export suppliers as Excel file."
@@ -2350,12 +3622,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/export/products/template/",
-              "host": ["{{baseUrl}}"],
-              "path": ["export", "products", "template", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "export",
+                "products",
+                "template",
+                ""
+              ]
             },
             "description": "Download Excel template for importing products."
           },
@@ -2366,12 +3648,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/export/customers/template/",
-              "host": ["{{baseUrl}}"],
-              "path": ["export", "customers", "template", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "export",
+                "customers",
+                "template",
+                ""
+              ]
             },
             "description": "Download Excel template for importing customers."
           },
@@ -2387,12 +3679,20 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/subscription/",
-              "host": ["{{baseUrl}}"],
-              "path": ["subscription", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscription",
+                ""
+              ]
             },
             "description": "Get current subscription details."
           },
@@ -2403,12 +3703,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/subscription/plans/",
-              "host": ["{{baseUrl}}"],
-              "path": ["subscription", "plans", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscription",
+                "plans",
+                ""
+              ]
             },
             "description": "List all available subscription plans."
           },
@@ -2419,12 +3728,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/subscription/invoices/",
-              "host": ["{{baseUrl}}"],
-              "path": ["subscription", "invoices", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscription",
+                "invoices",
+                ""
+              ]
             },
             "description": "List all subscription invoices."
           },
@@ -2440,12 +3758,21 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/workers/audit-logs/",
-              "host": ["{{baseUrl}}"],
-              "path": ["workers", "audit-logs", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workers",
+                "audit-logs",
+                ""
+              ]
             },
             "description": "List all worker audit logs."
           },
@@ -2456,12 +3783,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/workers/audit-logs/1/",
-              "host": ["{{baseUrl}}"],
-              "path": ["workers", "audit-logs", "1", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workers",
+                "audit-logs",
+                "1",
+                ""
+              ]
             },
             "description": "Get audit log details by ID."
           },
@@ -2477,14 +3814,27 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/promotions/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "promotions", ""],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "promotions",
+                ""
+              ],
               "query": [
-                { "key": "is_active", "value": "true", "disabled": true }
+                {
+                  "key": "is_active",
+                  "value": "true",
+                  "disabled": true
+                }
               ]
             },
             "description": "Barcha aksiyalar ro'yxati. ?is_active=true/false filter bilan."
@@ -2496,8 +3846,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -2505,8 +3861,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/promotions/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "promotions", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "promotions",
+                ""
+              ]
             },
             "description": "Yangi aksiya yaratish (manager+). Kamida products, categories yoki subcategories dan biri bo'lishi shart."
           },
@@ -2517,8 +3879,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -2526,8 +3894,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/promotions/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "promotions", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "promotions",
+                ""
+              ]
             },
             "description": "Ayrim mahsulotlarga aksiya. products ro'yxatida mahsulot IDlari."
           },
@@ -2538,12 +3912,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/promotions/1/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "promotions", "1", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "promotions",
+                "1",
+                ""
+              ]
             },
             "description": "Aksiya tafsilotlari — products, categories, subcategories nested."
           },
@@ -2554,8 +3938,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -2563,8 +3953,15 @@
             },
             "url": {
               "raw": "{{baseUrl}}/warehouse/promotions/1/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "promotions", "1", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "promotions",
+                "1",
+                ""
+              ]
             },
             "description": "Aksiyani qisman yangilash (manager+)."
           },
@@ -2575,12 +3972,23 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/promotions/1/activate/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "promotions", "1", "activate", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "promotions",
+                "1",
+                "activate",
+                ""
+              ]
             },
             "description": "Aksiyani faollashtirish (manager+)."
           },
@@ -2591,12 +3999,23 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/promotions/1/deactivate/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "promotions", "1", "deactivate", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "promotions",
+                "1",
+                "deactivate",
+                ""
+              ]
             },
             "description": "Aksiyani o'chirish (manual) — is_active=False qiladi. valid_to o'tsa avtomatik ham ishlamaydi."
           },
@@ -2607,12 +4026,22 @@
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/warehouse/promotions/1/",
-              "host": ["{{baseUrl}}"],
-              "path": ["warehouse", "promotions", "1", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "warehouse",
+                "promotions",
+                "1",
+                ""
+              ]
             },
             "description": "Aksiyani o'chirish (manager+). Qaytarib bo'lmaydi."
           },
@@ -2623,8 +4052,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -2632,12 +4067,722 @@
             },
             "url": {
               "raw": "{{baseUrl}}/trade/sales/",
-              "host": ["{{baseUrl}}"],
-              "path": ["trade", "sales", ""]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "trade",
+                "sales",
+                ""
+              ]
             },
             "description": "original_price va item_discount_pct berilmagan — server faol aksiyani avtomatik topib qo'llaydi. Aksiya bo'lmasa sale_price ishlatiladi."
           },
           "response": []
+        }
+      ]
+    },
+    {
+      "name": "27. SUPER ADMIN PANEL (B21)",
+      "item": [
+        {
+          "name": "Dashboard (umumiy holat)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/dashboard/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "dashboard",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Do'konlar ro'yxati",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/stores/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "stores",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Do'konlar — filter ?status=active",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/stores?status=active/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "stores?status=active",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Do'kon detail (id=1)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/stores/1/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "stores",
+                "1",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Do'konni bloklash",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/stores/1/block/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "stores",
+                "1",
+                "block",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Do'konni blokdan chiqarish",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/stores/1/unblock/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "stores",
+                "1",
+                "unblock",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Impersonate (do'kon nomidan token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/stores/1/impersonate/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "stores",
+                "1",
+                "impersonate",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Obunalar ro'yxati",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/subscriptions/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "subscriptions",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Obunalar — filter ?status=trial",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/subscriptions?status=trial/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "subscriptions?status=trial",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Obunani uzaytirish (+30 kun)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/subscriptions/1/extend/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "subscriptions",
+                "1",
+                "extend",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"days\": 30, \"note\": \"Bonus berildi\"}"
+            }
+          }
+        },
+        {
+          "name": "Tarif o'zgartirish",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/subscriptions/1/change-plan/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "subscriptions",
+                "1",
+                "change-plan",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"plan_id\": 2, \"note\": \"Pro ga ko'tarildi\"}"
+            }
+          }
+        },
+        {
+          "name": "Trial berish (+14 kun)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/subscriptions/1/give-trial/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "subscriptions",
+                "1",
+                "give-trial",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"days\": 14, \"note\": \"Yangi mijoz uchun sinov\"}"
+            }
+          }
+        },
+        {
+          "name": "Kuponlar ro'yxati",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/coupons/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "coupons",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Kupon yaratish — bepul kunlar (FREE_DAYS)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/coupons/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "coupons",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"code\": \"WELCOME30\", \"type\": \"free_days\", \"value\": \"30\", \"max_uses\": 100, \"valid_from\": \"2026-03-23T00:00:00Z\", \"valid_to\": \"2026-12-31T23:59:59Z\", \"for_new_only\": true, \"is_active\": true, \"description\": \"Yangi do'konlar uchun 30 kun bepul\"}"
+            }
+          }
+        },
+        {
+          "name": "Kupon yaratish — foiz chegirma (PERCENT_OFF)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/coupons/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "coupons",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"code\": \"SAVE50\", \"type\": \"percent_off\", \"value\": \"50\", \"max_uses\": 50, \"valid_from\": \"2026-03-23T00:00:00Z\", \"valid_to\": \"2026-06-30T23:59:59Z\", \"for_new_only\": false, \"is_active\": true, \"description\": \"50% chegirma bitta to'lovda\"}"
+            }
+          }
+        },
+        {
+          "name": "Kupon detail (id=1)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/coupons/1/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "coupons",
+                "1",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Kupon ishlatish tarixi",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/coupons/1/usages/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "coupons",
+                "1",
+                "usages",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Kuponni o'chirish (deactivate)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/coupons/1/deactivate/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "coupons",
+                "1",
+                "deactivate",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Kuponni yoqish (activate)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/coupons/1/activate/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "coupons",
+                "1",
+                "activate",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Kupon qo'llash (do'kon egasi)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscription/apply-coupon/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscription",
+                "apply-coupon",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"code\": \"WELCOME30\"}"
+            }
+          }
+        },
+        {
+          "name": "Moliyaviy hisobot (MRR, xarajat, foyda)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/financial/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "financial",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Moliyaviy hisobot — Excel export",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/financial/export/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "financial",
+                "export",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin xarajat qo'shish",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/admin-expenses/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "admin-expenses",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"title\": \"Railway server\", \"category\": \"server\", \"amount\": \"250000\", \"date\": \"2026-03-23\", \"note\": \"Oylik server to'lov\"}"
+            }
+          }
+        },
+        {
+          "name": "Admin xarajatlar ro'yxati",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/admin-expenses/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "admin-expenses",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin xarajatlar — filter ?month=3&year=2026",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/admin-expenses?month=3&year=2026/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "admin-expenses?month=3&year=2026",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Tarif rejalari ro'yxati (superadmin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/plans/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "plans",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Tarif reja detail (id=1)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/plans/1/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "plans",
+                "1",
+                ""
+              ]
+            }
+          }
         }
       ]
     }
