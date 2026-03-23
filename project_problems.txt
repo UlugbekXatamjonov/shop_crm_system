@@ -2,14 +2,15 @@
 
 
 ------ Qilish kerak ---------
-1) Aralash to'lov bo'lsa(naxt va plastig) dastur qanday yo'l tutadi ?
 2) Soliq bilan integratsiya bo'lsa, do'konning balansi(naxt/online) maydoni bo'ladimi ?
 3) chek aparat va terminalni surishtirish
 4) soliq bilan integratsiyani o'rganib chiqish
-5) bir nechta tovarlarga birdaniga chegirma berish hususiyatini berish kertak 
-6) Local migrationlarni to'g'irlash
+5) real biror CRM dasturi bilan aloqaga mijoz sifatida chiqib barcha savollarga javob olishim kerak
+
 
 ------ Tugadi ---------
+5) bir nechta tovarlarga birdaniga chegirma berish hususiyatini berish kertak 
+6) Local migrationlarni to'g'irlash
 
 
 
@@ -21,4 +22,41 @@
 3) Telegram Bot bilan integratsiya
 4) Click/Payme bilan integratsiya
 5) Soliq bilan integratsiya
-6) 
+6) habarnomalar bo'limi bo'lishi kerak. Sotuvchilarga  biror habar yuborish uchun + o'zgarishlar haqida 
+
+
+
+"""
+Dasturchi sifatida siz uchun bu juda yaxshi imkoniyat, chunki 2026-yilgacha ko‘plab tadbirkorlar aynan soliqqa tayyor (tax-ready) CRM tizimlarini qidirishni boshlaydi.
+Siz jismoniy shaxs ekanligingiz dastur yozishda to‘sqinlik qilmaydi, lekin uni savdo nuqtalariga o‘rnatishda "Integratsiya qiluvchi tashkilot" (Service tashkiloti) sifatida rasmiy ro‘yxatdan o‘tishingiz yoki mavjud operatorlar bilan hamkorlik qilishingiz kerak bo‘ladi.
+Mana siz amalga oshirishingiz kerak bo‘lgan texnik va huquqiy bosqichlar:
+
+1. OFD (API) bilan Integratsiya
+CRM tizimingiz har bir savdo amalga oshirilganda avtomatik ravishda elektron chek yaratishi va uni Soliq qo‘mitasiga (OFD serveriga) yuborishi shart.
+Nima qilish kerak: ofd.uz yoki boshqa operatorlarning API hujjatlarini oling.
+Misol: Foydalanuvchi "Sotish" tugmasini bosganda, JSON formatidagi ma'lumot (tovar nomi, narxi, QQS, MXIK kodi) API orqali yuboriladi va javob sifatida QR-kodli chek qaytadi.
+
+2. MXIK (IKPU) va Shtrix-kodlar bazasi
+Soliq tizimi har bir tovarni uning maxsus kodi (MXIK) orqali taniydi.
+Nima qilish kerak: CRM bazangizga har bir mahsulot uchun MXIK (17 xonali kod) maydonini qo'shing.
+Misol: Agar do'kon "Suv" sotsa, CRM tizimi soliqqa shunchaki "suv" deb emas, 01104001001000000 kodi bilan ma'lumot yuborishi shart.
+Resurs: tasnif.soliq.uz sayti orqali API orqali kodlarni tekshirishni yo'lga qo'ying.
+
+3. E-aktiv (Ombor hisobi) integratsiyasi
+2026-yildan faqat chek urish kamlik qiladi, tovarning kirimi ham soliqda ko‘rinishi kerak.
+Nima qilish kerak: CRM tizimingizda Elektron Hisob-faktura (EHF) qabul qilish funksiyasini yarating.
+Mantiq: Tadbirkorga tovar kelganda, u EHFni tasdiqlaydi -> tovar avtomatik CRM omboriga tushadi -> sotilganda ombordan chiqib ketadi.
+
+4. Virtual kassa sifatida ro'yxatdan o'tish
+Siz yaratgan dastur soliq organlari tomonidan "Virtual kassa" sifatida tan olinishi uchun sertifikatlanishi kerak.
+Muammo: Jismoniy shaxs sifatida virtual kassa reestridan o‘ta olmaysiz.
+Yechim: Kamida MCHJ yoki YaTT ochishingiz va dasturingizni soliq.uz reestridan o‘tkazishingiz kerak. Shunda do‘konlar sizning dasturingizni tanlaganda, soliq tizimi uni "rasmiy ishonchli dastur" deb qabul qiladi.
+
+5. Markirovka (Asl Belgisi) bilan ishlash
+Dori-darmon, alkogol, tamaki va maishiy texnika kabi tovarlar uchun DataMatrix kodlarini o‘qish majburiy.
+Nima qilish kerak: CRM tizimingiz skanerdan o‘tgan DataMatrix kodini ajratib olib, uni chek tarkibida OFDga yubora olishi kerak.
+Dasturchi sifatida birinchi qadam:
+Sizga hozir test muhiti (SandBox) kerak. Soliq servislarining ishlab chiquvchilar uchun portali orqali test kalitlarini olishga harakat qiling.
+Siz hozirda CRM tizimingizni qaysi dasturlash tilida (stack) yozayotganingizni aytsangiz, API bilan ishlash bo'yicha aniqroq maslahat bera olaman. Backend qismida API so'rovlarini yuborishni boshladingizmi?
+
+"""
