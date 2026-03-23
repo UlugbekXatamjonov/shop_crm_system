@@ -26,6 +26,7 @@ Modellar:
   StockAuditItem       — Inventarizatsiya satri (expected_qty vs actual_qty)
   Supplier             — Yetkazib beruvchi (B13, qarz balansi, soft delete)
   SupplierPayment      — Yetkazib beruvchiga to'lov tarixi (B13, immutable)
+  Promotion            — Aksiya/chegirma (muddatli, kategoriya yoki mahsulot bo'yicha)
 
 Muhim farq:
   Branch (Filial)   — sotuv nuqtasi (kassa, sotuvchi).
@@ -1273,4 +1274,117 @@ class SupplierPayment(models.Model):
         return (
             f"To'lov #{self.pk}: {self.supplier.name} — "
             f"{self.amount} ({self.get_payment_type_display()})"
+        )
+
+
+# ============================================================
+# AKSIYA / CHEGIRMA (PROMOTION)
+# ============================================================
+
+class Promotion(models.Model):
+    """
+    Vaqt chegaralangan aksiya/chegirma.
+
+    Qo'llanish doirasi (biri yoki bir nechtasi):
+      products     — aniq mahsulotlar ro'yxati (ManyToMany)
+      categories   — kategoriyalar (barcha mahsulotlari)
+      subcategories— subkategoriyalar (barcha mahsulotlari)
+
+    Ishlash mantiqi (trade/views.py Sale.create() da):
+      1. Kassir mahsulot qo'shganda — original_price/item_discount_pct berilmasa
+      2. Tizim shu mahsulot uchun aktiv aksiyani qidiradi:
+           is_active=True  VA  valid_from <= now <= valid_to
+           VA (products=product OR categories=product.category
+               OR subcategories=product.subcategory)
+      3. Bir nechta aksiya topilsa — eng katta discount_pct tanlanadi
+      4. original_price = product.sale_price, item_discount_pct = promotion.discount_pct
+
+    Vaqt o'tgach:
+      valid_to < now → aksiya avtomatik "o'chadi" (DB o'zgarmaydi, runtime tekshiruv)
+      Eski sotuvlar o'zgarmaydi (tarix saqlanadi)
+    """
+    store         = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name='promotions',
+        verbose_name="Do'kon",
+    )
+    name          = models.CharField(
+        max_length=200,
+        verbose_name='Aksiya nomi',
+    )
+    discount_pct  = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        verbose_name='Chegirma (%)',
+    )
+    valid_from    = models.DateTimeField(
+        verbose_name='Boshlanish vaqti',
+    )
+    valid_to      = models.DateTimeField(
+        verbose_name='Tugash vaqti',
+    )
+    is_active     = models.BooleanField(
+        default=True,
+        verbose_name='Faolmi (qo\'lda)',
+    )
+    products      = models.ManyToManyField(
+        'Product',
+        blank=True,
+        related_name='promotions',
+        verbose_name='Mahsulotlar',
+    )
+    categories    = models.ManyToManyField(
+        'Category',
+        blank=True,
+        related_name='promotions',
+        verbose_name='Kategoriyalar',
+    )
+    subcategories = models.ManyToManyField(
+        'SubCategory',
+        blank=True,
+        related_name='promotions',
+        verbose_name='Subkategoriyalar',
+    )
+    description   = models.TextField(
+        blank=True,
+        verbose_name='Izoh',
+    )
+    created_on    = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Yaratilgan vaqti',
+    )
+
+    class Meta:
+        verbose_name        = 'Aksiya'
+        verbose_name_plural = 'Aksiyalar'
+        ordering            = ['-created_on']
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.discount_pct}%)"
+
+    @classmethod
+    def get_active_for_product(cls, product, store_id):
+        """
+        Berilgan mahsulot uchun hozirgi aktiv aksiyani qaytaradi.
+        Bir nechta bo'lsa — eng katta chegirma tanlanadi.
+        """
+        from django.utils import timezone
+        from django.db.models import Q
+        now = timezone.now()
+        return (
+            cls.objects
+            .filter(
+                store_id=store_id,
+                is_active=True,
+                valid_from__lte=now,
+                valid_to__gte=now,
+            )
+            .filter(
+                Q(products=product)
+                | Q(categories=product.category_id)
+                | Q(subcategories=product.subcategory_id)
+            )
+            .order_by('-discount_pct')
+            .first()
         )

@@ -56,7 +56,7 @@ from config.cache_utils import get_store_settings
 
 from store.models import Smena, SmenaStatus
 
-from warehouse.models import MovementType, Stock, StockMovement
+from warehouse.models import MovementType, Promotion, Stock, StockMovement
 from warehouse.utils import fifo_deduct
 
 from .models import (
@@ -544,11 +544,17 @@ class SaleViewSet(AuditMixin, viewsets.ModelViewSet):
                 item_discount_amt      = (original_price * item_discount_pct / 100).quantize(Decimal('0.01'))
                 unit_price_before_sale = original_price - item_discount_amt
             else:
-                # Katalog chegirmasi yo'q yoki frontend allaqachon hisoblagan:
-                #   unit_price frontenddan olinadi yoki product.sale_price
-                unit_price_before_sale = item_data.get('unit_price') or product.sale_price
-                item_discount_pct      = Decimal('0')
-                item_discount_amt      = None  # null — katalog chegirmasi kuzatilmaydi
+                # Katalog chegirmasi yo'q — aksiyani avtomatik tekshir
+                promotion = Promotion.get_active_for_product(product, worker.store_id)
+                if promotion:
+                    original_price         = product.sale_price
+                    item_discount_pct      = promotion.discount_pct
+                    item_discount_amt      = (original_price * item_discount_pct / 100).quantize(Decimal('0.01'))
+                    unit_price_before_sale = original_price - item_discount_amt
+                else:
+                    unit_price_before_sale = item_data.get('unit_price') or product.sale_price
+                    item_discount_pct      = Decimal('0')
+                    item_discount_amt      = None  # null — katalog chegirmasi kuzatilmaydi
 
             item_total   = quantity * unit_price_before_sale
             total_price += item_total

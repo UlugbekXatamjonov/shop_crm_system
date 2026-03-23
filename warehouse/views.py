@@ -63,6 +63,7 @@ from .models import (
     ExchangeRate,
     MovementType,
     Product,
+    Promotion,
     Stock,
     StockAudit,
     StockAuditItem,
@@ -115,6 +116,9 @@ from .serializers import (
     SupplierListSerializer,
     SupplierPaymentSerializer,
     SupplierUpdateSerializer,
+    PromotionListSerializer,
+    PromotionDetailSerializer,
+    PromotionCreateSerializer,
     TransferCreateSerializer,
     TransferDetailSerializer,
     TransferListSerializer,
@@ -2553,4 +2557,162 @@ class SupplierPaymentViewSet(AuditMixin, viewsets.ModelViewSet):
                 ).data,
             },
             status=status.HTTP_201_CREATED,
+        )
+
+
+# ============================================================
+# AKSIYA (PROMOTION) VIEWSET
+# ============================================================
+
+class PromotionViewSet(AuditMixin, viewsets.ModelViewSet):
+    """
+    Aksiyalar (vaqtinchalik chegirmalar).
+
+    Endpointlar:
+      GET    /api/v1/warehouse/promotions/              — ro'yxat
+      POST   /api/v1/warehouse/promotions/              — yaratish (manager+)
+      GET    /api/v1/warehouse/promotions/{id}/         — detail
+      PATCH  /api/v1/warehouse/promotions/{id}/         — yangilash (manager+)
+      DELETE /api/v1/warehouse/promotions/{id}/         — o'chirish (manager+)
+      POST   /api/v1/warehouse/promotions/{id}/activate/   — faollashtirish (manager+)
+      POST   /api/v1/warehouse/promotions/{id}/deactivate/ — o'chirish (manager+)
+
+    Avtomatik: valid_to o'tgach aksiya runtime da e'tiborga olinmaydi (Celery shart emas).
+    """
+    http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated(), CanAccess('mahsulotlar')]
+        return [IsAuthenticated(), IsManagerOrAbove()]
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return PromotionListSerializer
+        if self.action == 'retrieve':
+            return PromotionDetailSerializer
+        return PromotionCreateSerializer
+
+    def get_queryset(self):
+        worker = getattr(self.request.user, 'worker', None)
+        if not worker or not worker.store:
+            return Promotion.objects.none()
+        qs = (
+            Promotion.objects
+            .filter(store=worker.store)
+            .prefetch_related('products', 'categories', 'subcategories')
+            .order_by('-created_on')
+        )
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            qs = qs.filter(is_active=is_active.lower() in ('true', '1', 'yes'))
+        return qs
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        worker = getattr(self.request.user, 'worker', None)
+        if worker:
+            context['store'] = worker.store
+        return context
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        worker = getattr(self.request.user, 'worker', None)
+        instance = serializer.save(store=worker.store)
+        self._audit_log(
+            AuditLog.Action.CREATE, instance,
+            f"Aksiya yaratildi: '{instance.name}' — {instance.discount_pct}%",
+        )
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(
+            {
+                'message': "Aksiya muvaffaqiyatli yaratildi.",
+                'data': PromotionDetailSerializer(
+                    serializer.instance,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    @transaction.atomic
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        self._audit_log(
+            AuditLog.Action.UPDATE, instance,
+            f"Aksiya yangilandi: '{instance.name}'",
+        )
+
+    def update(self, request, *args, **kwargs):
+        kwargs['partial'] = True
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(
+            {
+                'message': "Aksiya yangilandi.",
+                'data': PromotionDetailSerializer(
+                    serializer.instance,
+                    context=self.get_serializer_context(),
+                ).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        name = instance.name
+        instance.delete()
+        self._audit_log(
+            AuditLog.Action.DELETE, instance,
+            f"Aksiya o'chirildi: '{name}'",
+        )
+        return Response(
+            {'message': f"Aksiya '{name}' o'chirildi."},
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=['post'], url_path='activate')
+    @transaction.atomic
+    def activate(self, request, pk=None):
+        instance = self.get_object()
+        if instance.is_active:
+            return Response(
+                {'message': "Aksiya allaqachon faol."},
+                status=status.HTTP_200_OK,
+            )
+        instance.is_active = True
+        instance.save(update_fields=['is_active'])
+        self._audit_log(
+            AuditLog.Action.UPDATE, instance,
+            f"Aksiya faollashtirildi: '{instance.name}'",
+        )
+        return Response(
+            {'message': f"Aksiya '{instance.name}' faollashtirildi."},
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=['post'], url_path='deactivate')
+    @transaction.atomic
+    def deactivate(self, request, pk=None):
+        instance = self.get_object()
+        if not instance.is_active:
+            return Response(
+                {'message': "Aksiya allaqachon nofaol."},
+                status=status.HTTP_200_OK,
+            )
+        instance.is_active = False
+        instance.save(update_fields=['is_active'])
+        self._audit_log(
+            AuditLog.Action.UPDATE, instance,
+            f"Aksiya o'chirildi: '{instance.name}'",
+        )
+        return Response(
+            {'message': f"Aksiya '{instance.name}' o'chirildi."},
+            status=status.HTTP_200_OK,
         )

@@ -81,6 +81,14 @@ Router avtomatik quyidagi URL'larni yaratadi:
 
   GET    /api/v1/warehouse/supplier-payments/    — to'lovlar ro'yxati (?supplier=, ?smena=)
   POST   /api/v1/warehouse/supplier-payments/    — to'lov yaratish (manager+, debt_balance avtomatik)
+
+  GET    /api/v1/warehouse/promotions/              — aksiyalar ro'yxati (?is_active=true/false)
+  POST   /api/v1/warehouse/promotions/              — aksiya yaratish (manager+)
+  GET    /api/v1/warehouse/promotions/{id}/         — aksiya tafsilotlari
+  PATCH  /api/v1/warehouse/promotions/{id}/         — aksiya yangilash (manager+)
+  DELETE /api/v1/warehouse/promotions/{id}/         — aksiya o'chirish (manager+)
+  POST   /api/v1/warehouse/promotions/{id}/activate/   — aksiyani faollashtirish (manager+)
+  POST   /api/v1/warehouse/promotions/{id}/deactivate/ — aksiyani o'chirish (manager+)
 """
 
 from rest_framework.routers import DefaultRouter
@@ -90,6 +98,7 @@ from .views import (
     CurrencyViewSet,
     ExchangeRateViewSet,
     ProductViewSet,
+    PromotionViewSet,
     StockAuditViewSet,
     StockBatchViewSet,
     StockMovementViewSet,
@@ -117,5 +126,6 @@ router.register(r'wastages',           WastageRecordViewSet,   basename='wastage
 router.register(r'audits',            StockAuditViewSet,      basename='audit')
 router.register(r'suppliers',         SupplierViewSet,        basename='supplier')
 router.register(r'supplier-payments', SupplierPaymentViewSet, basename='supplier-payment')
+router.register(r'promotions',        PromotionViewSet,        basename='promotion')
 
 urlpatterns = router.urls

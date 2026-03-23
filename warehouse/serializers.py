@@ -23,6 +23,7 @@ Tartib:
   12. StockAudit serializers    (B8 — inventarizatsiya)
   13. Supplier serializers      (B13 — yetkazib beruvchi)
   14. SupplierPayment serializers (B13 — to'lov tarixi)
+  15. Promotion serializers      (Aksiya — muddatli chegirma)
 """
 
 from rest_framework import serializers
@@ -36,6 +37,7 @@ from .models import (
     ExchangeRate,
     MovementType,
     Product,
+    Promotion,
     Stock,
     StockAudit,
     StockAuditItem,
@@ -383,6 +385,7 @@ class ProductListSerializer(serializers.ModelSerializer):
     status_display   = serializers.CharField(source='get_status_display', read_only=True)
     currency_code     = serializers.SerializerMethodField()
     barcode_image_url = serializers.SerializerMethodField()
+    active_promotion  = serializers.SerializerMethodField()
 
     class Meta:
         model  = Product
@@ -391,6 +394,7 @@ class ProductListSerializer(serializers.ModelSerializer):
             'category_name', 'subcategory_name',
             'unit', 'unit_display',
             'sale_price', 'currency_code',
+            'active_promotion',
             'barcode', 'barcode_image_url',
             'status', 'status_display',
             'image',
@@ -408,6 +412,27 @@ class ProductListSerializer(serializers.ModelSerializer):
             return request.build_absolute_uri(url)
         return url
 
+    def get_active_promotion(self, obj):
+        store_id = self.context.get('store_id')
+        if not store_id:
+            request = self.context.get('request')
+            if request and hasattr(request, 'user') and hasattr(request.user, 'worker'):
+                store_id = request.user.worker.store_id
+        if not store_id:
+            return None
+        promo = Promotion.get_active_for_product(obj, store_id)
+        if not promo:
+            return None
+        from decimal import Decimal
+        discounted = (obj.sale_price * (1 - promo.discount_pct / 100)).quantize(Decimal('0.01'))
+        return {
+            'id':               promo.id,
+            'name':             promo.name,
+            'discount_pct':     promo.discount_pct,
+            'discounted_price': discounted,
+            'valid_to':         promo.valid_to,
+        }
+
 
 class ProductDetailSerializer(serializers.ModelSerializer):
     category_id      = serializers.IntegerField(source='category.id', read_only=True)
@@ -422,6 +447,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     store_name       = serializers.CharField(source='store.name', read_only=True)
     stock_total      = serializers.SerializerMethodField()
     barcode_image_url = serializers.SerializerMethodField()
+    active_promotion  = serializers.SerializerMethodField()
 
     class Meta:
         model  = Product
@@ -432,6 +458,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             'unit', 'unit_display',
             'purchase_price', 'sale_price',
             'currency_id', 'currency_code', 'currency_symbol',
+            'active_promotion',
             'barcode', 'barcode_image_url', 'image',
             'store_name', 'status', 'status_display',
             'stock_total', 'created_on',
@@ -459,6 +486,23 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         if request:
             return request.build_absolute_uri(url)
         return url
+
+    def get_active_promotion(self, obj):
+        request = self.context.get('request')
+        if not request or not hasattr(request.user, 'worker'):
+            return None
+        promo = Promotion.get_active_for_product(obj, request.user.worker.store_id)
+        if not promo:
+            return None
+        from decimal import Decimal
+        discounted = (obj.sale_price * (1 - promo.discount_pct / 100)).quantize(Decimal('0.01'))
+        return {
+            'id':               promo.id,
+            'name':             promo.name,
+            'discount_pct':     promo.discount_pct,
+            'discounted_price': discounted,
+            'valid_to':         promo.valid_to,
+        }
 
 
 class ProductCreateSerializer(serializers.ModelSerializer):
@@ -2027,3 +2071,105 @@ class SupplierPaymentSerializer(serializers.ModelSerializer):
                 "To'lov miqdori 0 dan katta bo'lishi shart."
             )
         return value
+
+
+# ============================================================
+# 15. PROMOTION SERIALIZERLARI
+# ============================================================
+
+class PromotionListSerializer(serializers.ModelSerializer):
+    """Aksiyalar ro'yxati. GET /api/v1/warehouse/promotions/"""
+    product_count  = serializers.SerializerMethodField()
+    is_currently_active = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = Promotion
+        fields = (
+            'id', 'name', 'discount_pct',
+            'valid_from', 'valid_to',
+            'is_active', 'is_currently_active',
+            'product_count', 'created_on',
+        )
+
+    def get_product_count(self, obj):
+        return obj.products.count() + obj.categories.count() + obj.subcategories.count()
+
+    def get_is_currently_active(self, obj):
+        from django.utils import timezone
+        now = timezone.now()
+        return obj.is_active and obj.valid_from <= now <= obj.valid_to
+
+
+class PromotionDetailSerializer(serializers.ModelSerializer):
+    """Aksiya to'liq ma'lumoti. GET /api/v1/warehouse/promotions/{id}/"""
+    products_detail      = serializers.SerializerMethodField()
+    categories_detail    = serializers.SerializerMethodField()
+    subcategories_detail = serializers.SerializerMethodField()
+    is_currently_active  = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = Promotion
+        fields = (
+            'id', 'name', 'discount_pct',
+            'valid_from', 'valid_to',
+            'is_active', 'is_currently_active',
+            'description',
+            'products', 'products_detail',
+            'categories', 'categories_detail',
+            'subcategories', 'subcategories_detail',
+            'created_on',
+        )
+
+    def get_is_currently_active(self, obj):
+        from django.utils import timezone
+        now = timezone.now()
+        return obj.is_active and obj.valid_from <= now <= obj.valid_to
+
+    def get_products_detail(self, obj):
+        return [{'id': p.id, 'name': p.name, 'sale_price': p.sale_price}
+                for p in obj.products.all()]
+
+    def get_categories_detail(self, obj):
+        return [{'id': c.id, 'name': c.name} for c in obj.categories.all()]
+
+    def get_subcategories_detail(self, obj):
+        return [{'id': s.id, 'name': s.name} for s in obj.subcategories.all()]
+
+
+class PromotionCreateSerializer(serializers.ModelSerializer):
+    """
+    Aksiya yaratish/yangilash.
+    POST /api/v1/warehouse/promotions/
+    PATCH /api/v1/warehouse/promotions/{id}/
+    """
+    class Meta:
+        model  = Promotion
+        fields = (
+            'name', 'discount_pct',
+            'valid_from', 'valid_to',
+            'is_active', 'description',
+            'products', 'categories', 'subcategories',
+        )
+
+    def validate_discount_pct(self, value):
+        if value <= 0 or value > 100:
+            raise serializers.ValidationError(
+                "Chegirma 0 dan katta va 100 dan kichik bo'lishi kerak."
+            )
+        return value
+
+    def validate(self, data):
+        valid_from = data.get('valid_from') or (self.instance.valid_from if self.instance else None)
+        valid_to   = data.get('valid_to')   or (self.instance.valid_to   if self.instance else None)
+        if valid_from and valid_to and valid_from >= valid_to:
+            raise serializers.ValidationError(
+                "Tugash vaqti boshlanish vaqtidan keyin bo'lishi kerak."
+            )
+        products      = data.get('products', [])
+        categories    = data.get('categories', [])
+        subcategories = data.get('subcategories', [])
+        if not products and not categories and not subcategories:
+            raise serializers.ValidationError(
+                "Kamida bitta mahsulot, kategoriya yoki subkategoriya tanlang."
+            )
+        return data

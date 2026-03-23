@@ -2468,6 +2468,178 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "21. PROMOTIONS (Aksiyalar)",
+      "item": [
+        {
+          "name": "List Promotions",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/promotions/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "promotions", ""],
+              "query": [
+                { "key": "is_active", "value": "true", "disabled": true }
+              ]
+            },
+            "description": "Barcha aksiyalar ro'yxati. ?is_active=true/false filter bilan."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Promotion — Kategoriya bo'yicha",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Yoz chegirmasi\",\n  \"discount_pct\": \"15.00\",\n  \"valid_from\": \"2026-03-23T00:00:00Z\",\n  \"valid_to\": \"2026-04-23T23:59:59Z\",\n  \"is_active\": true,\n  \"categories\": [1, 2],\n  \"products\": [],\n  \"subcategories\": [],\n  \"description\": \"Yoz mavsumi aksiyasi\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/promotions/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "promotions", ""]
+            },
+            "description": "Yangi aksiya yaratish (manager+). Kamida products, categories yoki subcategories dan biri bo'lishi shart."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Promotion — Ayrim mahsulotlar",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"iPhone chegirma\",\n  \"discount_pct\": \"10.00\",\n  \"valid_from\": \"2026-03-23T00:00:00Z\",\n  \"valid_to\": \"2026-03-31T23:59:59Z\",\n  \"is_active\": true,\n  \"products\": [5, 7, 12],\n  \"categories\": [],\n  \"subcategories\": [],\n  \"description\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/promotions/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "promotions", ""]
+            },
+            "description": "Ayrim mahsulotlarga aksiya. products ro'yxatida mahsulot IDlari."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Promotion Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/promotions/1/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "promotions", "1", ""]
+            },
+            "description": "Aksiya tafsilotlari — products, categories, subcategories nested."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Promotion (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"discount_pct\": \"20.00\",\n  \"valid_to\": \"2026-05-01T23:59:59Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/promotions/1/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "promotions", "1", ""]
+            },
+            "description": "Aksiyani qisman yangilash (manager+)."
+          },
+          "response": []
+        },
+        {
+          "name": "Activate Promotion",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/promotions/1/activate/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "promotions", "1", "activate", ""]
+            },
+            "description": "Aksiyani faollashtirish (manager+)."
+          },
+          "response": []
+        },
+        {
+          "name": "Deactivate Promotion",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/promotions/1/deactivate/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "promotions", "1", "deactivate", ""]
+            },
+            "description": "Aksiyani o'chirish (manual) — is_active=False qiladi. valid_to o'tsa avtomatik ham ishlamaydi."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Promotion",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/promotions/1/",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "promotions", "1", ""]
+            },
+            "description": "Aksiyani o'chirish (manager+). Qaytarib bo'lmaydi."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Sale — Aksiya avtomatik (promotion auto-apply)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branch\": 24,\n  \"payment_type\": \"cash\",\n  \"paid_amount\": \"85000.00\",\n  \"items\": [\n    {\n      \"product\": 5,\n      \"quantity\": 1\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/trade/sales/",
+              "host": ["{{baseUrl}}"],
+              "path": ["trade", "sales", ""]
+            },
+            "description": "original_price va item_discount_pct berilmagan — server faol aksiyani avtomatik topib qo'llaydi. Aksiya bo'lmasa sale_price ishlatiladi."
+          },
+          "response": []
+        }
+      ]
     }
   ]
 }
