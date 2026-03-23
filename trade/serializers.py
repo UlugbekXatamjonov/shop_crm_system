@@ -367,7 +367,9 @@ class SaleListSerializer(serializers.ModelSerializer):
             'id', 'branch', 'branch_name',
             'worker_name', 'customer', 'customer_name',
             'payment_type', 'payment_type_display',
-            'total_price', 'discount_amount', 'paid_amount', 'debt_amount',
+            'total_price', 'discount_amount',
+            'cash_amount', 'card_amount',
+            'paid_amount', 'debt_amount',
             'status', 'status_display',
             'created_on',
         )
@@ -407,7 +409,9 @@ class SaleDetailSerializer(serializers.ModelSerializer):
             'customer', 'customer_name',
             'smena_id',
             'payment_type', 'payment_type_display',
-            'total_price', 'discount_amount', 'paid_amount', 'debt_amount',
+            'total_price', 'discount_amount',
+            'cash_amount', 'card_amount',
+            'paid_amount', 'debt_amount',
             'status', 'status_display',
             'description', 'created_on',
             'items',
@@ -479,6 +483,28 @@ class SaleCreateSerializer(serializers.Serializer):
         error_messages={
             'invalid':   "To'g'ri chegirma miqdori kiritilishi shart.",
             'min_value': "Chegirma manfiy bo'lishi mumkin emas.",
+        }
+    )
+    cash_amount     = serializers.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        min_value=Decimal('0'),
+        required=False,
+        default=Decimal('0'),
+        error_messages={
+            'invalid':   "To'g'ri naqd to'lov miqdori kiritilishi shart.",
+            'min_value': "Naqd to'lov miqdori manfiy bo'lishi mumkin emas.",
+        }
+    )
+    card_amount     = serializers.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        min_value=Decimal('0'),
+        required=False,
+        default=Decimal('0'),
+        error_messages={
+            'invalid':   "To'g'ri karta to'lov miqdori kiritilishi shart.",
+            'min_value': "Karta to'lov miqdori manfiy bo'lishi mumkin emas.",
         }
     )
     paid_amount     = serializers.DecimalField(

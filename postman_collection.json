@@ -1753,7 +1753,7 @@
           "response": []
         },
         {
-          "name": "Create Sale",
+          "name": "Create Sale — Naqd (oddiy)",
           "request": {
             "method": "POST",
             "header": [
@@ -1762,14 +1762,98 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"branch\": 24,\n  \"smena\": 2,\n  \"payment_type\": \"cash\",\n  \"paid_amount\": \"15000\",\n  \"items\": [\n    {\n      \"product\": 9,\n      \"quantity\": \"1\",\n      \"unit_price\": \"12000\"\n    }\n  ]\n}"
+              "raw": "{\n  \"branch\": 24,\n  \"payment_type\": \"cash\",\n  \"paid_amount\": \"90000\",\n  \"items\": [\n    { \"product\": 9, \"quantity\": \"1\", \"unit_price\": \"30000\" },\n    { \"product\": 10, \"quantity\": \"1\", \"unit_price\": \"20000\" },\n    { \"product\": 11, \"quantity\": \"1\", \"unit_price\": \"40000\" }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/sales/",
               "host": ["{{baseUrl}}"],
               "path": ["sales", ""]
             },
-            "description": "Create a new sale. payment_type: cash | card | debt"
+            "description": "Oddiy naqd to'lov. paid_amount = items jami narxi bilan teng bo'lishi shart."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Sale — Chegirma bilan (Variant B)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branch\": 24,\n  \"payment_type\": \"cash\",\n  \"discount_amount\": \"10000\",\n  \"paid_amount\": \"90000\",\n  \"items\": [\n    { \"product\": 9,  \"quantity\": \"1\", \"unit_price\": \"30000\" },\n    { \"product\": 10, \"quantity\": \"1\", \"unit_price\": \"20000\" },\n    { \"product\": 11, \"quantity\": \"1\", \"unit_price\": \"50000\" }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sales/",
+              "host": ["{{baseUrl}}"],
+              "path": ["sales", ""]
+            },
+            "description": "Savdo darajasida chegirma. 10 000 so'm chegirma 3 ta mahsulotga proporsional taqsimlanadi:\n- A (30k → 27k), B (20k → 18k), C (50k → 45k)\npaid_amount = total_price - discount_amount = 100k - 10k = 90k"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Sale — Katalog chegirma + savdo chegirma (ikki qatlam)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branch\": 24,\n  \"payment_type\": \"cash\",\n  \"discount_amount\": \"9000\",\n  \"paid_amount\": \"81000\",\n  \"items\": [\n    {\n      \"product\": 9,\n      \"quantity\": \"1\",\n      \"original_price\": \"30000\",\n      \"item_discount_pct\": \"10\"\n    },\n    {\n      \"product\": 10,\n      \"quantity\": \"1\",\n      \"original_price\": \"50000\",\n      \"item_discount_pct\": \"20\"\n    },\n    {\n      \"product\": 11,\n      \"quantity\": \"1\",\n      \"unit_price\": \"20000\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sales/",
+              "host": ["{{baseUrl}}"],
+              "path": ["sales", ""]
+            },
+            "description": "Ikki qatlamli chegirma:\n1-qatlam (katalog): A mahsulot 30k → 10% → 27k; B mahsulot 50k → 20% → 40k\n2-qatlam (savdo): 9k chegirma 3 ta mahsulotga proporsional taqsimlanadi\n\noriginal_price + item_discount_pct berilsa — unit_price backend hisoblaydi.\nunit_price berilsa — original_price shart emas (oddiy mahsulot)."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Sale — Aralash to'lov (MIXED: naqd + karta)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branch\": 24,\n  \"payment_type\": \"mixed\",\n  \"cash_amount\": \"60000\",\n  \"card_amount\": \"30000\",\n  \"paid_amount\": \"90000\",\n  \"items\": [\n    { \"product\": 9,  \"quantity\": \"1\", \"unit_price\": \"30000\" },\n    { \"product\": 10, \"quantity\": \"1\", \"unit_price\": \"20000\" },\n    { \"product\": 11, \"quantity\": \"1\", \"unit_price\": \"40000\" }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sales/",
+              "host": ["{{baseUrl}}"],
+              "path": ["sales", ""]
+            },
+            "description": "Aralash to'lov: naqd + karta.\ncash_amount + card_amount = paid_amount (net narx) bo'lishi SHART.\nIkkalasi ham 0 dan katta bo'lishi kerak.\nDebt (nasiya) MIXED ga qo'shilmaydi."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Sale — Nasiya (DEBT)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branch\": 24,\n  \"customer\": 1,\n  \"payment_type\": \"debt\",\n  \"paid_amount\": \"50000\",\n  \"items\": [\n    { \"product\": 9,  \"quantity\": \"1\", \"unit_price\": \"30000\" },\n    { \"product\": 10, \"quantity\": \"1\", \"unit_price\": \"20000\" },\n    { \"product\": 11, \"quantity\": \"1\", \"unit_price\": \"40000\" }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sales/",
+              "host": ["{{baseUrl}}"],
+              "path": ["sales", ""]
+            },
+            "description": "Nasiya to'lov. paid_amount <= net_price. debt_amount = net_price - paid_amount.\ncustomer majburiy (nasiya kimga?). Customer.debt_balance avtomatik yangilanadi."
           },
           "response": []
         },

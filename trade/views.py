@@ -471,6 +471,8 @@ class SaleViewSet(AuditMixin, viewsets.ModelViewSet):
         payment_type    = data['payment_type']
         discount_amount = data.get('discount_amount', Decimal('0'))
         paid_amount     = data['paid_amount']
+        cash_amount     = data.get('cash_amount', Decimal('0'))
+        card_amount     = data.get('card_amount', Decimal('0'))
         items_data      = data['items']
         description     = data.get('description', '')
 
@@ -627,11 +629,31 @@ class SaleViewSet(AuditMixin, viewsets.ModelViewSet):
                     )
                 })
             debt_amount = Decimal('0')
+            # CASH/CARD uchun cash_amount/card_amount avtomatik to'ldiriladi
+            if payment_type == PaymentType.CASH:
+                cash_amount = net_price
+                card_amount = Decimal('0')
+            else:
+                cash_amount = Decimal('0')
+                card_amount = net_price
         elif payment_type == PaymentType.MIXED:
-            if paid_amount > net_price:
+            # MIXED: naqd + karta = net_price, ikkalasi > 0
+            if cash_amount <= 0:
                 raise ValidationError({
-                    'paid_amount': "To'lov summasi jami narxdan ko'p bo'lishi mumkin emas."
+                    'cash_amount': "Aralash to'lovda naqd summa 0 dan katta bo'lishi shart."
                 })
+            if card_amount <= 0:
+                raise ValidationError({
+                    'card_amount': "Aralash to'lovda karta summa 0 dan katta bo'lishi shart."
+                })
+            if cash_amount + card_amount != net_price:
+                raise ValidationError({
+                    'cash_amount': (
+                        f"Naqd ({cash_amount:.2f}) + karta ({card_amount:.2f}) "
+                        f"jami narxga teng bo'lishi shart: {net_price:.2f} so'm."
+                    )
+                })
+            paid_amount = net_price
             debt_amount = Decimal('0')
         else:  # DEBT
             if paid_amount > net_price:
@@ -639,6 +661,9 @@ class SaleViewSet(AuditMixin, viewsets.ModelViewSet):
                     'paid_amount': "To'lov summasi jami narxdan ko'p bo'lishi mumkin emas."
                 })
             debt_amount = net_price - paid_amount
+            # DEBT da qisman to'lov naqd deb hisoblanadi
+            cash_amount = paid_amount
+            card_amount = Decimal('0')
 
         # --------------------------------------------------
         # 8. Mahsulotlar do'konga tegishliligini tekshirish
@@ -693,6 +718,8 @@ class SaleViewSet(AuditMixin, viewsets.ModelViewSet):
             total_price     = total_price,
             discount_amount = discount_amount,
             paid_amount     = paid_amount,
+            cash_amount     = cash_amount,
+            card_amount     = card_amount,
             debt_amount     = debt_amount,
             status          = SaleStatus.COMPLETED,
             description     = description,

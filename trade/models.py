@@ -167,6 +167,11 @@ class Sale(models.Model):
     ⚠️ Customer.debt_balance nasiya bo'lsa yangilanadi.
 
     paid_amount + debt_amount == total_price - discount_amount (validatsiya views.py da)
+
+    MIXED to'lov:
+      cash_amount + card_amount == net_price (ya'ni paid_amount)
+      Faqat payment_type='mixed' bo'lganda ikkalasi > 0 bo'lishi shart.
+      Boshqa to'lov turlarida: cash_amount va card_amount = 0 (default).
     """
     branch          = models.ForeignKey(
         'store.Branch',
@@ -221,7 +226,19 @@ class Sale(models.Model):
     paid_amount     = models.DecimalField(
         max_digits=15,
         decimal_places=2,
-        verbose_name="To'langan summa",
+        verbose_name="To'langan summa (jami: naqd + karta)",
+    )
+    cash_amount     = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+        verbose_name="Naqd to'lov summasi",
+    )
+    card_amount     = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+        verbose_name="Karta to'lov summasi",
     )
     debt_amount     = models.DecimalField(
         max_digits=15,
