@@ -2348,6 +2348,9 @@ config/urls.py        ← /api/v1/ va /api/v1/admin/ urllar qo'shiladi
 18 ❌     Offline rejim                    ← YANGI
 19 ❌     QR kod + AuditLog API
 20 ❌     Subscription (Obuna tizimi)      ← YANGI
+21 ❌ V2  Super Admin Panel — Do'konlar + Obuna + Kupon + Moliya dashboard
+22 ❌ V2  Super Admin Panel — Support tickets + Onboarding + Health score + Referral
+23 ❌ V2  Super Admin Panel — Bildirishnomalar + Release notes + Audit log + Feature flags
 
 IXTIYORIY FLAGLAR (StoreSettings da, har do'kon uchun alohida):
   subcategory_enabled  → default=False (B1)
@@ -4735,4 +4738,281 @@ Body (JSON):
 
 ============================================================
   Sana: 23.03.2026  |  V1→V2 migration xavfsizlik qoidalari
+============================================================
+
+
+============================================================
+  B21 — SUPER ADMIN PANEL: YADRO
+  (Do'konlar + Obuna + Kupon + Moliya dashboard)
+  Versiya: V2  |  Sana: 23.03.2026
+============================================================
+
+  Maqsad: Loyiha egasi (superadmin) barcha do'konlarni nazorat qilishi,
+  mijozlarga hizmat ko'rsatishi va o'z daromad/xarajatlarini kuzatishi.
+  Frontend: Alohida React/Next.js yoki Vue panel.
+  Backend:  /api/v1/superadmin/* — faqat is_superuser=True kiradi.
+
+  ─────────────────────────────────────────────────────────────
+  1. DASHBOARD (Bosh sahifa)
+  ─────────────────────────────────────────────────────────────
+  GET /api/v1/superadmin/dashboard/
+    - Jami do'konlar soni (active / trial / expired / blocked)
+    - MRR (Monthly Recurring Revenue)
+    - ARR (Annual Recurring Revenue)
+    - Sof foyda = Daromad - Admin xarajatlari
+    - Bugun ro'yxatdan o'tgan yangi do'konlar
+    - Trial tugayotganlar (7 kun va kamroq qolgan)
+    - Ochiq support ticketlar soni
+    - Grafik: so'nggi 12 oy MRR o'zgarishi
+
+  ─────────────────────────────────────────────────────────────
+  2. DO'KONLAR BOSHQARUVI
+  ─────────────────────────────────────────────────────────────
+  GET    /api/v1/superadmin/stores/
+         ?status=active|trial|expired|blocked
+         ?plan=starter|pro|business
+         ?search=do'kon nomi yoki egasi
+  GET    /api/v1/superadmin/stores/{id}/
+           + xodimlar soni, sotuvlar soni, ombor hajmi,
+             faollik darajasi (health_score), onboarding progress
+  POST   /api/v1/superadmin/stores/{id}/block/
+  POST   /api/v1/superadmin/stores/{id}/unblock/
+  POST   /api/v1/superadmin/stores/{id}/impersonate/
+
+  Impersonate (muhim funksiya):
+    - Superadmin do'kon egasi nomidan tizimga kiradi
+    - Mijoz muammosini o'z ko'zi bilan ko'radi va hal qiladi
+    - Barcha harakatlar audit logda "superadmin impersonated" belgilanadi
+
+  Health Score (faollik darajasi):
+    Juda faol:  oxirgi 7 kunda 10+ sotuv
+    O'rtacha:   oxirgi 30 kunda 1-9 sotuv
+    Uxlayapti:  30 kundan ko'p sotuv yo'q
+    O'lik:      hech qachon bitta ham sotuv qilmagan
+
+  Onboarding Progress (har bir do'kon uchun):
+    Do'kon sozlandimi / Birinchi mahsulot / Birinchi xodim
+    Birinchi sotuv / Smena ochildimi / Ombor to'ldirildi
+
+  ─────────────────────────────────────────────────────────────
+  3. OBUNA BOSHQARUVI
+  ─────────────────────────────────────────────────────────────
+  GET  /api/v1/superadmin/subscriptions/
+  GET  /api/v1/superadmin/subscriptions/{id}/
+  POST /api/v1/superadmin/subscriptions/{id}/extend/
+       {"days": 30, "note": "Bonus berildi"}
+  POST /api/v1/superadmin/subscriptions/{id}/change-plan/
+       {"plan_id": 2, "note": "Pro ga ko'tarildi"}
+  POST /api/v1/superadmin/subscriptions/{id}/give-trial/
+       {"days": 14, "note": "Yangi do'kon uchun sinov"}
+
+  ─────────────────────────────────────────────────────────────
+  4. KUPON TIZIMI
+  ─────────────────────────────────────────────────────────────
+  Kupon turlari:
+    FREE_DAYS:   X kun bepul (30 kun, 3 oy, 1 yil)
+    PERCENT_OFF: X foiz chegirma (bitta to'lovda)
+    AMOUNT_OFF:  Aniq summa chegirma
+
+  Kupon modeli maydonlari:
+    code, type, value, max_uses, used_count,
+    valid_from, valid_to, for_new_only, plan, is_active
+
+  Endpointlar (superadmin):
+  GET    /api/v1/superadmin/coupons/
+  POST   /api/v1/superadmin/coupons/
+  PATCH  /api/v1/superadmin/coupons/{id}/
+  DELETE /api/v1/superadmin/coupons/{id}/
+  GET    /api/v1/superadmin/coupons/{id}/usages/
+
+  Do'kon egasi kupon qo'llash:
+  POST   /api/v1/subscriptions/apply-coupon/    {"code": "WELCOME30"}
+
+  ─────────────────────────────────────────────────────────────
+  5. ADMIN O'ZINING MOLIYASI
+  ─────────────────────────────────────────────────────────────
+  GET /api/v1/superadmin/financial/
+    Daromad:
+      - Har bir tarifdan: necha do'kon x narxi = jami summa
+      - Trial do'konlar soni (hali pul to'lamagan)
+      - Kupon ishlatayotganlar: soni + yo'qotish summasi
+      - Bepul foydalanayotganlar: soni + sababi
+      - Jami MRR, ARR
+    Xarajatlar:
+      - Server, SMS xizmat, Domain/SSL, boshqa
+    Natija:
+      - Sof foyda = Daromad - Xarajat
+      - O'tgan oy bilan taqqoslash
+      - 12 oylik grafik
+
+  GET    /api/v1/superadmin/admin-expenses/
+  POST   /api/v1/superadmin/admin-expenses/
+  PATCH  /api/v1/superadmin/admin-expenses/{id}/
+  DELETE /api/v1/superadmin/admin-expenses/{id}/
+  GET    /api/v1/superadmin/financial/export/   — Excel hisobot
+
+============================================================
+  B22 — SUPER ADMIN PANEL: MIJOZ XIZMATI
+  (Support tickets + Onboarding + Health score + Referral)
+  Versiya: V2  |  Sana: 23.03.2026
+============================================================
+
+  ─────────────────────────────────────────────────────────────
+  1. SUPPORT TICKETS
+  ─────────────────────────────────────────────────────────────
+  Ticket modeli:
+    store, title, description,
+    status: open | in_progress | resolved | closed
+    priority: low | medium | high | urgent
+    created_at, updated_at, resolved_at
+
+  Do'kon tarafida:
+  GET    /api/v1/support/tickets/
+  POST   /api/v1/support/tickets/
+  GET    /api/v1/support/tickets/{id}/
+
+  Superadmin tarafida:
+  GET    /api/v1/superadmin/tickets/
+         ?status=open|in_progress|resolved   ?priority=urgent|high
+  POST   /api/v1/superadmin/tickets/{id}/reply/
+  PATCH  /api/v1/superadmin/tickets/{id}/status/
+  GET    /api/v1/superadmin/tickets/stats/
+         - Ochiq/yopiq soni, o'rtacha javob vaqti,
+           eng ko'p uchraydigan muammolar
+
+  ─────────────────────────────────────────────────────────────
+  2. REFERRAL TIZIMI
+  ─────────────────────────────────────────────────────────────
+  Mantiq: Do'kon A -> Do'kon B ni taklif qiladi ->
+          Do'kon B ro'yxatdan o'tsa -> Do'kon A ga bonus (1 oy bepul)
+
+  Referral modeli:
+    referrer_store, referred_store, referral_code,
+    status: pending | confirmed | rewarded
+    reward_days, created_at, confirmed_at, rewarded_at
+
+  Do'kon tarafida:
+  GET  /api/v1/referral/my-code/       — O'z referral kodi
+  GET  /api/v1/referral/my-referrals/  — Kim taklif qilindi, bonus holati
+
+  Superadmin:
+  GET  /api/v1/superadmin/referrals/
+  GET  /api/v1/superadmin/referrals/stats/
+
+  ─────────────────────────────────────────────────────────────
+  3. FOYDALANUVCHILAR BOSHQARUVI
+  ─────────────────────────────────────────────────────────────
+  GET   /api/v1/superadmin/users/          ?store=ID  ?role=manager|seller
+  GET   /api/v1/superadmin/users/{id}/     + oxirgi kirish, faollik
+  POST  /api/v1/superadmin/users/{id}/block/
+  POST  /api/v1/superadmin/users/{id}/reset-password/
+  GET   /api/v1/superadmin/users/{id}/login-history/
+
+============================================================
+  B23 — SUPER ADMIN PANEL: TIZIM VA NAZORAT
+  (Bildirishnomalar + Release notes + Audit log + Feature flags)
+  Versiya: V2  |  Sana: 23.03.2026
+============================================================
+
+  ─────────────────────────────────────────────────────────────
+  1. BILDIRISHNOMALAR (Announcements)
+  ─────────────────────────────────────────────────────────────
+  Announcement modeli:
+    title, body,
+    type: info | warning | maintenance | new_feature
+    target: all | specific_stores | specific_plans
+    stores (M2M), plans (M2M),
+    scheduled_at, sent_at, is_sent
+
+  GET    /api/v1/superadmin/announcements/
+  POST   /api/v1/superadmin/announcements/
+  PATCH  /api/v1/superadmin/announcements/{id}/
+  DELETE /api/v1/superadmin/announcements/{id}/
+  POST   /api/v1/superadmin/announcements/{id}/send/
+
+  Do'kon tizimga kirganida:
+  GET    /api/v1/notifications/unread/
+
+  ─────────────────────────────────────────────────────────────
+  2. RELEASE NOTES / CHANGELOG
+  ─────────────────────────────────────────────────────────────
+  Release modeli:
+    version, title, content (Markdown),
+    release_type: major | minor | patch | hotfix
+    published_at, is_published
+
+  GET    /api/v1/superadmin/releases/
+  POST   /api/v1/superadmin/releases/
+  PATCH  /api/v1/superadmin/releases/{id}/
+  POST   /api/v1/superadmin/releases/{id}/publish/
+
+  Do'kon tarafida:
+  GET    /api/v1/changelog/
+
+  ─────────────────────────────────────────────────────────────
+  3. ADMIN AUDIT LOG
+  ─────────────────────────────────────────────────────────────
+  Loglanadigan harakatlar:
+    - Do'kon bloklandi / blokdan chiqarildi
+    - Obuna uzaytirildi / tarif o'zgartirildi
+    - Kupon yaratildi / o'chirildi
+    - Impersonate qilindi (qaysi do'konga)
+    - Announcement yuborildi
+    - Admin xarajat qo'shdi / o'chirdi
+
+  GET /api/v1/superadmin/audit-logs/
+      ?action=impersonate|block|extend_subscription|...
+      ?date_from=...&date_to=...
+
+  ─────────────────────────────────────────────────────────────
+  4. FEATURE FLAGS VA TARIF LIMITLARI
+  ─────────────────────────────────────────────────────────────
+  Plan limitlari (superadmin boshqaradi):
+    Starter:  max_branches=1,    max_workers=5,  max_products=1000
+    Pro:      max_branches=5,    max_workers=15, max_products=5000
+    Business: max_branches=null, max_workers=null, max_products=null
+
+  Feature flags (do'kon darajasida):
+    ofd_enabled, telegram_enabled, sms_enabled,
+    referral_enabled, advanced_reports
+
+  GET    /api/v1/superadmin/plans/
+  POST   /api/v1/superadmin/plans/
+  PATCH  /api/v1/superadmin/plans/{id}/
+  GET    /api/v1/superadmin/stores/{id}/flags/
+  PATCH  /api/v1/superadmin/stores/{id}/flags/
+
+  ─────────────────────────────────────────────────────────────
+  5. TIZIM MONITORING
+  ─────────────────────────────────────────────────────────────
+  GET /api/v1/superadmin/system/
+    - Server: CPU, RAM, disk holati
+    - Faol sessiyalar soni
+    - Bugungi API so'rovlar soni
+    - So'nggi 10 ta 500-xato
+
+  ─────────────────────────────────────────────────────────────
+  AMALGA OSHIRISH TARTIBI
+  ─────────────────────────────────────────────────────────────
+
+  B21 — MVP (birinchi qilinadi):
+    Dashboard (MRR, do'konlar holati)
+    Do'konlar boshqaruvi + Impersonate
+    Obuna boshqaruvi (uzaytirish, tarif o'zgartirish)
+    Kupon tizimi (yaratish, ishlatish, statistika)
+    Admin moliyasi (daromad, xarajat, sof foyda)
+
+  B22 — Mijoz xizmati:
+    Support tickets
+    Referral tizimi
+    Foydalanuvchilar boshqaruvi
+
+  B23 — Tizim nazorati:
+    Bildirishnomalar + Release notes
+    Admin audit log
+    Feature flags + Tarif limitlari
+    Tizim monitoring
+
+============================================================
+  Sana: 23.03.2026  |  B21-B22-B23 Super Admin Panel
 ============================================================
