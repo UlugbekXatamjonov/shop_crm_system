@@ -4647,3 +4647,92 @@ Body (JSON):
 ============================================================
   Sana: 23.03.2026  |  Soliq integratsiya rejasi  |  8 bosqich
 ============================================================
+
+
+============================================================
+  V1 → V2 O'TISH QOIDALARI (Soliq integratsiya boshlananda)
+  Sana: 23.03.2026
+============================================================
+
+  ESLATMA: V2 ishlanmasi boshlanganida (soliq integratsiya) quyidagi
+  qoidalarga QATIY amal qilish kerak. Aks holda v1 da yig'ilgan
+  10-20 do'kon ma'lumotlari zarar ko'rishi mumkin.
+
+  ─────────────────────────────────────────────────────────────
+  1. MIGRATION QOIDALARI (MAJBURIY)
+  ─────────────────────────────────────────────────────────────
+
+  Barcha yangi maydonlar null/blank safe bo'lishi SHART:
+
+    # XATO (eski ma'lumotlar xato beradi):
+    mxik_code = CharField(max_length=17)
+
+    # TO'G'RI (eski ma'lumotlar NULL/bo'sh qoladi):
+    mxik_code    = CharField(max_length=17, blank=True, default="")
+    fiscal_sign  = CharField(max_length=64, blank=True, default="")
+    fiscal_number= CharField(max_length=32, blank=True, default="")
+    fiscal_qr_url= URLField(blank=True, default="")
+    ofd_sent_at  = DateTimeField(null=True, blank=True)
+    ofd_status   = CharField(max_length=20, default="not_required")
+
+  ─────────────────────────────────────────────────────────────
+  2. OFD INTEGRATSIYA ARXITEKTURASI (MAJBURIY)
+  ─────────────────────────────────────────────────────────────
+
+  OFD chaqiruvi sotuv yaratishni BLOKIROVKA qilmasligi kerak:
+
+    # XATO (OFD ishlamasa sotuv ham yaratilmaydi):
+    def create(self, request):
+        ofd_response = send_to_ofd(data)   # fail bo'lsa?
+        sale = Sale.objects.create(...)
+
+    # TO'G'RI (avval saqlash, keyin OFD — xatolikda sotuv saqlanadi):
+    def create(self, request):
+        sale = Sale.objects.create(..., ofd_status='pending')
+        try:
+            result = send_to_ofd(sale)
+            sale.fiscal_sign   = result['fiscal_sign']
+            sale.fiscal_number = result['fiscal_number']
+            sale.ofd_status    = 'success'
+            sale.ofd_sent_at   = timezone.now()
+            sale.save()
+        except Exception:
+            sale.ofd_status = 'failed'  # Celery qayta urinadi
+            sale.save()
+
+  ─────────────────────────────────────────────────────────────
+  3. MXIK KOD — GRACE PERIOD (MAJBURIY)
+  ─────────────────────────────────────────────────────────────
+
+  V2 deploy qilinganda eski mahsulotlar mxik_code siz bo'ladi.
+  Ularni bir kunda to'ldirish mumkin emas.
+
+  Yechim:
+    - mxik_code bo'sh mahsulotlar sotilishi mumkin (bloklash yo'q)
+    - Admin panelda "MXIK to'ldirilmagan mahsulotlar" filtri bo'lishi kerak
+    - OFD ga yuborishda mxik_code bo'sh bo'lsa → ofd_status='mxik_missing'
+    - Do'kon egasi o'zi belgilangan muddatda to'ldiradi
+
+  ─────────────────────────────────────────────────────────────
+  4. DEPLOY TARTIBI (MAJBURIY)
+  ─────────────────────────────────────────────────────────────
+
+  V2 migration ni kechasi (traffic eng kam paytda) qilish:
+    1. Backup olish (pg_dump)
+    2. Migrate qilish (faqat ADD COLUMN — xavfsiz)
+    3. Yangi kodni deploy qilish
+    4. Ertasi kuni do'konlar ishlashda davom etadi
+
+  Smena ochiq bo'lsa ham muammo yo'q — yangi maydonlar NULL/default.
+
+  ─────────────────────────────────────────────────────────────
+  5. ESLATMA XULOSA
+  ─────────────────────────────────────────────────────────────
+
+  V2 boshlanganda bu bo'limni qayta o'qi va har bir qoidaga
+  amal qil. V1 da 10-20 do'kon, yuz minglab sotuv ma'lumotlari
+  bo'ladi — ularning hammasi saqlanishi SHART.
+
+============================================================
+  Sana: 23.03.2026  |  V1→V2 migration xavfsizlik qoidalari
+============================================================
