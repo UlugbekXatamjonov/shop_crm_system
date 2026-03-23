@@ -1372,6 +1372,15 @@ class Promotion(models.Model):
         from django.utils import timezone
         from django.db.models import Q
         now = timezone.now()
+
+        # Mahsulotga tegishli faol aksiyalar: mahsulot, kategoriya yoki subkategoriya bo'yicha.
+        # category/subcategory NULL bo'lishi mumkin (SET_NULL) — Q faqat mavjud qiymatlarda qo'llanadi.
+        product_q = Q(products=product)
+        if product.category_id is not None:
+            product_q |= Q(categories=product.category_id)
+        if product.subcategory_id is not None:
+            product_q |= Q(subcategories=product.subcategory_id)
+
         return (
             cls.objects
             .filter(
@@ -1380,11 +1389,7 @@ class Promotion(models.Model):
                 valid_from__lte=now,
                 valid_to__gte=now,
             )
-            .filter(
-                Q(products=product)
-                | Q(categories=product.category_id)
-                | Q(subcategories=product.subcategory_id)
-            )
+            .filter(product_q)
             .order_by('-discount_pct')
             .first()
         )

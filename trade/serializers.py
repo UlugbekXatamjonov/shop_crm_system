@@ -548,7 +548,7 @@ class SaleCreateSerializer(serializers.Serializer):
 
 class SaleReturnItemInputSerializer(serializers.Serializer):
     """SaleReturnCreate ichida har bir element uchun."""
-    product    = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
+    product    = serializers.PrimaryKeyRelatedField(queryset=Product.objects.filter(status='active'))
     quantity   = serializers.DecimalField(
         max_digits=10,
         decimal_places=3,
