@@ -93,6 +93,12 @@ urlpatterns = [
     # Super Admin Panel: /api/v1/superadmin/
     path('api/v1/superadmin/', include('superadmin.api_urls')),
 
+    # Support Tickets (do'kon egasi): /api/v1/support/tickets/
+    path('api/v1/support/', include('superadmin.support_urls')),
+
+    # Referral (do'kon egasi): /api/v1/referral/
+    path('api/v1/referral/', include('superadmin.referral_urls')),
+
     # --- API Dokumentatsiya ---
     path('swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path('swagger/',         schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),

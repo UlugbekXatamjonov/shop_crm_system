@@ -7,7 +7,11 @@ from rest_framework import serializers
 
 from store.models import Store
 from subscription.models import Subscription, SubscriptionInvoice, SubscriptionPlan
-from .models import AdminExpense, Coupon, CouponUsage
+from .models import (
+    AdminExpense, Coupon, CouponUsage,
+    Referral, StoreReferralCode,
+    SupportTicket, TicketReply,
+)
 
 User = get_user_model()
 
@@ -355,3 +359,144 @@ class AdminPlanSerializer(serializers.ModelSerializer):
     def get_monthly_revenue(self, obj):
         count = obj.subscriptions.filter(status='active').count()
         return float(obj.price_monthly) * count
+
+
+# ============================================================
+# SUPPORT TICKETS
+# ============================================================
+
+class TicketReplySerializer(serializers.ModelSerializer):
+    author_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = TicketReply
+        fields = ['id', 'author_name', 'message', 'is_admin', 'created_on']
+
+    def get_author_name(self, obj):
+        if obj.author:
+            return obj.author.get_full_name() or obj.author.email
+        return "Noma'lum"
+
+
+class SupportTicketListSerializer(serializers.ModelSerializer):
+    store_name   = serializers.CharField(source='store.name', read_only=True)
+    replies_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = SupportTicket
+        fields = [
+            'id', 'store_name', 'title', 'status', 'priority',
+            'replies_count', 'created_on', 'updated_on',
+        ]
+
+    def get_replies_count(self, obj):
+        return obj.replies.count()
+
+
+class SupportTicketDetailSerializer(serializers.ModelSerializer):
+    store_name = serializers.CharField(source='store.name', read_only=True)
+    replies    = TicketReplySerializer(many=True, read_only=True)
+
+    class Meta:
+        model  = SupportTicket
+        fields = [
+            'id', 'store_name', 'title', 'description', 'status', 'priority',
+            'replies', 'resolved_at', 'created_on', 'updated_on',
+        ]
+
+
+class SupportTicketCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = SupportTicket
+        fields = ['title', 'description', 'priority']
+
+
+class TicketReplyCreateSerializer(serializers.Serializer):
+    message = serializers.CharField(min_length=1)
+
+
+class TicketStatusUpdateSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=['open', 'in_progress', 'resolved', 'closed'])
+
+
+class TicketStatsSerializer(serializers.Serializer):
+    total        = serializers.IntegerField()
+    open         = serializers.IntegerField()
+    in_progress  = serializers.IntegerField()
+    resolved     = serializers.IntegerField()
+    closed       = serializers.IntegerField()
+    urgent       = serializers.IntegerField()
+    avg_resolve_hours = serializers.FloatField()
+
+
+# ============================================================
+# REFERRAL
+# ============================================================
+
+class StoreReferralCodeSerializer(serializers.ModelSerializer):
+    store_name   = serializers.CharField(source='store.name', read_only=True)
+    referral_url = serializers.SerializerMethodField()
+    referrals_count    = serializers.SerializerMethodField()
+    rewarded_count     = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = StoreReferralCode
+        fields = ['id', 'store_name', 'code', 'referral_url', 'referrals_count', 'rewarded_count', 'created_on']
+
+    def get_referral_url(self, obj):
+        return f"?ref={obj.code}"
+
+    def get_referrals_count(self, obj):
+        return Referral.objects.filter(referrer_store=obj.store).count()
+
+    def get_rewarded_count(self, obj):
+        return Referral.objects.filter(referrer_store=obj.store, status='rewarded').count()
+
+
+class ReferralListSerializer(serializers.ModelSerializer):
+    referrer_name = serializers.CharField(source='referrer_store.name', read_only=True)
+    referred_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = Referral
+        fields = [
+            'id', 'referrer_name', 'referred_name', 'referral_code',
+            'status', 'reward_days', 'confirmed_at', 'rewarded_at', 'created_on',
+        ]
+
+    def get_referred_name(self, obj):
+        return obj.referred_store.name if obj.referred_store else None
+
+
+class ReferralStatsSerializer(serializers.Serializer):
+    total_referrals  = serializers.IntegerField()
+    confirmed        = serializers.IntegerField()
+    rewarded         = serializers.IntegerField()
+    pending          = serializers.IntegerField()
+    total_bonus_days = serializers.IntegerField()
+
+
+# ============================================================
+# WORKERS (superadmin boshqaruvi)
+# ============================================================
+
+class AdminWorkerListSerializer(serializers.Serializer):
+    id          = serializers.IntegerField()
+    full_name   = serializers.SerializerMethodField()
+    email       = serializers.SerializerMethodField()
+    store_name  = serializers.SerializerMethodField()
+    role        = serializers.CharField()
+    status      = serializers.CharField()
+    last_login  = serializers.SerializerMethodField()
+
+    def get_full_name(self, obj):
+        return obj.user.get_full_name() or obj.user.email
+
+    def get_email(self, obj):
+        return obj.user.email
+
+    def get_store_name(self, obj):
+        return obj.store.name if obj.store else None
+
+    def get_last_login(self, obj):
+        return obj.user.last_login

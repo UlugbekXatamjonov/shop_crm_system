@@ -1,5 +1,11 @@
+import uuid
+
+from django.contrib.auth import get_user_model
 from django.db import models
+
 from store.models import Store
+
+User = get_user_model()
 
 
 # ============================================================
@@ -139,3 +145,148 @@ class AdminExpense(models.Model):
 
     def __str__(self):
         return f"{self.title} — {self.amount:,.0f} so'm ({self.date})"
+
+
+# ============================================================
+# SUPPORT TICKETS
+# ============================================================
+
+class TicketStatus(models.TextChoices):
+    OPEN        = 'open',        'Ochiq'
+    IN_PROGRESS = 'in_progress', "Ko'rilmoqda"
+    RESOLVED    = 'resolved',    'Hal qilindi'
+    CLOSED      = 'closed',      'Yopildi'
+
+
+class TicketPriority(models.TextChoices):
+    LOW    = 'low',    'Past'
+    MEDIUM = 'medium', "O'rta"
+    HIGH   = 'high',   'Yuqori'
+    URGENT = 'urgent', 'Shoshilinch'
+
+
+class SupportTicket(models.Model):
+    """Do'kon egasi superadminga muammo yuboradi."""
+    store       = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='tickets')
+    title       = models.CharField(max_length=200, verbose_name="Sarlavha")
+    description = models.TextField(verbose_name="Batafsil tavsif")
+    status      = models.CharField(
+        max_length=15, choices=TicketStatus.choices,
+        default=TicketStatus.OPEN, verbose_name="Holati"
+    )
+    priority    = models.CharField(
+        max_length=10, choices=TicketPriority.choices,
+        default=TicketPriority.MEDIUM, verbose_name="Ustuvorlik"
+    )
+    resolved_at = models.DateTimeField(null=True, blank=True, verbose_name="Hal qilingan vaqt")
+    created_on  = models.DateTimeField(auto_now_add=True)
+    updated_on  = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name        = 'Support ticket'
+        verbose_name_plural = 'Support ticketlar'
+        ordering            = ['-created_on']
+
+    def __str__(self):
+        return f"[{self.get_priority_display()}] {self.title} — {self.store.name}"
+
+
+class TicketReply(models.Model):
+    """Ticket javoblari — ham do'kon, ham superadmin yozishi mumkin."""
+    ticket     = models.ForeignKey(SupportTicket, on_delete=models.CASCADE, related_name='replies')
+    author     = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='ticket_replies')
+    message    = models.TextField(verbose_name="Xabar")
+    is_admin   = models.BooleanField(default=False, verbose_name="Superadmindan")
+    created_on = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name        = 'Ticket javob'
+        verbose_name_plural = 'Ticket javoblar'
+        ordering            = ['created_on']
+
+    def __str__(self):
+        who = "Admin" if self.is_admin else self.ticket.store.name
+        return f"{who} — {self.created_on.strftime('%d.%m.%Y %H:%M')}"
+
+
+# ============================================================
+# REFERRAL TIZIMI
+# ============================================================
+
+class ReferralStatus(models.TextChoices):
+    PENDING   = 'pending',   'Kutilmoqda'
+    CONFIRMED = 'confirmed', 'Tasdiqlandi'
+    REWARDED  = 'rewarded',  'Bonus berildi'
+
+
+class Referral(models.Model):
+    """
+    Do'kon A -> Do'kon B ni taklif qiladi.
+    Do'kon B ro'yxatdan o'tganda Do'kon A ga bonus beriladi.
+    """
+    referrer_store  = models.ForeignKey(
+        Store, on_delete=models.CASCADE,
+        related_name='referrals_made',
+        verbose_name="Taklif qilgan do'kon"
+    )
+    referred_store  = models.ForeignKey(
+        Store, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='referral_received',
+        verbose_name="Taklif qilingan do'kon"
+    )
+    referral_code   = models.CharField(
+        max_length=20, unique=True,
+        verbose_name="Referral kodi"
+    )
+    status          = models.CharField(
+        max_length=15, choices=ReferralStatus.choices,
+        default=ReferralStatus.PENDING, verbose_name="Holati"
+    )
+    reward_days     = models.PositiveIntegerField(
+        default=30, verbose_name="Bonus kunlar soni"
+    )
+    confirmed_at    = models.DateTimeField(null=True, blank=True, verbose_name="Tasdiqlangan vaqt")
+    rewarded_at     = models.DateTimeField(null=True, blank=True, verbose_name="Bonus berilgan vaqt")
+    created_on      = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name        = 'Referral'
+        verbose_name_plural = 'Referrallar'
+        ordering            = ['-created_on']
+
+    def __str__(self):
+        referred = self.referred_store.name if self.referred_store else "Hali foydalanilmagan"
+        return f"{self.referrer_store.name} → {referred} [{self.get_status_display()}]"
+
+
+class StoreReferralCode(models.Model):
+    """Har bir do'konning doimiy referral kodi."""
+    store = models.OneToOneField(
+        Store, on_delete=models.CASCADE,
+        related_name='referral_code_obj',
+        verbose_name="Do'kon"
+    )
+    code       = models.CharField(max_length=20, unique=True, verbose_name="Referral kodi")
+    created_on = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name        = "Do'kon referral kodi"
+        verbose_name_plural = "Do'kon referral kodlari"
+
+    def __str__(self):
+        return f"{self.store.name}: {self.code}"
+
+    @classmethod
+    def get_or_create_for_store(cls, store):
+        obj, created = cls.objects.get_or_create(
+            store=store,
+            defaults={'code': cls._generate_code(store)}
+        )
+        return obj
+
+    @classmethod
+    def _generate_code(cls, store):
+        base = store.name[:4].upper().replace(' ', '')
+        suffix = uuid.uuid4().hex[:4].upper()
+        return f"{base}{suffix}"

@@ -4785,6 +4785,492 @@
           }
         }
       ]
+    },
+    {
+      "name": "28. B22 — SUPPORT va REFERRAL",
+      "item": [
+        {
+          "name": "Support — O'z ticketlari ro'yxati",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support/tickets/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support",
+                "tickets",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Support — Yangi ticket yaratish",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support/tickets/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support",
+                "tickets",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"title\": \"Sotuv yaratishda xato chiqyapti\", \"description\": \"Sotuv qilmoqchi bo'lganimda 500 xato chiqadi. Iltimos yordam bering.\", \"priority\": \"high\"}"
+            }
+          }
+        },
+        {
+          "name": "Support — Ticket detail (id=1)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support/tickets/1/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support",
+                "tickets",
+                "1",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Support — Ticket ga javob (do'kon egasi)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support/tickets/1/reply/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support",
+                "tickets",
+                "1",
+                "reply",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"message\": \"Xato hali ham davom etyapti, versiyamiz: 1.0.2\"}"
+            }
+          }
+        },
+        {
+          "name": "SuperAdmin — Barcha ticketlar",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/tickets/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "tickets",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "SuperAdmin — Ticketlar ?status=open",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/tickets?status=open/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "SuperAdmin — Ticketlar ?priority=urgent",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/tickets?priority=urgent/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "SuperAdmin — Ticket statistika",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/tickets/stats/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "tickets",
+                "stats",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "SuperAdmin — Ticket ga javob berish",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/tickets/1/reply/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "tickets",
+                "1",
+                "reply",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"message\": \"Muammoni aniqladik, tuzatish ustida ishlamoqdamiz.\"}"
+            }
+          }
+        },
+        {
+          "name": "SuperAdmin — Ticket status o'zgartirish",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/tickets/1/set-status/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "tickets",
+                "1",
+                "set-status",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\": \"resolved\"}"
+            }
+          }
+        },
+        {
+          "name": "Referral — O'z referral kodir",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/referral/my-code/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "referral",
+                "my-code",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Referral — Taklif qilganlar ro'yxati",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/referral/my-referrals/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "referral",
+                "my-referrals",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "SuperAdmin — Barcha referrallar",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/referrals/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "referrals",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "SuperAdmin — Referral statistika",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/referrals/stats/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "referrals",
+                "stats",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "SuperAdmin — Barcha workerlar",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/workers/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "workers",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "SuperAdmin — Workerlar ?store=1",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/workers?store=1/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "SuperAdmin — Worker bloklash",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/workers/1/block/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "workers",
+                "1",
+                "block",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "SuperAdmin — Worker blokdan chiqarish",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/workers/1/unblock/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "workers",
+                "1",
+                "unblock",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "SuperAdmin — Worker parol reset",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/superadmin/workers/1/reset-password/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "superadmin",
+                "workers",
+                "1",
+                "reset-password",
+                ""
+              ]
+            }
+          }
+        }
+      ]
     }
   ]
 }

@@ -13,13 +13,14 @@ from store.models import Store
 from subscription.models import Subscription, SubscriptionPlan
 from trade.models import Sale
 
-from .models import AdminExpense, Coupon, CouponUsage
+from .models import AdminExpense, Coupon, CouponUsage, Referral, StoreReferralCode, SupportTicket, TicketReply
 from .permissions import IsSuperAdmin
 from .serializers import (
     AdminExpenseSerializer,
     AdminPlanSerializer,
     AdminSubscriptionDetailSerializer,
     AdminSubscriptionListSerializer,
+    AdminWorkerListSerializer,
     ApplyCouponSerializer,
     ChangePlanSerializer,
     CouponCreateSerializer,
@@ -28,8 +29,16 @@ from .serializers import (
     CouponUsageSerializer,
     ExtendSubscriptionSerializer,
     GiveTrialSerializer,
+    ReferralListSerializer,
+    ReferralStatsSerializer,
     StoreDetailSerializer,
     StoreListSerializer,
+    StoreReferralCodeSerializer,
+    SupportTicketCreateSerializer,
+    SupportTicketDetailSerializer,
+    SupportTicketListSerializer,
+    TicketReplyCreateSerializer,
+    TicketStatusUpdateSerializer,
 )
 
 
@@ -509,3 +518,269 @@ class SuperAdminPlanViewSet(viewsets.ModelViewSet):
     permission_classes = [IsSuperAdmin]
     serializer_class   = AdminPlanSerializer
     queryset           = SubscriptionPlan.objects.order_by('price_monthly')
+
+
+# ============================================================
+# SUPPORT TICKETS — DO'KON EGASI
+# ============================================================
+
+class StoreTicketViewSet(viewsets.ModelViewSet):
+    """Do'kon egasi o'z ticketlarini ko'radi va yaratadi."""
+
+    def get_permissions(self):
+        from rest_framework.permissions import IsAuthenticated
+        return [IsAuthenticated()]
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return SupportTicketCreateSerializer
+        if self.action == 'retrieve':
+            return SupportTicketDetailSerializer
+        return SupportTicketListSerializer
+
+    def get_queryset(self):
+        from accaunt.models import Worker
+        worker = Worker.objects.filter(user=self.request.user, status='active').first()
+        if not worker or not worker.store:
+            return SupportTicket.objects.none()
+        return SupportTicket.objects.filter(store=worker.store).order_by('-created_on')
+
+    def perform_create(self, serializer):
+        from accaunt.models import Worker
+        worker = Worker.objects.filter(user=self.request.user, status='active').first()
+        serializer.save(store=worker.store)
+
+    @action(detail=True, methods=['post'])
+    def reply(self, request, pk=None):
+        ticket = self.get_object()
+        serializer = TicketReplyCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        TicketReply.objects.create(
+            ticket=ticket,
+            author=request.user,
+            message=serializer.validated_data['message'],
+            is_admin=False,
+        )
+        ticket.status = 'in_progress'
+        ticket.save()
+        return Response({'detail': "Javob yuborildi."})
+
+
+# ============================================================
+# SUPPORT TICKETS — SUPERADMIN
+# ============================================================
+
+class SuperAdminTicketViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [IsSuperAdmin]
+    queryset = SupportTicket.objects.select_related('store').order_by('-created_on')
+
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return SupportTicketDetailSerializer
+        return SupportTicketListSerializer
+
+    def get_queryset(self):
+        qs       = super().get_queryset()
+        st       = self.request.query_params.get('status')
+        priority = self.request.query_params.get('priority')
+        search   = self.request.query_params.get('search')
+        if st:
+            qs = qs.filter(status=st)
+        if priority:
+            qs = qs.filter(priority=priority)
+        if search:
+            qs = qs.filter(
+                Q(title__icontains=search) | Q(store__name__icontains=search)
+            )
+        return qs
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        from django.db.models import Avg, F, ExpressionWrapper, DurationField
+        qs = SupportTicket.objects.all()
+        resolved = qs.filter(status='resolved', resolved_at__isnull=False)
+        avg_hours = None
+        if resolved.exists():
+            avg_delta = resolved.annotate(
+                duration=ExpressionWrapper(
+                    F('resolved_at') - F('created_on'),
+                    output_field=DurationField()
+                )
+            ).aggregate(avg=Avg('duration'))['avg']
+            if avg_delta:
+                avg_hours = round(avg_delta.total_seconds() / 3600, 1)
+
+        return Response({
+            'total':       qs.count(),
+            'open':        qs.filter(status='open').count(),
+            'in_progress': qs.filter(status='in_progress').count(),
+            'resolved':    qs.filter(status='resolved').count(),
+            'closed':      qs.filter(status='closed').count(),
+            'urgent':      qs.filter(priority='urgent').count(),
+            'avg_resolve_hours': avg_hours,
+        })
+
+    @action(detail=True, methods=['post'])
+    def reply(self, request, pk=None):
+        ticket = self.get_object()
+        serializer = TicketReplyCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        TicketReply.objects.create(
+            ticket=ticket,
+            author=request.user,
+            message=serializer.validated_data['message'],
+            is_admin=True,
+        )
+        if ticket.status == 'open':
+            ticket.status = 'in_progress'
+            ticket.save()
+        return Response({'detail': "Javob yuborildi."})
+
+    @action(detail=True, methods=['patch'], url_path='set-status')
+    def set_status(self, request, pk=None):
+        ticket = self.get_object()
+        serializer = TicketStatusUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        new_status = serializer.validated_data['status']
+        ticket.status = new_status
+        if new_status == 'resolved':
+            ticket.resolved_at = timezone.now()
+        ticket.save()
+        return Response({'detail': f"Status '{new_status}' ga o'zgartirildi."})
+
+
+# ============================================================
+# REFERRAL — DO'KON EGASI
+# ============================================================
+
+class StoreReferralView(APIView):
+    """Do'kon egasi o'z referral kodini ko'radi."""
+
+    def get_permissions(self):
+        from rest_framework.permissions import IsAuthenticated
+        return [IsAuthenticated()]
+
+    def _get_store(self, request):
+        from accaunt.models import Worker
+        worker = Worker.objects.filter(user=request.user, status='active').first()
+        return worker.store if worker else None
+
+    def get(self, request):
+        store = self._get_store(request)
+        if not store:
+            return Response({'detail': "Do'kon topilmadi."}, status=404)
+        ref_obj = StoreReferralCode.get_or_create_for_store(store)
+        serializer = StoreReferralCodeSerializer(ref_obj)
+        return Response(serializer.data)
+
+
+class StoreMyReferralsView(APIView):
+    """Do'kon egasi o'zi taklif qilganlarni ko'radi."""
+
+    def get_permissions(self):
+        from rest_framework.permissions import IsAuthenticated
+        return [IsAuthenticated()]
+
+    def get(self, request):
+        from accaunt.models import Worker
+        worker = Worker.objects.filter(user=request.user, status='active').first()
+        if not worker or not worker.store:
+            return Response({'detail': "Do'kon topilmadi."}, status=404)
+        referrals = Referral.objects.filter(
+            referrer_store=worker.store
+        ).select_related('referred_store').order_by('-created_on')
+        serializer = ReferralListSerializer(referrals, many=True)
+        return Response({
+            'referrals': serializer.data,
+            'total':     referrals.count(),
+            'rewarded':  referrals.filter(status='rewarded').count(),
+        })
+
+
+# ============================================================
+# REFERRAL — SUPERADMIN
+# ============================================================
+
+class SuperAdminReferralView(APIView):
+    permission_classes = [IsSuperAdmin]
+
+    def get(self, request):
+        referrals = Referral.objects.select_related(
+            'referrer_store', 'referred_store'
+        ).order_by('-created_on')
+        st = request.query_params.get('status')
+        if st:
+            referrals = referrals.filter(status=st)
+        serializer = ReferralListSerializer(referrals, many=True)
+        return Response(serializer.data)
+
+
+class SuperAdminReferralStatsView(APIView):
+    permission_classes = [IsSuperAdmin]
+
+    def get(self, request):
+        qs = Referral.objects.all()
+        total_bonus = qs.filter(status='rewarded').aggregate(
+            total=Sum('reward_days')
+        )['total'] or 0
+        return Response({
+            'total_referrals':  qs.count(),
+            'confirmed':        qs.filter(status='confirmed').count(),
+            'rewarded':         qs.filter(status='rewarded').count(),
+            'pending':          qs.filter(status='pending').count(),
+            'total_bonus_days': total_bonus,
+        })
+
+
+# ============================================================
+# WORKERS — SUPERADMIN
+# ============================================================
+
+class SuperAdminWorkerViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [IsSuperAdmin]
+    serializer_class   = AdminWorkerListSerializer
+
+    def get_queryset(self):
+        from accaunt.models import Worker
+        qs     = Worker.objects.select_related('user', 'store').order_by('-user__date_joined')
+        store  = self.request.query_params.get('store')
+        role   = self.request.query_params.get('role')
+        search = self.request.query_params.get('search')
+        if store:
+            qs = qs.filter(store_id=store)
+        if role:
+            qs = qs.filter(role=role)
+        if search:
+            qs = qs.filter(
+                Q(user__first_name__icontains=search) |
+                Q(user__last_name__icontains=search) |
+                Q(user__email__icontains=search)
+            )
+        return qs
+
+    @action(detail=True, methods=['post'])
+    def block(self, request, pk=None):
+        worker = self.get_object()
+        worker.status = 'inactive'
+        worker.save()
+        return Response({'detail': f"Xodim bloklandi: {worker.user.get_full_name() or worker.user.email}"})
+
+    @action(detail=True, methods=['post'])
+    def unblock(self, request, pk=None):
+        worker = self.get_object()
+        worker.status = 'active'
+        worker.save()
+        return Response({'detail': f"Xodim blokdan chiqarildi: {worker.user.get_full_name() or worker.user.email}"})
+
+    @action(detail=True, methods=['post'], url_path='reset-password')
+    def reset_password(self, request, pk=None):
+        import secrets
+        worker   = self.get_object()
+        new_pass = secrets.token_urlsafe(10)
+        worker.user.set_password(new_pass)
+        worker.user.save()
+        return Response({
+            'detail':       "Parol yangilandi.",
+            'new_password': new_pass,
+            'warning':      "Bu parolni foydalanuvchiga xavfsiz yo'l bilan yetkazing.",
+        })
